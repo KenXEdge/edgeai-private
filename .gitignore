@@ -1,0 +1,14 @@
+# Secrets — never commit
+.env
+*.json
+!package.json
+!tsconfig.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
