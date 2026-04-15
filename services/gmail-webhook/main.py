@@ -394,35 +394,30 @@ Email body:
 {body}"""
 
 
-EXTRACT_PROMPT = """You are analyzing a freight broker email sent to a carrier.
-
-Return a JSON object with exactly these fields:
-{{
-  "classification": "<label>",
-  "sender_name": "<name or null>",
-  "load_origin": "<city, state or null>",
-  "load_destination": "<city, state or null>",
-  "rate_offered": "<amount or null>"
-}}
-
-Classification labels:
-- load_offer   : offering a specific load, lane, or rate
-- positive     : interested/positive but no specific load offered
-- negative     : not interested, DNC, out of network
-- question     : asking a clarifying question
-- unknown      : cannot determine intent
-
-Extraction rules:
-- sender_name: full name from email signature, null if not present
-- load_origin: pickup city/state e.g. "Dallas, TX", null if not mentioned
-- load_destination: delivery city/state e.g. "Chicago, IL", null if not mentioned
-- rate_offered: dollar rate e.g. "$2.50/mile" or "$1,500 flat", null if not mentioned
-
-Return ONLY valid JSON, no other text.
-
-Subject: {subject}
-Body:
-{body}"""
+EXTRACT_PROMPT = (
+    "You are analyzing a freight broker email sent to a carrier.\n\n"
+    "Return a JSON object with exactly these fields:\n"
+    "{\"classification\": \"<label>\", "
+    "\"sender_name\": \"<name or null>\", "
+    "\"load_origin\": \"<city, state or null>\", "
+    "\"load_destination\": \"<city, state or null>\", "
+    "\"rate_offered\": \"<amount or null>\"}\n\n"
+    "Classification labels:\n"
+    "- load_offer   : offering a specific load, lane, or rate\n"
+    "- positive     : interested/positive but no specific load offered\n"
+    "- negative     : not interested, DNC, out of network\n"
+    "- question     : asking a clarifying question\n"
+    "- unknown      : cannot determine intent\n\n"
+    "Extraction rules:\n"
+    "- sender_name: full name from email signature, null if not present\n"
+    "- load_origin: pickup city/state e.g. Dallas TX, null if not mentioned\n"
+    "- load_destination: delivery city/state e.g. Chicago IL, null if not mentioned\n"
+    "- rate_offered: dollar rate e.g. $2.50/mile or $1500 flat, null if not mentioned\n\n"
+    "Return ONLY valid JSON, no other text.\n\n"
+    "Subject: {subject}\n"
+    "Body:\n"
+    "{body}"
+)
 
 
 def classify_reply(email_data: dict) -> str:
@@ -464,18 +459,16 @@ def classify_and_extract(email_data: dict) -> dict:
         "rate_offered": None,
     }
     try:
+        subject = email_data["subject"]
+        body = email_data["body"]
+        prompt_text = (
+            EXTRACT_PROMPT[: EXTRACT_PROMPT.rfind("Subject: ")]
+            + f"Subject: {subject}\nBody:\n{body}"
+        )
         msg = anthropic_client().messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=200,
-            messages=[
-                {
-                    "role": "user",
-                    "content": EXTRACT_PROMPT.format(
-                        subject=email_data["subject"],
-                        body=email_data["body"],
-                    ),
-                }
-            ],
+            messages=[{"role": "user", "content": prompt_text}],
         )
         raw = msg.content[0].text.strip()
         extracted = json.loads(raw)
