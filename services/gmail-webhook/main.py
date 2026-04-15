@@ -9,7 +9,7 @@ import json
 import base64
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
 from email.utils import parseaddr
 
@@ -18,7 +18,6 @@ from flask import Flask, request, jsonify
 from supabase import create_client, Client
 from twilio.rest import Client as TwilioClient
 from google.oauth2.credentials import Credentials as OAuthCredentials
-from google.auth.transport.requests import Request as GoogleAuthRequest
 from googleapiclient.discovery import build
 
 # ── Structured JSON logging for Cloud Run ─────────────────────────────────────
@@ -35,7 +34,6 @@ app = Flask(__name__)
 _supabase: Client | None = None
 _anthropic: anthropic.Anthropic | None = None
 _twilio: TwilioClient | None = None
-_gmail = None  # googleapiclient resource
 
 
 def supabase_client() -> Client:
@@ -66,40 +64,19 @@ def twilio_client() -> TwilioClient:
 
 
 def gmail_service():
-    """
-    Build Gmail API service using OAuth 2.0 refresh token.
-    Reads GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_OAUTH_REFRESH_TOKEN
-    from environment. Token is refreshed eagerly on first use so any
-    credential errors surface at startup rather than mid-request.
-    """
-    global _gmail
-    if _gmail is None:
-        log.info('"building gmail OAuth credentials — user=%s"', os.environ.get("GMAIL_USER"))
-
-        creds = OAuthCredentials(
-            token=None,
-            refresh_token=os.environ["GMAIL_OAUTH_REFRESH_TOKEN"],
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.environ["GMAIL_CLIENT_ID"],
-            client_secret=os.environ["GMAIL_CLIENT_SECRET"],
-            scopes=["https://www.googleapis.com/auth/gmail.modify"],
-        )
-
-        creds.refresh(GoogleAuthRequest())
-        log.info('"OAuth token refreshed — valid=%s"', creds.valid)
-
-        _gmail = build("gmail", "v1", credentials=creds, cache_discovery=False)
-
-        try:
-            profile = _gmail.users().getProfile(userId="me").execute()
-            log.info('"OAuth verified — connectedAs=%s messagesTotal=%s"',
-                     profile.get("emailAddress"), profile.get("messagesTotal"))
-        except Exception as exc:
-            log.error('"OAuth verification FAILED — %s"', exc)
-            _gmail = None
-            raise
-
-    return _gmail
+    import google.auth.transport.requests as google_requests
+    import requests as requests_lib
+    creds = OAuthCredentials(
+        token=None,
+        refresh_token=os.environ["GMAIL_OAUTH_REFRESH_TOKEN"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.environ["GMAIL_CLIENT_ID"],
+        client_secret=os.environ["GMAIL_CLIENT_SECRET"],
+        scopes=["https://www.googleapis.com/auth/gmail.modify"],
+    )
+    auth_req = google_requests.Request(session=requests_lib.Session())
+    creds.refresh(auth_req)
+    return build("gmail", "v1", credentials=creds, cache_discovery=False)
 
 
 # ── Gmail helpers ──────────────────────────────────────────────────────────────
@@ -153,7 +130,7 @@ def get_unread_messages() -> list[dict]:
             .messages()
             .list(
                 userId="me",
-                q="in:inbox newer_than:1h",
+                q="in:inbox is:unread newer_than:2d",
                 maxResults=10,
             )
             .execute()
@@ -307,18 +284,25 @@ def is_duplicate(message_id: str) -> bool:
 
 
 def log_response(email_data: dict, classification: str) -> None:
-    supabase_client().table("responses").insert(
-        {
-            "gmail_message_id": email_data["message_id"],
-            "thread_id": email_data["thread_id"],
-            "broker_email": email_data["from_email"],
-            "subject": email_data["subject"],
-            "body": email_data["body"],
-            "classification": classification,
-            "carrier_id": os.environ["CARRIER_UUID"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-    ).execute()
+    try:
+        supabase_client().table("responses").insert(
+            {
+                "gmail_message_id": email_data["message_id"],
+                "thread_id": email_data["thread_id"],
+                "broker_email": email_data["from_email"],
+                "subject": email_data["subject"],
+                "body": email_data["body"],
+                "classification": classification,
+                "carrier_id": os.environ["CARRIER_UUID"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ).execute()
+    except Exception as exc:
+        if "23505" in str(exc) or "duplicate key" in str(exc):
+            log.info('"log_response duplicate — already processed messageId=%s"',
+                     email_data["message_id"])
+            return
+        raise
 
 
 def log_load_win(email_data: dict) -> None:
@@ -550,6 +534,37 @@ def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
         log.error('"send_unknown_broker_sms failed: %s"', exc)
 
 
+# ── Thread helpers ────────────────────────────────────────────────────────────
+
+def has_carrier_replied(thread_id: str) -> bool:
+    """Return True if the carrier's own Gmail account has sent a message in this thread.
+    Checks thread message headers for GMAIL_USER as the From address.
+    Returns False on any exception so SMS is never suppressed due to an API error.
+    """
+    try:
+        thread = (
+            gmail_service()
+            .users()
+            .threads()
+            .get(
+                userId="me",
+                id=thread_id,
+                format="metadata",
+                metadataHeaders=["From"],
+            )
+            .execute()
+        )
+        carrier_email = os.environ.get("GMAIL_USER", "").lower()
+        for message in thread.get("messages", []):
+            headers = message.get("payload", {}).get("headers", [])
+            for h in headers:
+                if h.get("name", "").lower() == "from" and carrier_email in h.get("value", "").lower():
+                    return True
+    except Exception as exc:
+        log.error('"has_carrier_replied failed thread=%s: %s"', thread_id, exc)
+    return False
+
+
 # ── Core processing pipeline ───────────────────────────────────────────────────
 
 def process_message(message_id: str) -> None:
@@ -559,6 +574,7 @@ def process_message(message_id: str) -> None:
     # Prevents 150x replay: if the message is already in either table, stop immediately.
     if is_duplicate(message_id):
         log.info('"duplicate message %s — skipping"', message_id)
+        mark_as_read(message_id)
         return
 
     # Step 2 — fetch email content from Gmail API
@@ -583,8 +599,11 @@ def process_message(message_id: str) -> None:
         log_response(email_data, classification)
 
         if classification == "load_offer":
-            send_load_offer_sms(email_data)
-            log_load_win(email_data)
+            if not has_carrier_replied(email_data["thread_id"]):
+                send_load_offer_sms(email_data)
+            else:
+                log.info('"SMS suppressed — carrier already replied in thread=%s"',
+                         email_data["thread_id"])
 
         update_broker_status(broker["id"], classification)
 
@@ -597,7 +616,11 @@ def process_message(message_id: str) -> None:
         classification = extracted.get("classification", "unknown")
         log.info('"unknown broker classified %s as %s"', message_id, classification)
 
-        # Insert into unknown_brokers_inbox FIRST — this is the dedup record.
+        if classification in ("negative", "unknown"):
+            log.info('"unknown broker discarded — classification=%s sender=%s"',
+                     classification, email_data["from_email"])
+            return
+
         log_unknown_broker_inbox(email_data, extracted)
 
         if classification == "load_offer":
@@ -697,6 +720,432 @@ def webhook():
 def health():
     """Cloud Run health check."""
     return jsonify({"status": "ok", "service": "edgeai-gmail-webhook"}), 200
+
+
+@app.route("/confirm-win", methods=["POST"])
+def confirm_win():
+    """
+    Dashboard calls this when a carrier confirms a load offer as won.
+    Marks the response row load_accepted=true and logs it to load_wins.
+    Never returns 5xx.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        message_id = data.get("message_id")
+        if not message_id:
+            return jsonify({"error": "message_id required"}), 400
+
+        resp = (
+            supabase_client()
+            .table("responses")
+            .select("*")
+            .eq("gmail_message_id", message_id)
+            .eq("carrier_id", os.environ["CARRIER_UUID"])
+            .limit(1)
+            .execute()
+        )
+
+        if not resp.data:
+            return jsonify({"error": "not found"}), 404
+
+        row = resp.data[0]
+
+        if row["classification"] != "load_offer":
+            return jsonify({"error": "not a load offer"}), 400
+
+        supabase_client().table("responses").update(
+            {"load_accepted": True}
+        ).eq("gmail_message_id", message_id).execute()
+
+        log_load_win({
+            "from_email": row["broker_email"],
+            "subject": row["subject"],
+            "body": row["body"],
+            "message_id": row["gmail_message_id"],
+        })
+
+        return jsonify({"ok": True, "win_logged": True}), 200
+
+    except Exception as exc:
+        log.error('"confirm_win — unhandled exception: %s"', exc, exc_info=True)
+        return jsonify({"ok": False, "error": "internal error"}), 200
+
+
+@app.route("/renew-watches", methods=["POST"])
+def renew_watches():
+    """
+    Renew Gmail Watch subscriptions for all emails tracked in gmail_sync.
+    Gmail Watch expires every 7 days — invoke weekly via Cloud Scheduler.
+    Always returns 200 so Cloud Scheduler does not retry on error.
+    """
+    count_success = 0
+    count_errors = 0
+
+    try:
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT", "edgeai-493115")
+        topic_name = f"projects/{project}/topics/edgeai-gmail"
+
+        # Fetch all tracked email addresses
+        resp = supabase_client().table("gmail_sync").select("email").execute()
+        emails = [row["email"] for row in (resp.data or [])]
+
+        if not emails:
+            log.warning('"renew_watches — no rows in gmail_sync, nothing to renew"')
+            return jsonify({"renewed": 0, "errors": 0}), 200
+
+        for email in emails:
+            try:
+                result = (
+                    gmail_service()
+                    .users()
+                    .watch(
+                        userId="me",
+                        body={"topicName": topic_name, "labelIds": ["INBOX"]},
+                    )
+                    .execute()
+                )
+                new_history_id = str(result.get("historyId", ""))
+                if new_history_id:
+                    upsert_history_id(email, new_history_id)
+                log.info('"renew_watches — renewed email=%s historyId=%s expiration=%s"',
+                         email, new_history_id, result.get("expiration"))
+                count_success += 1
+            except Exception as exc:
+                log.error('"renew_watches — failed for email=%s: %s"', email, exc)
+                count_errors += 1
+
+    except Exception as exc:
+        log.error('"renew_watches — unhandled exception: %s"', exc, exc_info=True)
+        return jsonify({"renewed": 0, "errors": 1}), 200
+
+    return jsonify({"renewed": count_success, "errors": count_errors}), 200
+
+
+@app.route("/extract-brokers", methods=["POST"])
+def extract_brokers():
+    """
+    Scan SENT emails for broker contacts not yet in the brokers table.
+    Accepts JSON body: {"carrier_id": "<uuid>", "days": <int>}.
+
+    Pipeline:
+      1. Page through SENT message IDs (messages.list, no body download)
+      2. Metadata fetch per message (To: + Subject: headers only — fast path)
+      3. Deduplicate recipient emails; batch-check against brokers table
+      4. Claude called ONCE per unique unknown email to enrich contact details
+    Never returns 5xx.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+
+        carrier_id = data.get("carrier_id")
+        if not carrier_id:
+            return jsonify({"error": "carrier_id required"}), 400
+
+        carrier_resp = (
+            supabase_client()
+            .table("carriers")
+            .select("*")
+            .eq("id", carrier_id)
+            .limit(1)
+            .execute()
+        )
+        if not carrier_resp.data:
+            return jsonify({"error": "carrier not found"}), 404
+        carrier = carrier_resp.data[0]
+
+        days = int(data.get("days", 7))
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y/%m/%d")
+
+        # ── Build per-carrier Gmail service ───────────────────────────────────
+        refresh_token = carrier.get("gmail_token") or os.environ["GMAIL_OAUTH_REFRESH_TOKEN"]
+        import google.auth.transport.requests as google_requests
+        import requests as requests_lib
+        carrier_creds = OAuthCredentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.environ["GMAIL_CLIENT_ID"],
+            client_secret=os.environ["GMAIL_CLIENT_SECRET"],
+            scopes=["https://www.googleapis.com/auth/gmail.modify"],
+        )
+        carrier_creds.refresh(google_requests.Request(session=requests_lib.Session()))
+        svc = build("gmail", "v1", credentials=carrier_creds, cache_discovery=False)
+
+        # ── Step 1: Page through SENT message IDs ─────────────────────────────
+        message_ids: list[str] = []
+        page_token = None
+        pages_fetched = 0
+
+        while True:
+            list_kwargs: dict = {
+                "userId": "me",
+                "labelIds": ["SENT"],
+                "q": f"after:{cutoff_date}",
+                "maxResults": 500,
+            }
+            if page_token:
+                list_kwargs["pageToken"] = page_token
+
+            try:
+                list_resp = svc.users().messages().list(**list_kwargs).execute()
+            except Exception as exc:
+                log.error('"extract_brokers — gmail list failed page=%d: %s"', pages_fetched + 1, exc)
+                break
+
+            pages_fetched += 1
+            batch = list_resp.get("messages", [])
+            message_ids.extend(m["id"] for m in batch)
+            page_token = list_resp.get("nextPageToken")
+            log.info(
+                '"extract_brokers — pages_fetched=%d page_size=%d total_ids=%d"',
+                pages_fetched, len(batch), len(message_ids),
+            )
+            if not page_token:
+                break
+
+        log.info('"extract_brokers — step1 done pages=%d messages_scanned=%d"',
+                 pages_fetched, len(message_ids))
+
+        # ── Step 2: Metadata fetch — batched 100 IDs per chunk ───────────────────
+        # email -> list of unique subjects seen across all messages sent to them
+        email_subjects: dict[str, list[str]] = {}
+        # email -> display name captured from To: header
+        email_names: dict[str, str] = {}
+
+        _NOISE_DOMAINS = {
+            "apple.com", "icloud.com", "google.com", "gmail.com",
+            "microsoft.com", "outlook.com", "hotmail.com",
+            "amazonaws.com", "twilio.com", "supabase.io", "stripe.com",
+            "anthropic.com", "github.com", "squarespace.com",
+            "highway.com", "truckstop.com", "dat.com",
+            "sylectus.com", "omnitracs.com", "paypal.com",
+            "ntgfreight.com", "e.truckstop.com", "spotinc.com",
+            "prdlax.com", "loadmatches.com", "notifications.com",
+            "macropoint.com", "fourkites.com", "project44.com",
+            "keeptruckin.com", "motive.com", "samsara.com",
+            "irs.gov", "dol.gov", "fmcsa.dot.gov",
+            "xtxtransport.com", "xedge-ai.com",
+        }
+        _CHUNK_SIZE = 100
+
+        def _handle_meta(request_id, response, exception):
+            if exception or not response:
+                log.error('"extract_brokers — metadata fetch failed id=%s: %s"', request_id, exception)
+                return
+            headers = response.get("payload", {}).get("headers", [])
+            to_val = subject_val = ""
+            for h in headers:
+                name_lower = h.get("name", "").lower()
+                if name_lower == "to":
+                    to_val = h.get("value", "")
+                elif name_lower == "subject":
+                    subject_val = h.get("value", "")
+            if not to_val:
+                return
+            to_name, to_email = parseaddr(to_val)
+            to_email = to_email.lower().strip()
+            if not to_email:
+                return
+            domain = to_email.split("@")[-1] if "@" in to_email else ""
+            if domain in _NOISE_DOMAINS:
+                return
+            if to_email not in email_names and to_name:
+                email_names[to_email] = to_name.strip()
+            if to_email not in email_subjects:
+                email_subjects[to_email] = []
+            if subject_val and subject_val not in email_subjects[to_email]:
+                email_subjects[to_email].append(subject_val)
+
+        chunks = [message_ids[i:i + _CHUNK_SIZE] for i in range(0, len(message_ids), _CHUNK_SIZE)]
+        for chunk_idx, chunk in enumerate(chunks):
+            batch = svc.new_batch_http_request(callback=_handle_meta)
+            for msg_id in chunk:
+                batch.add(
+                    svc.users().messages().get(
+                        userId="me",
+                        id=msg_id,
+                        format="metadata",
+                        metadataHeaders=["To", "Subject"],
+                    ),
+                    request_id=msg_id,
+                )
+            try:
+                batch.execute()
+            except Exception as exc:
+                log.error('"extract_brokers — batch execute failed chunk=%d: %s"', chunk_idx + 1, exc)
+            log.info(
+                '"extract_brokers — step2 chunk=%d/%d msgs_processed=%d unique_emails=%d"',
+                chunk_idx + 1, len(chunks), min((chunk_idx + 1) * _CHUNK_SIZE, len(message_ids)), len(email_subjects),
+            )
+
+        unique_emails = list(email_subjects.keys())
+        log.info('"extract_brokers — step2 done unique_emails=%d"', len(unique_emails))
+
+        # ── Step 3: Batch-check which recipients are already in network ────────
+        known_resp = (
+            supabase_client()
+            .table("brokers")
+            .select("email")
+            .eq("carrier_id", carrier_id)
+            .execute()
+        )
+        known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
+
+        unknown_emails = [e for e in unique_emails if e not in known_set]
+        already_in_network = len(unique_emails) - len(unknown_emails)
+        log.info(
+            '"extract_brokers — step3 done already_in_network=%d unknown=%d"',
+            already_in_network, len(unknown_emails),
+        )
+
+        # ── Step 4: Claude enrichment — ONE call per unique unknown email ──────
+        brokers = []
+        enrich_count = 0
+
+        for email in unknown_emails:
+            subjects_str = "; ".join(email_subjects[email][:5]) or "none"
+            to_name = email_names.get(email)
+            prompt_text = (
+                "Given the broker's email address, display name (if known), "
+                "and subjects of emails sent to them, extract what you can.\n\n"
+                "Return a JSON object with exactly these fields:\n"
+                "{\"name\": \"first last or null\", "
+                "\"title\": \"job title or null\", "
+                "\"company\": \"company name or null\", "
+                "\"mobile\": \"mobile phone or null\", "
+                "\"direct\": \"direct phone or null\"}\n\n"
+                "Return ONLY valid JSON, no other text.\n\n"
+                f"Email: {email}\n"
+                f"Name hint: {to_name or ''}\n"
+                f"Subjects: {subjects_str}"
+            )
+            try:
+                claude_msg = anthropic_client().messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=200,
+                    messages=[{"role": "user", "content": prompt_text}],
+                )
+                enriched = json.loads(claude_msg.content[0].text.strip())
+                enrich_count += 1
+            except Exception as exc:
+                log.error('"extract_brokers — enrich failed email=%s: %s"', email, exc)
+                enriched = {}
+
+            brokers.append({
+                "email": email,
+                "name": enriched.get("name") or to_name or None,
+                "title": enriched.get("title"),
+                "company": enriched.get("company"),
+                "mobile": enriched.get("mobile"),
+                "direct": enriched.get("direct"),
+            })
+
+        log.info(
+            '"extract_brokers — step4 done claude_enrichments=%d final_broker_count=%d"',
+            enrich_count, len(brokers),
+        )
+
+        return jsonify({
+            "ok": True,
+            "brokers": brokers,
+            "total": len(brokers),
+            "messages_scanned": len(message_ids),
+            "already_in_network": already_in_network,
+        }), 200
+
+    except Exception as exc:
+        log.error('"extract_brokers — unhandled exception: %s"', exc, exc_info=True)
+        return jsonify({"ok": False, "error": "internal error", "brokers": []}), 200
+
+
+@app.route("/import-brokers", methods=["POST"])
+def import_brokers():
+    """
+    Import enriched broker contacts into the brokers table.
+    Accepts JSON body: {"carrier_id": "<uuid>", "brokers": [...]}.
+    Each broker dict may contain: email, name, company, mobile, direct.
+    Always returns 200.
+    """
+    imported = 0
+    duplicates = 0
+    errors = 0
+    total = 0
+
+    try:
+        data = request.get_json(silent=True) or {}
+
+        carrier_id = data.get("carrier_id")
+        if not carrier_id:
+            return jsonify({"error": "carrier_id required"}), 400
+
+        broker_list = data.get("brokers")
+        if not broker_list or not isinstance(broker_list, list):
+            return jsonify({"error": "brokers list required"}), 400
+
+        total = len(broker_list)
+
+        # Pre-fetch existing emails for this carrier to detect duplicates without
+        # relying on DB constraint errors in the hot path.
+        existing_resp = (
+            supabase_client()
+            .table("brokers")
+            .select("email")
+            .eq("carrier_id", carrier_id)
+            .execute()
+        )
+        existing_set: set[str] = {row["email"].lower() for row in (existing_resp.data or [])}
+
+        for broker in broker_list:
+            email = (broker.get("email") or "").lower().strip()
+            if not email:
+                log.error('"import_brokers — skipping entry with no email"')
+                errors += 1
+                continue
+
+            if email in existing_set:
+                duplicates += 1
+                continue
+
+            try:
+                supabase_client().table("brokers").insert({
+                    "carrier_id": carrier_id,
+                    "email": email,
+                    "name": broker.get("name"),
+                    "company": broker.get("company"),
+                    "phone": broker.get("mobile") or broker.get("direct"),
+                    "status": "warm",
+                    "priority": "medium",
+                    "days_cadence": 3,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }).execute()
+                existing_set.add(email)
+                imported += 1
+            except Exception as exc:
+                log.error('"import_brokers — insert failed email=%s: %s"', email, exc)
+                errors += 1
+
+        log.info(
+            '"import_brokers — done imported=%d duplicates=%d errors=%d total=%d"',
+            imported, duplicates, errors, total,
+        )
+
+        return jsonify({
+            "ok": True,
+            "imported": imported,
+            "duplicates": duplicates,
+            "errors": errors,
+            "total": total,
+        }), 200
+
+    except Exception as exc:
+        log.error('"import_brokers — unhandled exception: %s"', exc, exc_info=True)
+        return jsonify({
+            "ok": False,
+            "imported": imported,
+            "duplicates": duplicates,
+            "errors": errors,
+            "total": total,
+        }), 200
 
 
 if __name__ == "__main__":
