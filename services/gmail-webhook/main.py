@@ -283,20 +283,23 @@ def is_duplicate(message_id: str) -> bool:
     return in_unknown
 
 
-def log_response(email_data: dict, classification: str) -> None:
+def log_response(email_data: dict, classification: str, broker_id: str | None = None, broker_name: str | None = None) -> None:
     try:
-        supabase_client().table("responses").insert(
-            {
-                "gmail_message_id": email_data["message_id"],
-                "thread_id": email_data["thread_id"],
-                "broker_email": email_data["from_email"],
-                "subject": email_data["subject"],
-                "body": email_data["body"],
-                "classification": classification,
-                "carrier_id": os.environ["CARRIER_UUID"],
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ).execute()
+        row = {
+            "gmail_message_id": email_data["message_id"],
+            "thread_id": email_data["thread_id"],
+            "broker_email": email_data["from_email"],
+            "subject": email_data["subject"],
+            "body": email_data["body"],
+            "classification": classification,
+            "carrier_id": os.environ["CARRIER_UUID"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if broker_id is not None:
+            row["broker_id"] = broker_id
+        if broker_name is not None:
+            row["broker_name"] = broker_name
+        supabase_client().table("responses").insert(row).execute()
     except Exception as exc:
         if "23505" in str(exc) or "duplicate key" in str(exc):
             log.info('"log_response duplicate — already processed messageId=%s"',
@@ -596,7 +599,7 @@ def process_message(message_id: str) -> None:
 
         # Insert into responses FIRST — this is the dedup record.
         # Must succeed before SMS so that any retry finds it and stops.
-        log_response(email_data, classification)
+        log_response(email_data, classification, broker_id=broker.get("id"), broker_name=broker.get("name"))
 
         if classification == "load_offer":
             if not has_carrier_replied(email_data["thread_id"]):
