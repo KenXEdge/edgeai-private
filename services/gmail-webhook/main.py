@@ -462,8 +462,15 @@ def classify_and_extract(email_data: dict) -> dict:
         subject = email_data["subject"]
         body = email_data["body"]
         prompt_text = (
-            EXTRACT_PROMPT[: EXTRACT_PROMPT.rfind("Subject: ")]
-            + f"Subject: {subject}\nBody:\n{body}"
+            "You are analyzing a freight broker email sent to a carrier.\n\n"
+            "Return ONLY valid JSON with these exact fields:\n"
+            "{\"classification\": \"\", \"sender_name\": null, "
+            "\"load_origin\": null, \"load_destination\": null, "
+            "\"rate_offered\": null}\n\n"
+            "classification must be exactly one of: load_offer, positive, "
+            "negative, question, unknown\n\n"
+            f"Subject: {subject}\n"
+            f"Body:\n{body[:3000]}"
         )
         msg = anthropic_client().messages.create(
             model="claude-haiku-4-5-20251001",
@@ -478,7 +485,10 @@ def classify_and_extract(email_data: dict) -> dict:
             extracted["classification"] = "unknown"
         return extracted
     except Exception as exc:
-        log.error('"classify_and_extract failed: %s"', exc)
+        log.error('"classify_and_extract failed: %s"', str(exc))
+        if hasattr(exc, 'response'):
+            log.error('"classify_and_extract response body: %s"',
+                      exc.response.text if hasattr(exc.response, 'text') else str(exc.response))
         return fallback
 
 
