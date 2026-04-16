@@ -79,6 +79,30 @@ def gmail_service():
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
 
 
+# ── Load board constants ───────────────────────────────────────────────────────
+
+LOAD_BOARD_SENDERS: dict[str, str] = {
+    "noreply@spotinc.com":         "Spot",
+    "loadmatches@ntgfreight.com":  "NTG",
+    "ftl-projects@prdlax.com":     "NTG",
+    "alerts@dat.com":              "DAT",
+    "notifications@truckstop.com": "Truckstop",
+}
+
+LOAD_BOARD_PARSE_PROMPT = (
+    "You are a freight load board email parser. Extract the following fields from the email body.\n"
+    "Return ONLY valid JSON. No markdown, no preamble, no explanation.\n\n"
+    "Fields:\n"
+    "- equipment_type: string (e.g. 'Dry Van', 'Reefer', 'Flatbed') or null\n"
+    "- origin: string (City ST format, e.g. 'Dallas TX') or null\n"
+    "- destination: string (City ST format, e.g. 'Oklahoma City OK') or null\n"
+    "- mileage: integer or null\n"
+    "- pickup_date: string (e.g. '4/27') or null\n"
+    "- shipment_number: string or null\n\n"
+    "Email body:\n{body}"
+)
+
+
 # ── Gmail helpers ──────────────────────────────────────────────────────────────
 
 def get_history(start_history_id: str) -> list[dict]:
@@ -540,6 +564,113 @@ def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
         log.error('"send_unknown_broker_sms failed: %s"', exc)
 
 
+# ── Load board helpers ────────────────────────────────────────────────────────
+
+def is_load_board_email(from_email: str) -> bool:
+    """Return True if the sender is a known load board system address."""
+    return from_email.lower().strip() in LOAD_BOARD_SENDERS
+
+
+def parse_load_board_email(email_data: dict) -> dict:
+    """Call Claude to extract structured fields from a load board email.
+    Returns dict with keys: equipment_type, origin, destination, mileage,
+    pickup_date, shipment_number. All values may be None on parse failure.
+    """
+    fallback = {
+        "equipment_type": None,
+        "origin": None,
+        "destination": None,
+        "mileage": None,
+        "pickup_date": None,
+        "shipment_number": None,
+    }
+    try:
+        body = email_data["body"]
+        prompt_text = (
+            LOAD_BOARD_PARSE_PROMPT[: LOAD_BOARD_PARSE_PROMPT.rfind("Email body:")]
+            + f"Email body:\n{body[:3000]}"
+        )
+        msg = anthropic_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt_text}],
+        )
+        parsed = json.loads(msg.content[0].text.strip())
+        return parsed
+    except Exception as exc:
+        log.error('"parse_load_board_email failed: %s"', str(exc))
+        return fallback
+
+
+def get_carrier_profile() -> dict | None:
+    """Query the carriers table for the current carrier's profile.
+    Returns the first row (equipment_type, max_radius, home_base_zip) or None.
+    """
+    try:
+        resp = (
+            supabase_client()
+            .table("carriers")
+            .select("equipment_type, max_radius, home_base_zip")
+            .eq("id", os.environ["CARRIER_UUID"])
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return resp.data[0]
+    except Exception as exc:
+        log.error('"get_carrier_profile failed: %s"', exc)
+    return None
+
+
+def load_board_matches_carrier(parsed: dict, carrier: dict) -> bool:
+    """Return True if the load's equipment type matches the carrier's.
+    Case-insensitive substring check — e.g. carrier 'Dry Van' matches load 'dry van'.
+    Logs and returns False on mismatch.
+    """
+    carrier_equip = (carrier.get("equipment_type") or "").lower()
+    load_equip = (parsed.get("equipment_type") or "").lower()
+    if not carrier_equip or not load_equip:
+        return True  # no data to disqualify on — let it through
+    if carrier_equip in load_equip or load_equip in carrier_equip:
+        return True
+    log.info(
+        '"load_board_matches_carrier — mismatch carrier_equip=%s load_equip=%s"',
+        carrier_equip, load_equip,
+    )
+    return False
+
+
+def send_load_board_sms(email_data: dict, parsed: dict, board_name: str) -> None:
+    """Send a load board alert SMS to the carrier."""
+    origin = parsed.get("origin") or "?"
+    destination = parsed.get("destination") or "?"
+    mileage = parsed.get("mileage")
+    equip = parsed.get("equipment_type") or "?"
+    pickup = parsed.get("pickup_date") or "?"
+    shipment = parsed.get("shipment_number") or "?"
+
+    body = (
+        f"{board_name.upper()} ALERT — "
+        f"{origin} to {destination} — "
+        f"{mileage} mi — "
+        f"{equip} — "
+        f"Pickup {pickup} — "
+        f"Shipment {shipment}"
+    )
+    try:
+        twilio_client().messages.create(
+            body=body,
+            from_=os.environ["TWILIO_FROM"],
+            to=os.environ["TWILIO_TO"],
+        )
+        log.info(
+            '"SMS sent — load board alert board=%s shipment=%s"',
+            board_name, shipment,
+        )
+    except Exception as exc:
+        log.error('"send_load_board_sms failed: %s"', exc)
+
+
 # ── Thread helpers ────────────────────────────────────────────────────────────
 
 def has_carrier_replied(thread_id: str) -> bool:
@@ -589,6 +720,27 @@ def process_message(message_id: str) -> None:
         return
 
     log.info('"processing message %s from %s"', message_id, email_data["from_email"])
+
+    # Step 3a — load board intercept (before broker lookup)
+    if is_load_board_email(email_data["from_email"]):
+        board_name = LOAD_BOARD_SENDERS[email_data["from_email"].lower().strip()]
+        log.info('"load board email detected board=%s message=%s"', board_name, message_id)
+
+        parsed = parse_load_board_email(email_data)
+        if parsed is None:
+            log.error('"load board parse failed — skipping message=%s"', message_id)
+            mark_as_read(message_id)
+            return
+        carrier = get_carrier_profile()
+
+        if carrier and not load_board_matches_carrier(parsed, carrier):
+            log.info('"load board message skipped — equipment mismatch message=%s"', message_id)
+            mark_as_read(message_id)
+            return
+
+        send_load_board_sms(email_data, parsed, board_name)
+        mark_as_read(message_id)
+        return
 
     # Step 3 — broker lookup determines which path to take
     broker = lookup_broker(email_data["from_email"])
