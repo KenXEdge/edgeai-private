@@ -742,6 +742,24 @@ def process_message(message_id: str) -> None:
         mark_as_read(message_id)
         return
 
+    # ── Pre-Claude noise filter — discard before API call ─────────────────────
+    _sender = email_data["from_email"]
+    _subject = email_data["subject"].lower()
+    _domain = _sender.split("@")[-1] if "@" in _sender else ""
+    _noise_senders = {"system@ucr.gov"}
+    _noise_domains = {"apple.com", "icloud.com"}
+    _noise_subjects = {
+        "invoice", "statement", "payment due", "remittance",
+        "pod", "proof of delivery", "signed bol", "bill of lading", "receipt",
+    }
+    if (
+        _sender in _noise_senders
+        or _domain in _noise_domains
+        or any(kw in _subject for kw in _noise_subjects)
+    ):
+        mark_as_read(message_id)
+        return
+
     # Step 3 — broker lookup determines which path to take
     broker = lookup_broker(email_data["from_email"])
 
