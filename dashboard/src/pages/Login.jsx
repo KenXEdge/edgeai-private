@@ -163,6 +163,7 @@ export default function Login() {
                   <button onClick={() => { setSignupSent(false); switchMode('signin') }} style={{fontSize:'13px',color:'#185FA5',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Back to sign in</button>
                 </div>
               ) : (
+              <>
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div>
                   <label className={labelClass}>First name</label>
@@ -194,6 +195,7 @@ export default function Login() {
                   Already have an account? Sign in
                 </button>
               </div>
+              </>
               )}
             </>
           )}
