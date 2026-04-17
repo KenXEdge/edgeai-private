@@ -1,18 +1,39 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    // TODO: supabase.auth.signInWithPassword({ email, password })
-    console.log('login', { email, password })
+    setError(null)
+    setLoading(true)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    setLoading(false)
+    if (error) {
+      setError(error.message)
+    } else {
+      navigate('/carrier')
+    }
   }
 
-  function handleGoogleLogin() {
-    // TODO: supabase.auth.signInWithOAuth({ provider: 'google' })
-    console.log('google oauth')
+  async function handleGoogleLogin() {
+    setError(null)
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/carrier' }
+    })
+    if (error) setError(error.message)
   }
 
   return (
@@ -31,11 +52,15 @@ export default function Login() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <h2 className="text-lg font-semibold text-slate-800 mb-6">Sign in to your account</h2>
 
+          {error && (
+            <div className="mb-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <input
                 type="email"
                 required
@@ -47,9 +72,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <input
                 type="password"
                 required
@@ -62,9 +85,10 @@ export default function Login() {
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 bg-[#185FA5] hover:bg-[#0C447C] text-white text-sm font-semibold rounded-lg transition-colors duration-150"
+              disabled={loading}
+              className="w-full py-2.5 px-4 bg-[#185FA5] hover:bg-[#0C447C] text-white text-sm font-semibold rounded-lg transition-colors duration-150 disabled:opacity-50"
             >
-              Sign In
+              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
