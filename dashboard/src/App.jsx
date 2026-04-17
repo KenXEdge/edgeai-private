@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import CarrierHome from './pages/carrier/Home'
 import Layout from './components/Layout'
 
@@ -15,7 +16,9 @@ function RequireAuth({ children }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session)
+    })
     return () => subscription.unsubscribe()
   }, [])
 
@@ -34,6 +37,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route
           path="/carrier"
