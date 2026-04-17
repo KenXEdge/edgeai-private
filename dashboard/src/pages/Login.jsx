@@ -8,8 +8,9 @@ const supabase = createClient(
 )
 
 export default function Login() {
-  const [mode, setMode] = useState('signin') // 'signin' | 'signup' | 'forgot'
-  const [name, setName] = useState('')
+  const [mode, setMode] = useState('signin')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -43,10 +44,12 @@ export default function Login() {
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     setLoading(true)
 
+    const fullName = `${firstName} ${lastName}`.trim()
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } }
+      options: { data: { full_name: fullName } }
     })
 
     if (error) { setError(error.message); setLoading(false); return }
@@ -54,7 +57,7 @@ export default function Login() {
     if (data.user) {
       await supabase.from('carriers').insert({
         id: data.user.id,
-        name,
+        name: fullName,
         email,
         subscription_status: 'trial',
         subscription_tier: 'base',
@@ -93,6 +96,9 @@ export default function Login() {
     forgot: 'Reset your password',
   }
 
+  const inputClass = "w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent"
+  const labelClass = "block text-sm font-medium text-slate-700 mb-1"
+
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -109,9 +115,7 @@ export default function Login() {
           <h2 className="text-lg font-semibold text-slate-800 mb-6">{titles[mode]}</h2>
 
           {error && (
-            <div className="mb-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-              {error}
-            </div>
+            <div className="mb-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
           )}
 
           {/* ── Sign In ── */}
@@ -119,14 +123,12 @@ export default function Login() {
             <>
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent" />
+                  <label className={labelClass}>Email</label>
+                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                  <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent" />
+                  <label className={labelClass}>Password</label>
+                  <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
                 </div>
                 <button type="submit" disabled={loading}
                   className="w-full py-2.5 px-4 bg-[#185FA5] hover:bg-[#0C447C] text-white text-sm font-semibold rounded-lg transition-colors duration-150 disabled:opacity-50">
@@ -138,8 +140,8 @@ export default function Login() {
                 <button onClick={() => switchMode('forgot')} className="text-sm text-slate-400 hover:text-slate-600">
                   Forgot password?
                 </button>
-                <button onClick={() => switchMode('signup')} className="text-sm text-[#185FA5] hover:text-[#0C447C] font-semibold">
-                  Get Started — Create Account
+                <button onClick={() => switchMode('signup')} className="text-sm text-[#185FA5] hover:text-[#0C447C] font-medium">
+                  New? Register <span className="font-bold underline">HERE</span>
                 </button>
               </div>
 
@@ -166,31 +168,30 @@ export default function Login() {
             <>
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Full name</label>
-                  <input type="text" required value={name} onChange={e => setName(e.target.value)} placeholder="Ken Korbel"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent" />
+                  <label className={labelClass}>First name</label>
+                  <input type="text" required value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Ken" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent" />
+                  <label className={labelClass}>Last name</label>
+                  <input type="text" required value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Korbel" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                  <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent" />
+                  <label className={labelClass}>Email</label>
+                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Confirm password</label>
-                  <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat password"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent" />
+                  <label className={labelClass}>Password</label>
+                  <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Confirm password</label>
+                  <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat password" className={inputClass} />
                 </div>
                 <button type="submit" disabled={loading}
                   className="w-full py-2.5 px-4 bg-[#185FA5] hover:bg-[#0C447C] text-white text-sm font-semibold rounded-lg transition-colors duration-150 disabled:opacity-50">
                   {loading ? 'Creating account...' : 'Create Account'}
                 </button>
               </form>
-
               <div className="mt-4 text-center">
                 <button onClick={() => switchMode('signin')} className="text-sm text-slate-400 hover:text-slate-600">
                   Already have an account? Sign in
@@ -211,9 +212,8 @@ export default function Login() {
                   <p className="text-sm text-slate-500 mb-4">Enter your email and we'll send a reset link.</p>
                   <form onSubmit={handleForgot} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                      <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
-                        className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent" />
+                      <label className={labelClass}>Email</label>
+                      <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className={inputClass} />
                     </div>
                     <button type="submit" disabled={loading}
                       className="w-full py-2.5 px-4 bg-[#185FA5] hover:bg-[#0C447C] text-white text-sm font-semibold rounded-lg transition-colors duration-150 disabled:opacity-50">

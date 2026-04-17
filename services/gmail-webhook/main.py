@@ -28,7 +28,8 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__)from flask_cors import CORS
+CORS(app, resources={r"/*": {"origins": ["https://edgeai-dashboard.vercel.app","http://localhost:5173"]}})
 
 # ── Lazy singletons (initialised once per container cold start) ────────────────
 _supabase: Client | None = None
