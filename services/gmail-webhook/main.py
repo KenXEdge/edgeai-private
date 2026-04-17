@@ -1323,6 +1323,98 @@ def import_brokers():
             "total": total,
         }), 200
 
+# ── Stripe ───────────────────────────────────────────────────────────────────
+import stripe
+import os
+
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+
+PRICE_IDS = {
+    "base":    "price_1TN2Y5PyMuFPyN5Gl2cTFgVj",
+    "custom":  "price_1TN2YhPyMuFPyN5GChyx5zvT",
+    "premium": "price_1TN2dgPyMuFPyN5Ghu1erL5c",
+}
+
+@app.route("/create-checkout-session", methods=["POST"])
+def create_checkout_session():
+    try:
+        data = request.get_json()
+        tier = data.get("tier")
+        carrier_id = data.get("carrier_id")
+        email = data.get("email")
+
+        if tier not in PRICE_IDS:
+            return jsonify({"error": "Invalid tier"}), 400
+
+        # Premium is one-time, Base and Custom are recurring
+        price_id = PRICE_IDS[tier]
+        mode = "payment" if tier == "premium" else "subscription"
+
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode=mode,
+            customer_email=email,
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url="https://edgeai-dashboard.vercel.app/onboard?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url="https://edgeai-dashboard.vercel.app/subscribe?cancelled=true",
+            metadata={"carrier_id": carrier_id, "tier": tier},
+        )
+
+        return jsonify({"url": session.url})
+
+    except Exception as e:
+        logging.error(f"[STRIPE] Checkout session error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/stripe-webhook", methods=["POST"])
+def stripe_webhook():
+    payload = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature")
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except stripe.error.SignatureVerificationError as e:
+        logging.error(f"[STRIPE] Webhook signature failed: {e}")
+        return jsonify({"error": "Invalid signature"}), 400
+
+    # Handle successful payment
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        carrier_id = session["metadata"].get("carrier_id")
+        tier = session["metadata"].get("tier")
+
+        if carrier_id:
+            # Update carrier subscription in Supabase
+            sb = supabase_client()
+
+            if tier == "premium":
+                # Premium is setup fee only — don't change subscription tier
+                sb.table("carriers").update({
+                    "onboarding_complete": False,
+                    "subscription_status": "trial",
+                }).eq("id", carrier_id).execute()
+            else:
+                sb.table("carriers").update({
+                    "subscription_tier": tier,
+                    "subscription_status": "active",
+                    "subscription_start": "now()",
+                    "stripe_customer_id": session.get("customer"),
+                }).eq("id", carrier_id).execute()
+
+            logging.info(f"[STRIPE] Payment complete — carrier {carrier_id} — tier {tier}")
+
+    # Handle subscription cancellation
+    if event["type"] == "customer.subscription.deleted":
+        customer_id = event["data"]["object"]["customer"]
+        sb = supabase_client()
+        sb.table("carriers").update({
+            "subscription_status": "cancelled",
+        }).eq("stripe_customer_id", customer_id).execute()
+        logging.info(f"[STRIPE] Subscription cancelled — customer {customer_id}")
+
+    return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
