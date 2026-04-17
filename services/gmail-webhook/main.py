@@ -12,6 +12,7 @@ import sys
 from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
 from email.utils import parseaddr
+from flask_cors import CORS
 
 import anthropic
 from flask import Flask, request, jsonify
@@ -28,8 +29,16 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-app = Flask(__name__)from flask_cors import CORS
-CORS(app, resources={r"/*": {"origins": ["https://edgeai-dashboard.vercel.app","http://localhost:5173"]}})
+app = Flask(__name__)
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
+
+CORS(app, origins=["https://edgeai-dashboard.vercel.app", "http://localhost:5173"])
 
 # ── Lazy singletons (initialised once per container cold start) ────────────────
 _supabase: Client | None = None
@@ -520,6 +529,10 @@ def classify_and_extract(email_data: dict) -> dict:
 # ── Twilio SMS ─────────────────────────────────────────────────────────────────
 
 def send_load_offer_sms(email_data: dict) -> None:
+
+if os.environ.get("SMS_ENABLED", "true") == "false":
+        log.info('"SMS disabled — skipping load offer SMS"')
+        return
     """Known broker load offer alert."""
     body = (
         f"LOAD OFFER from {email_data['from_email']}\n"
@@ -538,6 +551,9 @@ def send_load_offer_sms(email_data: dict) -> None:
 
 
 def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
+if os.environ.get("SMS_ENABLED", "true") == "false":
+        log.info('"SMS disabled — skipping unknown broker SMS"')
+        return
     """Unknown broker load offer alert with extracted load details."""
     origin = extracted.get("load_origin") or "Unknown"
     destination = extracted.get("load_destination") or "Unknown"
@@ -642,6 +658,9 @@ def load_board_matches_carrier(parsed: dict, carrier: dict) -> bool:
 
 
 def send_load_board_sms(email_data: dict, parsed: dict, board_name: str) -> None:
+cd C:\Users\korbs\EDGEai\services\gmail-webhook
+$env_vars = (Get-Content .env | Where-Object { $_ -match "^[A-Z]" } | ForEach-Object { $_ -replace '\s*#.*$', '' } | Where-Object { $_ -match "=" }) -join ","
+gcloud run services update edgeai-gmail-webhook --set-env-vars $env_vars --region us-central1 --project edgeai-493115
     """Send a load board alert SMS to the carrier."""
     origin = parsed.get("origin") or "?"
     destination = parsed.get("destination") or "?"
@@ -1336,21 +1355,23 @@ PRICE_IDS = {
     "premium": "price_1TN2dgPyMuFPyN5Ghu1erL5c",
 }
 
-@app.route("/create-checkout-session", methods=["POST"])
+@app.route("/create-checkout-session", methods=["POST", "OPTIONS"])
 def create_checkout_session():
+    if request.method == "OPTIONS":
+        response = app.make_default_options_response()
+        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
+        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
     try:
         data = request.get_json()
         tier = data.get("tier")
         carrier_id = data.get("carrier_id")
         email = data.get("email")
-
         if tier not in PRICE_IDS:
             return jsonify({"error": "Invalid tier"}), 400
-
-        # Premium is one-time, Base and Custom are recurring
         price_id = PRICE_IDS[tier]
         mode = "payment" if tier == "premium" else "subscription"
-
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             mode=mode,
@@ -1360,12 +1381,14 @@ def create_checkout_session():
             cancel_url="https://edgeai-dashboard.vercel.app/subscribe?cancelled=true",
             metadata={"carrier_id": carrier_id, "tier": tier},
         )
-
-        return jsonify({"url": session.url})
-
+        response = jsonify({"url": session.url})
+        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
+        return response
     except Exception as e:
         logging.error(f"[STRIPE] Checkout session error: {e}")
-        return jsonify({"error": str(e)}), 500
+        response = jsonify({"error": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
+        return response, 500
 
 
 @app.route("/stripe-webhook", methods=["POST"])

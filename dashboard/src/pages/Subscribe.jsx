@@ -75,7 +75,7 @@ export default function Subscribe() {
   const cancelled = searchParams.get('cancelled')
 
   useEffect(() => {
-    // Check if already subscribed
+    // Check if already subscribed — create carriers row if new user
     async function checkSubscription() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { navigate('/login'); return }
@@ -88,6 +88,20 @@ export default function Subscribe() {
 
       if (data?.[0]?.subscription_status === 'active') {
         navigate('/carrier')
+        return
+      }
+
+      if (!data || data.length === 0) {
+        const fullName = session.user.user_metadata?.full_name || ''
+        await supabase.from('carriers').upsert({
+          id: session.user.id,
+          name: fullName,
+          email: session.user.email,
+          subscription_status: 'trial',
+          subscription_tier: 'base',
+          ace_status: 'inactive',
+          onboarding_complete: false,
+        }, { onConflict: 'id' })
       }
     }
     checkSubscription()

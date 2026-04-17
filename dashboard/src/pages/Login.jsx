@@ -17,6 +17,7 @@ export default function Login() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
+  const [signupSent, setSignupSent] = useState(false)
   const navigate = useNavigate()
 
   function switchMode(newMode) {
@@ -54,20 +55,8 @@ export default function Login() {
 
     if (error) { setError(error.message); setLoading(false); return }
 
-    if (data.user) {
-      await supabase.from('carriers').insert({
-        id: data.user.id,
-        name: fullName,
-        email,
-        subscription_status: 'trial',
-        subscription_tier: 'base',
-        ace_status: 'inactive',
-        onboarding_complete: false,
-      })
-    }
-
     setLoading(false)
-    navigate('/subscribe')
+    setSignupSent(true)
   }
 
   async function handleForgot(e) {
@@ -166,6 +155,14 @@ export default function Login() {
           {/* ── Create Account ── */}
           {mode === 'signup' && (
             <>
+              {signupSent ? (
+                <div style={{textAlign:'center',padding:'2rem 0'}}>
+                  <div style={{fontSize:'2rem',marginBottom:'1rem'}}>📬</div>
+                  <p style={{fontWeight:700,color:'#0C447C',marginBottom:'0.5rem'}}>Check your email</p>
+                  <p style={{fontSize:'13px',color:'#666',lineHeight:'1.7',marginBottom:'1.5rem'}}>We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then sign in.</p>
+                  <button onClick={() => { setSignupSent(false); switchMode('signin') }} style={{fontSize:'13px',color:'#185FA5',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Back to sign in</button>
+                </div>
+              ) : (
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div>
                   <label className={labelClass}>First name</label>
@@ -197,6 +194,7 @@ export default function Login() {
                   Already have an account? Sign in
                 </button>
               </div>
+              )}
             </>
           )}
 
