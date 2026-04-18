@@ -57,7 +57,7 @@ function Sidebar({ onClose }) {
 
   function handleLogout() {
     // TODO: supabase.auth.signOut()
-    navigate('/login')
+    navigate('/auth')
   }
 
   return (

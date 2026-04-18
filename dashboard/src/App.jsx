@@ -33,6 +33,8 @@ function RequireAuth({ children }) {
           .eq('id', session.user.id)
           .limit(1)
         setSubscribed(data?.[0]?.subscription_status === 'active')
+      } else {
+        setSubscribed(null)
       }
     }
     check()
@@ -49,7 +51,7 @@ function RequireAuth({ children }) {
     </div>
   )
 
-  if (!session) return <Navigate to="/login" replace />
+  if (!session) return <Navigate to="/auth" replace />
   if (!subscribed) return <Navigate to="/subscribe" replace />
   return children
 }
@@ -58,7 +60,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/auth" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/subscribe" element={<Subscribe />} />
 
