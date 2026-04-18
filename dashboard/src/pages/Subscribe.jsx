@@ -7,7 +7,6 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-const CLOUD_RUN_URL = 'https://edgeai-gmail-webhook-417422203146.us-central1.run.app'
 
 const TIERS = [
   {
@@ -115,7 +114,7 @@ export default function Subscribe() {
     if (!session) { navigate('/login'); return }
 
     try {
-      const res = await fetch(`${CLOUD_RUN_URL}/create-checkout-session`, {
+      const res = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
