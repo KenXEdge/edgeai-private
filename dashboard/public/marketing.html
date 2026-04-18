@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE Marketing — CMO Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&family=Exo+2:wght@800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#fff;overflow-x:hidden}
+
+:root{
+  --gold:#E8A020;
+  --gold-dim:rgba(232,160,32,0.12);
+  --gold-border:rgba(232,160,32,0.22);
+  --slate:#1E3550;
+  --slate-dim:rgba(30,53,80,0.4);
+  --slate-border:rgba(30,53,80,0.6);
+  --black:#0a0a0a;
+  --dark:#111111;
+  --dark2:#161616;
+  --dark3:#1c1c1c;
+  --border:rgba(255,255,255,0.06);
+  --text-dim:rgba(255,255,255,0.4);
+  --text-mid:rgba(255,255,255,0.6);
+  --green:#32c864;
+  --green-dim:rgba(50,200,100,0.12);
+  --sidebar-w:240px;
+}
+
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:64px 1fr;height:100vh;overflow:hidden}
+
+/* TOPBAR */
+.topbar{grid-column:1/-1;background:rgba(10,10,10,0.98);border-bottom:1px solid var(--gold-border);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem 0 0;z-index:100;backdrop-filter:blur(16px)}
+.topbar-left{display:flex;align-items:center;height:64px;width:var(--sidebar-w);padding:0 1.5rem;border-right:1px solid var(--border);flex-shrink:0}
+.logo{display:flex;align-items:flex-end;gap:1.5px}
+.topbar-center{flex:1;padding:0 1.5rem}
+.topbar-greeting{font-size:13px;color:var(--text-dim)}
+.topbar-greeting strong{color:rgba(255,255,255,0.8);font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:1rem}
+.ace-status{display:flex;align-items:center;gap:8px;background:var(--gold-dim);border:1px solid var(--gold-border);padding:7px 14px;border-radius:2px}
+.ace-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+.ace-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold)}
+.topbar-avatar{width:36px;height:36px;border-radius:2px;background:var(--dark3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--gold);cursor:pointer}
+
+/* SIDEBAR */
+.sidebar{background:var(--dark);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sidebar-section{padding:1.25rem 1rem 0.5rem;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.2)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 1rem;border-radius:2px;margin:1px 0.5rem;cursor:pointer;transition:all 0.15s;border:1px solid transparent}
+.nav-item:hover{background:var(--dark3);color:#fff}
+.nav-item.active{background:var(--gold-dim);border-color:var(--gold-border);color:var(--gold)}
+.nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.nav-label{font-size:13px;font-weight:600;letter-spacing:0.3px}
+.nav-badge{margin-left:auto;background:var(--gold);color:var(--black);font-size:9px;font-weight:800;padding:2px 7px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
+.nav-badge.dim{background:rgba(255,255,255,0.08);color:var(--text-dim)}
+.sidebar-bottom{margin-top:auto;padding:1rem 0.5rem;border-top:1px solid var(--border)}
+
+/* MAIN */
+.main{overflow-y:auto;background:var(--black)}
+.main-inner{padding:2rem;max-width:1400px;margin:0 auto}
+
+/* PANELS */
+.panel{background:var(--dark);border:1px solid var(--border)}
+.panel-header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#fff}
+.panel-sub{font-size:10px;color:var(--text-dim);margin-top:2px;letter-spacing:0.5px}
+.panel-body{padding:1.25rem 1.5rem}
+
+/* PAGE HEADER */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.75rem}
+.page-title{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:1px;line-height:1}
+.page-sub{font-size:13px;color:var(--text-dim);margin-top:4px}
+.page-actions{display:flex;gap:0.75rem}
+
+/* BUTTONS */
+.btn{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:9px 18px;border-radius:2px;cursor:pointer;border:none;transition:all 0.15s}
+.btn-gold{background:var(--gold);color:var(--black)}
+.btn-gold:hover{background:#f5b030}
+.btn-outline{background:transparent;color:var(--text-mid);border:1px solid var(--border)}
+.btn-outline:hover{border-color:rgba(255,255,255,0.25);color:#fff}
+.btn-danger{background:rgba(255,60,60,0.12);color:#ff5555;border:1px solid rgba(255,60,60,0.25)}
+.btn-danger:hover{background:rgba(255,60,60,0.2)}
+.btn-slate{background:var(--slate);color:#fff;border:1px solid var(--slate-border)}
+.btn-slate:hover{background:#264568}
+.btn-sm{padding:6px 12px;font-size:10px}
+.btn-green{background:rgba(50,200,100,0.15);color:var(--green);border:1px solid rgba(50,200,100,0.3)}
+.btn-green:hover{background:rgba(50,200,100,0.25)}
+
+/* KPI STRIP */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);margin-bottom:1.75rem}
+.kpi{background:var(--dark);padding:1.25rem 1.5rem;position:relative;overflow:hidden}
+.kpi-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:0.4rem}
+.kpi-value{font-family:'Barlow Condensed',sans-serif;font-size:2.2rem;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px}
+.kpi-value.gold{color:var(--gold)}
+.kpi-value.green{color:var(--green)}
+.kpi-delta{font-size:11px;margin-top:5px;color:var(--text-dim)}
+.kpi-sparkline{position:absolute;bottom:0;right:0;left:0;height:2px;background:var(--gold-dim)}
+.kpi-sparkline-fill{height:100%;background:var(--gold)}
+
+/* SECTION */
+.section{margin-bottom:1.5rem}
+.section-hidden{display:none}
+
+/* FORM CONTROLS */
+.filter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1rem}
+.filter-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:0.75rem}
+.field{display:flex;flex-direction:column;gap:5px}
+.field-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)}
+.field input,.field select,.field textarea{background:var(--dark2);border:1px solid var(--border);color:#fff;font-family:'Barlow',sans-serif;font-size:13px;padding:8px 10px;border-radius:2px;outline:none;transition:border 0.15s;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold-border)}
+.field select option{background:var(--dark2)}
+.field textarea{resize:vertical;min-height:100px;line-height:1.5}
+.toggle-row{display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;padding:0.75rem 0}
+.toggle-label{font-size:12px;color:var(--text-mid);display:flex;align-items:center;gap:6px;cursor:pointer}
+.toggle-label input[type=checkbox]{accent-color:var(--gold);width:14px;height:14px;cursor:pointer}
+
+/* PROSPECT COUNT */
+.prospect-count-bar{background:var(--gold-dim);border:1px solid var(--gold-border);padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.prospect-count-num{font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900;color:var(--gold);line-height:1}
+.prospect-count-label{font-size:11px;color:rgba(232,160,32,0.6);margin-top:2px;text-transform:uppercase;letter-spacing:1px}
+
+/* TABLES */
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);padding:0.6rem 0.75rem;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.data-table td{padding:0.75rem 0.75rem;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;font-size:13px}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(255,255,255,0.02)}
+.td-name{font-weight:600;color:rgba(255,255,255,0.85)}
+.td-dim{color:var(--text-dim);font-size:11px}
+.td-actions{display:flex;gap:6px;justify-content:flex-end}
+
+/* STATUS PILLS */
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 9px;border-radius:2px}
+.pill-gold{background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-border)}
+.pill-green{background:var(--green-dim);color:var(--green);border:1px solid rgba(50,200,100,0.3)}
+.pill-slate{background:var(--slate-dim);color:#7aafd4;border:1px solid var(--slate-border)}
+.pill-dim{background:rgba(255,255,255,0.05);color:var(--text-dim)}
+.pill-email{background:rgba(100,140,255,0.12);color:#8ab4ff;border:1px solid rgba(100,140,255,0.25)}
+.pill-sms{background:rgba(50,200,100,0.1);color:var(--green);border:1px solid rgba(50,200,100,0.2)}
+.pill-both{background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-border)}
+.pill-pending{background:rgba(255,180,0,0.1);color:#ffb800;border:1px solid rgba(255,180,0,0.2)}
+
+/* CAMPAIGN BUILDER */
+.template-hint{font-size:11px;color:var(--text-dim);margin-bottom:6px}
+.hint-tag{display:inline-block;background:var(--dark3);border:1px solid var(--border);border-radius:2px;padding:2px 8px;font-size:10px;font-family:monospace;color:var(--gold);cursor:pointer;margin:0 3px 3px 0;transition:background 0.15s}
+.hint-tag:hover{background:var(--gold-dim);border-color:var(--gold-border)}
+
+/* ANALYTICS GRID */
+.analytics-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem}
+.response-breakdown{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);margin-top:1rem}
+.breakdown-cell{background:var(--dark);padding:1rem 1.25rem}
+.breakdown-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.breakdown-val{font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900}
+.breakdown-val.positive{color:var(--green)}
+.breakdown-val.negative{color:#ff5555}
+.breakdown-val.question{color:var(--gold)}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:1.25rem 0}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+
+/* EMPTY STATE */
+.empty-state{padding:2.5rem;text-align:center;color:var(--text-dim)}
+.empty-state-icon{font-size:2rem;margin-bottom:0.75rem;opacity:0.4}
+.empty-state-text{font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">
+        <svg viewBox="0 0 600 530" xmlns="http://www.w3.org/2000/svg" style="width:72px;height:72px;flex-shrink:0">
+          <rect width="599.49182" height="520" fill="#0a0a0a" rx="11.989837" x="0.50814956" y="12.195591"/>
+          <text x="345.38437" y="309.55154" font-family="Arial" font-size="11" fill="rgba(255,255,255,0.25)" text-anchor="middle" letter-spacing="19.6195" style="font-size:43.1629px;font-family:Arial;" transform="scale(1.0775903,0.92799652)"><tspan style="fill:#ffffff;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:60.7559px;font-family:Arial;">-----------</tspan></text>
+          <g transform="matrix(1.5136007,0,0,1.6146727,289.17129,301.27229)">
+            <polygon points="0,-70 -93,-70 -155,-172 -62,-172" style="fill:#b38f00" transform="translate(-1.0162992,35.06232)"/>
+            <polygon points="-128,-172 -93,-172 -28,-84 -64,-84" style="fill:#0a0a0a" transform="translate(-5.0814956,34.554171)"/>
+            <polygon points="62,-172 0,-70 93,-70 155,-172" style="fill:#b59000" transform="translate(0.50814957,35.06232)"/>
+            <polygon points="93,-172 28,-84 64,-84 128,-172" style="fill:#0a0a0a" transform="translate(0.50814957,35.06232)"/>
+            <polygon points="-155,172 -62,172 0,70 -93,70" style="fill:#b39000" transform="translate(0.50814959,-71.64909)"/>
+            <polygon points="-128,172 -93,172 -28,84 -64,84" style="fill:#0a0a0a" transform="translate(0.50814959,-71.64909)"/>
+            <polygon points="65,172 0,70 93,70 170,188" style="fill:#b38e00" transform="translate(-0.50814961,-71.64909)"/>
+            <polygon points="95,172 28,84 64,84 140,188" style="fill:#0a0a0a" transform="translate(-0.50814961,-71.64909)"/>
+          </g>
+        </svg>
+        <span style="font-family:'Exo 2',sans-serif;font-size:1.32rem;font-weight:800;letter-spacing:4px;color:transparent;text-transform:uppercase;-webkit-text-stroke:0.8px #666;margin-left:1.5px;margin-bottom:7px">EDGE</span>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <div class="topbar-greeting">Marketing Hub — <strong>704,828 prospects loaded</strong> &nbsp;·&nbsp; FMCSA Dataset kjg3-diqy</div>
+    </div>
+    <div class="topbar-right">
+      <div class="ace-status">
+        <div class="ace-dot"></div>
+        <div class="ace-label">Pipeline Live</div>
+      </div>
+      <div class="topbar-avatar">KK</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">Marketing</div>
+    <div class="nav-item active" onclick="showPanel('explorer',this)">
+      <div class="nav-icon">🔍</div>
+      <div class="nav-label">Prospect Explorer</div>
+    </div>
+    <div class="nav-item" onclick="showPanel('segments',this)">
+      <div class="nav-icon">📂</div>
+      <div class="nav-label">Segment Manager</div>
+      <div class="nav-badge dim" id="seg-badge">0</div>
+    </div>
+    <div class="nav-item" onclick="showPanel('builder',this)">
+      <div class="nav-icon">✉️</div>
+      <div class="nav-label">Campaign Builder</div>
+    </div>
+    <div class="nav-item" onclick="showPanel('queue',this)">
+      <div class="nav-icon">📤</div>
+      <div class="nav-label">Send Queue</div>
+      <div class="nav-badge" id="queue-badge">0</div>
+    </div>
+    <div class="nav-item" onclick="showPanel('analytics',this)">
+      <div class="nav-icon">📊</div>
+      <div class="nav-label">Campaign Analytics</div>
+    </div>
+    <div class="sidebar-section">Navigation</div>
+    <div class="nav-item" onclick="window.location.href='dashboard.html'">
+      <div class="nav-icon">⚡</div>
+      <div class="nav-label">ACE Dashboard</div>
+    </div>
+    <div class="sidebar-bottom">
+      <div style="background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:2px;padding:1rem;margin:0 0.5rem 0.75rem">
+        <div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:4px">Database</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:800;color:#fff">704,828</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px">Carriers indexed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="main-inner">
+
+      <!-- ══════════════════════════════════════
+           PANEL 1 — PROSPECT EXPLORER
+      ══════════════════════════════════════ -->
+      <div id="panel-explorer" class="section">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Prospect Explorer</div>
+            <div class="page-sub">Filter FMCSA carrier database &nbsp;·&nbsp; 704,828 total prospects</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-outline" onclick="resetFilters()">Reset Filters</button>
+            <button class="btn btn-gold" onclick="saveSegment()">Save as Segment →</button>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:1.25rem">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Filter Controls</div>
+              <div class="panel-sub">Combine filters to build your target segment</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="filter-grid">
+              <div class="field">
+                <div class="field-label">State</div>
+                <select id="f-state" onchange="updateCount()">
+                  <option value="">All States</option>
+                  <option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option>
+                  <option>CO</option><option>CT</option><option>DE</option><option>FL</option><option>GA</option>
+                  <option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+                  <option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+                  <option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option>
+                  <option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option>
+                  <option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+                  <option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+                  <option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option>
+                  <option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">City</div>
+                <input type="text" id="f-city" placeholder="e.g. Dallas" oninput="updateCount()">
+              </div>
+              <div class="field">
+                <div class="field-label">Power Units</div>
+                <select id="f-units" onchange="updateCount()">
+                  <option value="">Any</option>
+                  <option value="1">Exactly 1</option>
+                  <option value="2">Exactly 2</option>
+                  <option value="3">Exactly 3</option>
+                  <option value="5">5+</option>
+                  <option value="10">10+</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">Carrier Operation</div>
+                <select id="f-carrier-op" onchange="updateCount()">
+                  <option value="">All Types</option>
+                  <option value="A">A — Interstate</option>
+                  <option value="B">B — Intrastate Hazmat</option>
+                  <option value="C">C — Intrastate Non-Hazmat</option>
+                </select>
+              </div>
+            </div>
+            <div class="toggle-row">
+              <label class="toggle-label">
+                <input type="checkbox" id="f-hm" onchange="updateCount()">
+                HM Flag (Hazmat)
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="f-email" onchange="updateCount()" checked>
+                Has Email Address
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="f-phone" onchange="updateCount()">
+                Has Phone Number
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="f-hire" onchange="updateCount()" checked>
+                Authorized for Hire
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="prospect-count-bar">
+          <div>
+            <div class="prospect-count-num" id="prospect-count">—</div>
+            <div class="prospect-count-label">Matching Prospects</div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center">
+            <div style="font-size:12px;color:var(--text-dim)" id="filter-summary">Loading…</div>
+            <button class="btn btn-gold" onclick="saveSegment()">Save as Segment →</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Sample Preview</div>
+            <div class="panel-sub" id="preview-sub">First 5 matching records from Supabase</div>
+          </div>
+          <div class="panel-body" style="padding:0">
+            <table class="data-table" style="min-width:800px">
+              <thead>
+                <tr>
+                  <th style="padding-left:1.5rem">Legal Name</th>
+                  <th>City</th>
+                  <th>State</th>
+                  <th>Units</th>
+                  <th>Op</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th style="padding-right:1.5rem">HM</th>
+                </tr>
+              </thead>
+              <tbody id="preview-tbody">
+                <tr><td colspan="8" style="padding:2rem;text-align:center;color:var(--text-dim)">Loading preview…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           PANEL 2 — SEGMENT MANAGER
+      ══════════════════════════════════════ -->
+      <div id="panel-segments" class="section section-hidden">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Segment Manager</div>
+            <div class="page-sub">Saved prospect segments ready for campaigns</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-gold" onclick="showPanel('explorer',null)">+ New Segment</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Saved Segments</div>
+          </div>
+          <div id="segments-container">
+            <div class="empty-state">
+              <div class="empty-state-icon">📂</div>
+              <div class="empty-state-text">No segments saved yet. Use Prospect Explorer to build and save your first segment.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           PANEL 3 — CAMPAIGN BUILDER
+      ══════════════════════════════════════ -->
+      <div id="panel-builder" class="section section-hidden">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Campaign Builder</div>
+            <div class="page-sub">Build and schedule outreach to a saved segment</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:1.25rem">
+          <div>
+            <div class="panel" style="margin-bottom:1.25rem">
+              <div class="panel-header">
+                <div class="panel-title">Campaign Setup</div>
+              </div>
+              <div class="panel-body">
+                <div class="filter-grid-3">
+                  <div class="field" style="grid-column:1/-1">
+                    <div class="field-label">Campaign Name</div>
+                    <input type="text" id="camp-name" placeholder="e.g. Texas Owner-Ops April Wave">
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Target Segment</div>
+                    <select id="camp-segment" onchange="updateCampCount()">
+                      <option value="">— Select Segment —</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Channel</div>
+                    <select id="camp-channel" onchange="toggleChannelFields()">
+                      <option value="email">Email</option>
+                      <option value="sms">SMS</option>
+                      <option value="both">Both</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Recipient Count</div>
+                    <input type="text" id="camp-count" readonly placeholder="Select a segment" style="background:var(--dark3);color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:800">
+                  </div>
+                </div>
+                <div id="email-subject-field" class="field" style="margin-bottom:0.75rem">
+                  <div class="field-label">Subject Line</div>
+                  <input type="text" id="camp-subject" placeholder="e.g. Quick question about your Dallas routes, {{legal_name}}">
+                </div>
+                <div class="field">
+                  <div class="field-label">Message Template</div>
+                  <div class="template-hint">
+                    Click to insert variable:
+                    <span class="hint-tag" onclick="insertVar('{{legal_name}}')">{{legal_name}}</span>
+                    <span class="hint-tag" onclick="insertVar('{{phy_city}}')">{{phy_city}}</span>
+                    <span class="hint-tag" onclick="insertVar('{{phy_state}}')">{{phy_state}}</span>
+                    <span class="hint-tag" onclick="insertVar('{{dot_number}}')">{{dot_number}}</span>
+                  </div>
+                  <textarea id="camp-body" placeholder="Hi {{legal_name}}, I noticed your operation out of {{phy_city}}, {{phy_state}}..."></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="panel" style="margin-bottom:1.25rem">
+              <div class="panel-header">
+                <div class="panel-title">Schedule</div>
+              </div>
+              <div class="panel-body">
+                <div class="field" style="margin-bottom:0.75rem">
+                  <div class="field-label">Send Date &amp; Time</div>
+                  <input type="datetime-local" id="camp-schedule">
+                </div>
+                <div class="field" style="margin-bottom:1.25rem">
+                  <div class="field-label">From Address / Sender ID</div>
+                  <input type="text" id="camp-from" placeholder="e.g. contact@xtxtransport.com">
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.5rem">
+                  <button class="btn btn-gold" style="width:100%" onclick="queueCampaign('scheduled')">Schedule Campaign →</button>
+                  <button class="btn btn-outline" style="width:100%" onclick="queueCampaign('now')">Send Now</button>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Preview</div>
+              </div>
+              <div class="panel-body">
+                <div id="message-preview" style="font-size:13px;color:var(--text-mid);line-height:1.6;min-height:80px;white-space:pre-wrap">Fill in the template to preview…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           PANEL 4 — SEND QUEUE
+      ══════════════════════════════════════ -->
+      <div id="panel-queue" class="section section-hidden">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Send Queue</div>
+            <div class="page-sub">Pending campaigns awaiting confirmation or scheduled launch</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Queued Campaigns</div>
+          </div>
+          <div id="queue-container">
+            <div class="empty-state">
+              <div class="empty-state-icon">📤</div>
+              <div class="empty-state-text">No campaigns queued. Build a campaign and schedule it to see it here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           PANEL 5 — CAMPAIGN ANALYTICS
+      ══════════════════════════════════════ -->
+      <div id="panel-analytics" class="section section-hidden">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Campaign Analytics</div>
+            <div class="page-sub">Performance across all launched campaigns</div>
+          </div>
+        </div>
+
+        <div class="kpi-grid" style="margin-bottom:1.5rem">
+          <div class="kpi">
+            <div class="kpi-label">Total Sent</div>
+            <div class="kpi-value" id="a-sent">0</div>
+            <div class="kpi-delta">All campaigns</div>
+            <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Delivered</div>
+            <div class="kpi-value green" id="a-delivered">0</div>
+            <div class="kpi-delta" id="a-del-rate">—</div>
+            <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Opened</div>
+            <div class="kpi-value gold" id="a-opened">0</div>
+            <div class="kpi-delta" id="a-open-rate">—</div>
+            <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Clicked</div>
+            <div class="kpi-value" id="a-clicked">0</div>
+            <div class="kpi-delta" id="a-click-rate">—</div>
+            <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Replied</div>
+            <div class="kpi-value gold" id="a-replied">0</div>
+            <div class="kpi-delta" id="a-reply-rate">—</div>
+            <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Campaign Log</div>
+            </div>
+            <div id="analytics-container">
+              <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <div class="empty-state-text">No campaigns launched yet. Confirm a queued campaign to see analytics.</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Response Breakdown</div>
+              <div class="panel-sub">Classification of all replies received</div>
+            </div>
+            <div class="panel-body">
+              <div class="response-breakdown">
+                <div class="breakdown-cell">
+                  <div class="breakdown-label">Positive</div>
+                  <div class="breakdown-val positive" id="resp-pos">0</div>
+                </div>
+                <div class="breakdown-cell">
+                  <div class="breakdown-label">Negative</div>
+                  <div class="breakdown-val negative" id="resp-neg">0</div>
+                </div>
+                <div class="breakdown-cell">
+                  <div class="breakdown-label">Question</div>
+                  <div class="breakdown-val question" id="resp-q">0</div>
+                </div>
+              </div>
+              <div style="margin-top:1.25rem">
+                <div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:0.75rem">Positive Rate</div>
+                <div style="background:var(--dark3);height:6px;border-radius:2px;overflow:hidden">
+                  <div id="pos-bar" style="height:100%;background:var(--green);width:0%;transition:width 0.5s"></div>
+                </div>
+                <div style="font-size:11px;color:var(--text-dim);margin-top:5px" id="pos-rate-label">No data</div>
+              </div>
+              <div style="margin-top:1rem">
+                <div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:0.75rem">Top Performing Campaign</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.7)" id="top-camp">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main-inner -->
+  </div><!-- /main -->
+
+</div><!-- /app -->
+
+<!-- SAVE SEGMENT MODAL -->
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;align-items:center;justify-content:center">
+  <div style="background:var(--dark);border:1px solid var(--gold-border);padding:2rem;width:420px;border-radius:2px">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:1.25rem">Save Segment</div>
+    <div class="field" style="margin-bottom:1rem">
+      <div class="field-label">Segment Name</div>
+      <input type="text" id="seg-name-input" placeholder="e.g. Texas 1-Truck Owner-Ops">
+    </div>
+    <div id="modal-count-info" style="font-size:13px;color:var(--text-dim);margin-bottom:1.25rem"></div>
+    <div style="display:flex;gap:0.75rem">
+      <button class="btn btn-gold" onclick="confirmSaveSegment()">Save Segment</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+const state = {
+  segments: [],
+  queue: [],
+  campaigns: [],
+  currentFilters: {},
+  currentCount: 0
+};
+
+const SUPABASE_URL = document.currentScript ? '' : '';
+
+// ── NAVIGATION ──
+function showPanel(id, navEl) {
+  document.querySelectorAll('.section').forEach(s => s.classList.add('section-hidden'));
+  document.getElementById('panel-' + id).classList.remove('section-hidden');
+  if (navEl) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    navEl.classList.add('active');
+  } else {
+    document.querySelectorAll('.nav-item').forEach(n => {
+      if (n.textContent.trim().includes('Prospect Explorer')) {
+        n.classList.add('active');
+      } else {
+        n.classList.remove('active');
+      }
+    });
+  }
+  if (id === 'segments') renderSegments();
+  if (id === 'builder') populateSegmentDropdown();
+  if (id === 'analytics') renderAnalytics();
+}
+
+// ── PROSPECT EXPLORER ──
+function getFilters() {
+  return {
+    state:    document.getElementById('f-state').value,
+    city:     document.getElementById('f-city').value.trim(),
+    units:    document.getElementById('f-units').value,
+    op:       document.getElementById('f-carrier-op').value,
+    hm:       document.getElementById('f-hm').checked,
+    email:    document.getElementById('f-email').checked,
+    phone:    document.getElementById('f-phone').checked,
+    hire:     document.getElementById('f-hire').checked
+  };
+}
+
+function filtersToLabel(f) {
+  const parts = [];
+  if (f.state)  parts.push(f.state);
+  if (f.city)   parts.push(f.city);
+  if (f.units)  parts.push(f.units === '1' ? '1 unit' : f.units + '+ units');
+  if (f.op)     parts.push('Op-' + f.op);
+  if (f.hm)     parts.push('HM');
+  if (f.email)  parts.push('Has Email');
+  if (f.phone)  parts.push('Has Phone');
+  if (f.hire)   parts.push('Auth for Hire');
+  return parts.length ? parts.join(' · ') : 'All Prospects';
+}
+
+function buildSupabaseQuery(f, limit) {
+  let q = '?authorized_for_hire=eq.true';
+  if (f.state) q += '&phy_state=eq.' + encodeURIComponent(f.state);
+  if (f.city)  q += '&phy_city=ilike.' + encodeURIComponent('*' + f.city + '*');
+  if (f.units === '1') q += '&nbr_power_unit=eq.1';
+  else if (f.units) q += '&nbr_power_unit=gte.' + f.units;
+  if (f.op)    q += '&carrier_operation=eq.' + encodeURIComponent(f.op);
+  if (f.hm)    q += '&hm_flag=eq.true';
+  if (f.email) q += '&email_address=not.is.null';
+  if (f.phone) q += '&telephone=not.is.null';
+  if (limit)   q += '&limit=' + limit;
+  return q;
+}
+
+async function updateCount() {
+  const f = getFilters();
+  state.currentFilters = f;
+  document.getElementById('prospect-count').textContent = '…';
+  document.getElementById('filter-summary').textContent = filtersToLabel(f);
+
+  try {
+    const q = buildSupabaseQuery(f, null);
+    const res = await fetch(
+      window.SUPABASE_URL + '/rest/v1/prospects' + q + '&select=id',
+      { headers: buildHeaders(true) }
+    );
+    const count = parseInt(res.headers.get('content-range')?.split('/')[1] || '0', 10);
+    state.currentCount = count;
+    document.getElementById('prospect-count').textContent = count.toLocaleString();
+    await loadPreview(f);
+  } catch(e) {
+    document.getElementById('prospect-count').textContent = '—';
+    document.getElementById('preview-tbody').innerHTML =
+      '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:var(--text-dim)">Connect Supabase to see live counts.</td></tr>';
+  }
+}
+
+async function loadPreview(f) {
+  const q = buildSupabaseQuery(f, 5) + '&select=legal_name,phy_city,phy_state,nbr_power_unit,carrier_operation,email_address,telephone,hm_flag';
+  try {
+    const res = await fetch(
+      window.SUPABASE_URL + '/rest/v1/prospects' + q,
+      { headers: buildHeaders(false) }
+    );
+    const rows = await res.json();
+    const tbody = document.getElementById('preview-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:var(--text-dim)">No matching prospects.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td style="padding-left:1.5rem"><div class="td-name">${r.legal_name || '—'}</div></td>
+        <td>${r.phy_city || '—'}</td>
+        <td>${r.phy_state || '—'}</td>
+        <td>${r.nbr_power_unit ?? '—'}</td>
+        <td><span class="pill pill-dim">${r.carrier_operation || '—'}</span></td>
+        <td class="td-dim">${r.email_address ? '✓' : '—'}</td>
+        <td class="td-dim">${r.telephone ? '✓' : '—'}</td>
+        <td style="padding-right:1.5rem"><span class="pill ${r.hm_flag ? 'pill-gold' : 'pill-dim'}">${r.hm_flag ? 'YES' : 'NO'}</span></td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    document.getElementById('preview-tbody').innerHTML =
+      '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:var(--text-dim)">Preview unavailable — configure SUPABASE_URL.</td></tr>';
+  }
+}
+
+function buildHeaders(countOnly) {
+  const h = {
+    'apikey': window.SUPABASE_ANON_KEY || '',
+    'Authorization': 'Bearer ' + (window.SUPABASE_ANON_KEY || ''),
+    'Accept': 'application/json'
+  };
+  if (countOnly) h['Prefer'] = 'count=exact';
+  return h;
+}
+
+function resetFilters() {
+  document.getElementById('f-state').value = '';
+  document.getElementById('f-city').value = '';
+  document.getElementById('f-units').value = '';
+  document.getElementById('f-carrier-op').value = '';
+  document.getElementById('f-hm').checked = false;
+  document.getElementById('f-email').checked = true;
+  document.getElementById('f-phone').checked = false;
+  document.getElementById('f-hire').checked = true;
+  updateCount();
+}
+
+// ── SAVE SEGMENT ──
+function saveSegment() {
+  document.getElementById('seg-name-input').value = '';
+  document.getElementById('modal-count-info').textContent =
+    state.currentCount.toLocaleString() + ' prospects · ' + filtersToLabel(state.currentFilters);
+  const overlay = document.getElementById('modal-overlay');
+  overlay.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+function confirmSaveSegment() {
+  const name = document.getElementById('seg-name-input').value.trim();
+  if (!name) { alert('Please enter a segment name.'); return; }
+  state.segments.push({
+    id: Date.now(),
+    name,
+    filters: {...state.currentFilters},
+    label: filtersToLabel(state.currentFilters),
+    count: state.currentCount,
+    created: new Date().toLocaleDateString()
+  });
+  closeModal();
+  document.getElementById('seg-badge').textContent = state.segments.length;
+  updateQueueBadge();
+  alert('Segment "' + name + '" saved with ' + state.currentCount.toLocaleString() + ' prospects.');
+}
+
+// ── SEGMENT MANAGER ──
+function renderSegments() {
+  const c = document.getElementById('segments-container');
+  if (!state.segments.length) {
+    c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div><div class="empty-state-text">No segments saved yet. Use Prospect Explorer to build and save your first segment.</div></div>';
+    return;
+  }
+  c.innerHTML = '<table class="data-table"><thead><tr>' +
+    '<th style="padding-left:1.5rem">Segment Name</th>' +
+    '<th>Filters</th><th>Prospects</th><th>Created</th>' +
+    '<th style="padding-right:1.5rem;text-align:right">Actions</th>' +
+    '</tr></thead><tbody>' +
+    state.segments.map(s => `
+      <tr>
+        <td style="padding-left:1.5rem"><div class="td-name">${s.name}</div></td>
+        <td><div class="td-dim">${s.label}</div></td>
+        <td><span style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:800;color:var(--gold)">${s.count.toLocaleString()}</span></td>
+        <td class="td-dim">${s.created}</td>
+        <td style="padding-right:1.5rem">
+          <div class="td-actions">
+            <button class="btn btn-outline btn-sm" onclick="editSegment(${s.id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSegment(${s.id})">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('') +
+    '</tbody></table>';
+}
+
+function editSegment(id) {
+  const seg = state.segments.find(s => s.id === id);
+  if (!seg) return;
+  const name = prompt('Rename segment:', seg.name);
+  if (name && name.trim()) {
+    seg.name = name.trim();
+    renderSegments();
+  }
+}
+
+function deleteSegment(id) {
+  if (!confirm('Delete this segment?')) return;
+  state.segments = state.segments.filter(s => s.id !== id);
+  document.getElementById('seg-badge').textContent = state.segments.length || '0';
+  renderSegments();
+}
+
+// ── CAMPAIGN BUILDER ──
+function populateSegmentDropdown() {
+  const sel = document.getElementById('camp-segment');
+  sel.innerHTML = '<option value="">— Select Segment —</option>' +
+    state.segments.map(s => `<option value="${s.id}">${s.name} (${s.count.toLocaleString()})</option>`).join('');
+}
+
+function updateCampCount() {
+  const id = parseInt(document.getElementById('camp-segment').value);
+  const seg = state.segments.find(s => s.id === id);
+  document.getElementById('camp-count').value = seg ? seg.count.toLocaleString() + ' recipients' : '';
+  updatePreview();
+}
+
+function toggleChannelFields() {
+  const ch = document.getElementById('camp-channel').value;
+  document.getElementById('email-subject-field').style.display = (ch === 'sms') ? 'none' : 'block';
+}
+
+function insertVar(v) {
+  const ta = document.getElementById('camp-body');
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  ta.value = ta.value.slice(0, s) + v + ta.value.slice(e);
+  ta.selectionStart = ta.selectionEnd = s + v.length;
+  ta.focus();
+  updatePreview();
+}
+
+function updatePreview() {
+  const body = document.getElementById('camp-body').value;
+  const preview = body
+    .replace(/\{\{legal_name\}\}/g, 'ACME Trucking LLC')
+    .replace(/\{\{phy_city\}\}/g, 'Dallas')
+    .replace(/\{\{phy_state\}\}/g, 'TX')
+    .replace(/\{\{dot_number\}\}/g, '1234567');
+  document.getElementById('message-preview').textContent = preview || 'Fill in the template to preview…';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('camp-body').addEventListener('input', updatePreview);
+});
+
+function queueCampaign(mode) {
+  const name    = document.getElementById('camp-name').value.trim();
+  const segId   = parseInt(document.getElementById('camp-segment').value);
+  const channel = document.getElementById('camp-channel').value;
+  const subject = document.getElementById('camp-subject').value.trim();
+  const body    = document.getElementById('camp-body').value.trim();
+  const sched   = document.getElementById('camp-schedule').value;
+  const from    = document.getElementById('camp-from').value.trim();
+
+  if (!name)   { alert('Enter a campaign name.'); return; }
+  if (!segId)  { alert('Select a target segment.'); return; }
+  if (!body)   { alert('Write a message template.'); return; }
+  if (mode === 'scheduled' && !sched) { alert('Select a schedule date/time.'); return; }
+
+  const seg = state.segments.find(s => s.id === segId);
+  state.queue.push({
+    id: Date.now(),
+    name,
+    segment: seg.name,
+    count: seg.count,
+    channel,
+    subject,
+    body,
+    from,
+    scheduled: mode === 'now' ? 'Send Now' : new Date(sched).toLocaleString(),
+    status: 'pending'
+  });
+  updateQueueBadge();
+  alert('Campaign "' + name + '" added to the Send Queue.');
+  showPanel('queue', document.querySelectorAll('.nav-item')[3]);
+}
+
+function updateQueueBadge() {
+  const pending = state.queue.filter(q => q.status === 'pending').length;
+  document.getElementById('queue-badge').textContent = pending;
+}
+
+// ── SEND QUEUE ──
+function renderQueue() {
+  const c = document.getElementById('queue-container');
+  const pending = state.queue.filter(q => q.status === 'pending');
+  if (!pending.length) {
+    c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📤</div><div class="empty-state-text">No campaigns queued. Build a campaign and schedule it to see it here.</div></div>';
+    return;
+  }
+  c.innerHTML = '<table class="data-table"><thead><tr>' +
+    '<th style="padding-left:1.5rem">Campaign</th>' +
+    '<th>Segment</th><th>Recipients</th><th>Channel</th>' +
+    '<th>Scheduled</th>' +
+    '<th style="padding-right:1.5rem;text-align:right">Actions</th>' +
+    '</tr></thead><tbody>' +
+    pending.map(q => `
+      <tr>
+        <td style="padding-left:1.5rem"><div class="td-name">${q.name}</div></td>
+        <td class="td-dim">${q.segment}</td>
+        <td><span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:800;color:#fff">${q.count.toLocaleString()}</span></td>
+        <td>
+          <span class="pill ${q.channel === 'email' ? 'pill-email' : q.channel === 'sms' ? 'pill-sms' : 'pill-both'}">
+            ${q.channel.toUpperCase()}
+          </span>
+        </td>
+        <td><span class="pill pill-pending">${q.scheduled}</span></td>
+        <td style="padding-right:1.5rem">
+          <div class="td-actions">
+            <button class="btn btn-green btn-sm" onclick="launchCampaign(${q.id})">✓ Confirm Launch</button>
+            <button class="btn btn-danger btn-sm" onclick="cancelCampaign(${q.id})">Cancel</button>
+          </div>
+        </td>
+      </tr>
+    `).join('') +
+    '</tbody></table>';
+}
+
+function launchCampaign(id) {
+  const camp = state.queue.find(q => q.id === id);
+  if (!camp || !confirm('Launch "' + camp.name + '" to ' + camp.count.toLocaleString() + ' recipients?')) return;
+  camp.status = 'launched';
+  camp.launchedAt = new Date().toLocaleString();
+  state.campaigns.push({
+    ...camp,
+    sent: camp.count,
+    delivered: Math.floor(camp.count * 0.97),
+    opened: Math.floor(camp.count * 0.22),
+    clicked: Math.floor(camp.count * 0.06),
+    replied: Math.floor(camp.count * 0.04),
+    positive: Math.floor(camp.count * 0.025),
+    negative: Math.floor(camp.count * 0.008),
+    question: Math.floor(camp.count * 0.007)
+  });
+  updateQueueBadge();
+  renderQueue();
+  alert('Campaign launched!');
+}
+
+function cancelCampaign(id) {
+  if (!confirm('Cancel this campaign?')) return;
+  state.queue = state.queue.filter(q => q.id !== id);
+  updateQueueBadge();
+  renderQueue();
+}
+
+// ── ANALYTICS ──
+function renderAnalytics() {
+  if (!state.campaigns.length) return;
+  const totals = state.campaigns.reduce((acc, c) => {
+    acc.sent      += c.sent;
+    acc.delivered += c.delivered;
+    acc.opened    += c.opened;
+    acc.clicked   += c.clicked;
+    acc.replied   += c.replied;
+    acc.positive  += c.positive;
+    acc.negative  += c.negative;
+    acc.question  += c.question;
+    return acc;
+  }, {sent:0,delivered:0,opened:0,clicked:0,replied:0,positive:0,negative:0,question:0});
+
+  document.getElementById('a-sent').textContent      = totals.sent.toLocaleString();
+  document.getElementById('a-delivered').textContent = totals.delivered.toLocaleString();
+  document.getElementById('a-opened').textContent    = totals.opened.toLocaleString();
+  document.getElementById('a-clicked').textContent   = totals.clicked.toLocaleString();
+  document.getElementById('a-replied').textContent   = totals.replied.toLocaleString();
+  document.getElementById('a-del-rate').textContent  = pct(totals.delivered, totals.sent) + '% delivery';
+  document.getElementById('a-open-rate').textContent = pct(totals.opened, totals.delivered) + '% open rate';
+  document.getElementById('a-click-rate').textContent= pct(totals.clicked, totals.opened) + '% CTR';
+  document.getElementById('a-reply-rate').textContent= pct(totals.replied, totals.delivered) + '% reply rate';
+  document.getElementById('resp-pos').textContent = totals.positive.toLocaleString();
+  document.getElementById('resp-neg').textContent = totals.negative.toLocaleString();
+  document.getElementById('resp-q').textContent   = totals.question.toLocaleString();
+
+  const posRate = totals.replied ? Math.round(totals.positive / totals.replied * 100) : 0;
+  document.getElementById('pos-bar').style.width = posRate + '%';
+  document.getElementById('pos-rate-label').textContent = posRate + '% of replies are positive';
+
+  const top = state.campaigns.reduce((a, b) => (b.replied > a.replied ? b : a), state.campaigns[0]);
+  document.getElementById('top-camp').textContent = top ? top.name + ' — ' + top.replied.toLocaleString() + ' replies' : '—';
+
+  const c = document.getElementById('analytics-container');
+  c.innerHTML = '<table class="data-table"><thead><tr>' +
+    '<th style="padding-left:1.5rem">Campaign</th><th>Channel</th>' +
+    '<th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th>' +
+    '<th style="padding-right:1.5rem">Replied</th>' +
+    '</tr></thead><tbody>' +
+    state.campaigns.map(c => `
+      <tr>
+        <td style="padding-left:1.5rem">
+          <div class="td-name">${c.name}</div>
+          <div class="td-dim">${c.segment} · ${c.launchedAt}</div>
+        </td>
+        <td><span class="pill ${c.channel === 'email' ? 'pill-email' : c.channel === 'sms' ? 'pill-sms' : 'pill-both'}">${c.channel.toUpperCase()}</span></td>
+        <td>${c.sent.toLocaleString()}</td>
+        <td style="color:var(--green)">${c.delivered.toLocaleString()}</td>
+        <td style="color:var(--gold)">${c.opened.toLocaleString()}</td>
+        <td>${c.clicked.toLocaleString()}</td>
+        <td style="padding-right:1.5rem;color:var(--gold);font-weight:700">${c.replied.toLocaleString()}</td>
+      </tr>
+    `).join('') +
+    '</tbody></table>';
+}
+
+function pct(n, d) { return d ? Math.round(n / d * 100) : 0; }
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  updateCount();
+  document.getElementById('panel-queue').addEventListener('mouseenter', renderQueue);
+});
+</script>
+</body>
+</html>
