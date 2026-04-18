@@ -12,6 +12,11 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
+function MarketingPage() {
+  useEffect(() => { window.location.replace('/home.html') }, [])
+  return null
+}
+
 function RequireAuth({ children }) {
   const [session, setSession] = useState(undefined)
   const [subscribed, setSubscribed] = useState(undefined)
@@ -68,7 +73,7 @@ export default function App() {
           <Route index element={<CarrierHome />} />
         </Route>
 
-        <Route path="/" element={<Navigate to="/carrier" replace />} />
+        <Route path="/" element={<MarketingPage />} />
         <Route path="*" element={<Navigate to="/carrier" replace />} />
       </Routes>
     </BrowserRouter>

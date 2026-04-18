@@ -1,5 +1,6 @@
 {
   "routes": [
+    { "source": "/", "destination": "/home.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/dashboard", "destination": "/dashboard.html" }
   ],
