@@ -31,10 +31,20 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = app.make_response("")
+        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.status_code = 200
+        return response
+
 @app.after_request
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
@@ -529,11 +539,9 @@ def classify_and_extract(email_data: dict) -> dict:
 # ── Twilio SMS ─────────────────────────────────────────────────────────────────
 
 def send_load_offer_sms(email_data: dict) -> None:
-
-if os.environ.get("SMS_ENABLED", "true") == "false":
+    if os.environ.get("SMS_ENABLED", "true") == "false":
         log.info('"SMS disabled — skipping load offer SMS"')
         return
-    """Known broker load offer alert."""
     body = (
         f"LOAD OFFER from {email_data['from_email']}\n"
         f"Subject: {email_data['subject']}\n"
@@ -551,10 +559,9 @@ if os.environ.get("SMS_ENABLED", "true") == "false":
 
 
 def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
-if os.environ.get("SMS_ENABLED", "true") == "false":
+    if os.environ.get("SMS_ENABLED", "true") == "false":
         log.info('"SMS disabled — skipping unknown broker SMS"')
         return
-    """Unknown broker load offer alert with extracted load details."""
     origin = extracted.get("load_origin") or "Unknown"
     destination = extracted.get("load_destination") or "Unknown"
     rate = extracted.get("rate_offered") or "Not specified"
@@ -658,10 +665,6 @@ def load_board_matches_carrier(parsed: dict, carrier: dict) -> bool:
 
 
 def send_load_board_sms(email_data: dict, parsed: dict, board_name: str) -> None:
-cd C:\Users\korbs\EDGEai\services\gmail-webhook
-$env_vars = (Get-Content .env | Where-Object { $_ -match "^[A-Z]" } | ForEach-Object { $_ -replace '\s*#.*$', '' } | Where-Object { $_ -match "=" }) -join ","
-gcloud run services update edgeai-gmail-webhook --set-env-vars $env_vars --region us-central1 --project edgeai-493115
-    """Send a load board alert SMS to the carrier."""
     origin = parsed.get("origin") or "?"
     destination = parsed.get("destination") or "?"
     mileage = parsed.get("mileage")
@@ -1443,3 +1446,5 @@ def stripe_webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
+
+# sync revision 2026-04-17 22:15:26
