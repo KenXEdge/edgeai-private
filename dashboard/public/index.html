@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE — Carriers Gain an Edge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Barlow',sans-serif;background:#0a0a0a;color:#fff;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+
+:root{
+  --gold:#E8A020;
+  --gold-dim:rgba(232,160,32,0.15);
+  --gold-border:rgba(232,160,32,0.25);
+  --black:#0a0a0a;
+  --dark:#111111;
+  --dark2:#161616;
+  --white-60:rgba(255,255,255,0.6);
+  --white-40:rgba(255,255,255,0.4);
+  --white-20:rgba(255,255,255,0.08);
+}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(10,10,10,0.95);border-bottom:1px solid var(--gold-border);backdrop-filter:blur(16px)}
+.nav-inner{max-width:1320px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:72px;padding:0 2.5rem}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:38px;height:38px;position:relative}
+.logo-mark svg{width:100%;height:100%}
+.logo-text{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:600;letter-spacing:5px;color:rgba(255,255,255,0.75);text-transform:uppercase}
+.logo-text em{color:var(--gold);font-style:normal}
+.nav-links{display:flex;align-items:center;gap:2.5rem}
+.nav-links a{font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--white-60);text-transform:uppercase;transition:color 0.15s}
+.nav-links a:hover{color:#fff}
+.nav-cta{background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:12px 28px;border-radius:2px;transition:all 0.15s;cursor:pointer;border:none}
+.nav-cta:hover{background:#f5b030;transform:translateY(-1px)}
+
+/* ── HERO ── */
+.hero{min-height:100vh;position:relative;display:flex;align-items:center;padding-top:72px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=1920&q=85') center/cover no-repeat;filter:brightness(0.55) saturate(0.7)}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(110deg,rgba(10,10,10,0.82) 30%,rgba(10,10,10,0.45) 60%,rgba(10,10,10,0.15) 100%)}
+.hero-stripe{position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,transparent,var(--gold) 30%,var(--gold) 70%,transparent)}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(232,160,32,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(232,160,32,0.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+
+.hero-content{position:relative;max-width:1320px;margin:0 auto;padding:6rem 2.5rem;width:100%;display:grid;grid-template-columns:1fr 420px;gap:4rem;align-items:center}
+
+.hero-left{}
+.hero-badge{display:inline-flex;align-items:center;gap:10px;background:var(--gold-dim);border:1px solid var(--gold-border);color:var(--gold);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:7px 16px;border-radius:2px;margin-bottom:2.5rem}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+
+h1{font-family:'Barlow Condensed',sans-serif;font-size:clamp(4rem,8vw,7.5rem);font-weight:900;line-height:0.9;letter-spacing:-1px;color:#fff;margin-bottom:2rem;text-transform:uppercase}
+h1 .gold{color:var(--gold);display:block}
+h1 .outline{-webkit-text-stroke:2px rgba(255,255,255,0.3);color:transparent;display:block}
+
+.hero-sub{font-size:1.05rem;color:rgba(255,255,255,0.5);max-width:480px;line-height:1.9;margin-bottom:2.5rem;font-weight:400}
+.hero-sub strong{color:rgba(255,255,255,0.85);font-weight:600}
+
+.hero-btns{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:3rem}
+.btn-gold{background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:18px 40px;border-radius:2px;transition:all 0.2s;display:inline-flex;align-items:center;gap:10px;cursor:pointer;border:none}
+.btn-gold:hover{background:#f5b030;transform:translateY(-2px);box-shadow:0 12px 40px rgba(232,160,32,0.3)}
+.btn-ghost{color:rgba(255,255,255,0.65);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:18px 28px;border:1px solid rgba(255,255,255,0.15);border-radius:2px;transition:all 0.15s;cursor:pointer;background:transparent}
+.btn-ghost:hover{border-color:rgba(255,255,255,0.45);color:#fff}
+
+.hero-proof{display:flex;gap:2.5rem;align-items:center}
+.proof-item{display:flex;flex-direction:column;gap:2px}
+.proof-num{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:var(--gold);letter-spacing:-1px;line-height:1}
+.proof-label{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.3)}
+.proof-div{width:1px;height:40px;background:rgba(255,255,255,0.1)}
+
+/* hero right — signup card */
+.hero-card{background:rgba(17,17,17,0.95);border:1px solid var(--gold-border);border-radius:4px;padding:2.5rem;backdrop-filter:blur(20px);position:relative;overflow:hidden}
+.hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold)}
+.card-tag{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:1.25rem}
+.card-title{font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:0.5rem;line-height:1.1;text-transform:uppercase;letter-spacing:1px}
+.card-sub{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:2rem;line-height:1.6}
+
+.form-group{margin-bottom:1rem}
+.form-group label{display:block;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:6px}
+.form-group input,.form-group select{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:2px;padding:12px 14px;font-size:14px;color:#fff;font-family:'Barlow',sans-serif;transition:border-color 0.15s;outline:none;appearance:none}
+.form-group input:focus,.form-group select:focus{border-color:var(--gold-border)}
+.form-group input::placeholder{color:rgba(255,255,255,0.2)}
+.form-group select option{background:#111;color:#fff}
+
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
+
+.tier-select{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:1.5rem}
+.tier-opt{border:1px solid rgba(255,255,255,0.1);border-radius:2px;padding:12px;cursor:pointer;transition:all 0.15s;text-align:center}
+.tier-opt:hover{border-color:var(--gold-border)}
+.tier-opt.active{border-color:var(--gold);background:var(--gold-dim)}
+.tier-opt-name{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:3px}
+.tier-opt.active .tier-opt-name{color:var(--gold)}
+.tier-opt-price{font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:800;color:#fff}
+
+.btn-signup{width:100%;background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:16px;border-radius:2px;border:none;cursor:pointer;transition:all 0.15s;margin-bottom:1rem}
+.btn-signup:hover{background:#f5b030}
+.card-fine{font-size:10px;color:rgba(255,255,255,0.2);text-align:center;letter-spacing:0.5px;line-height:1.6}
+
+/* ── STATS BAR ── */
+.stats-bar{background:var(--gold);padding:0}
+.stats-inner{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.stat{padding:2.5rem 2rem;border-right:1px solid rgba(0,0,0,0.12);text-align:center;position:relative}
+.stat:last-child{border-right:none}
+.stat-num{font-family:'Barlow Condensed',sans-serif;font-size:3rem;font-weight:900;color:var(--black);letter-spacing:-2px;line-height:1}
+.stat-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(0,0,0,0.5);margin-top:4px}
+
+/* ── HOW ACE WORKS ── */
+.section{padding:7rem 2.5rem}
+.section-inner{max-width:1320px;margin:0 auto}
+.section-dark{background:var(--dark)}
+.section-black{background:var(--black)}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;display:flex;align-items:center;gap:10px}
+.eyebrow::before{content:'';width:24px;height:2px;background:var(--gold)}
+h2{font-family:'Barlow Condensed',sans-serif;font-size:clamp(2.2rem,4vw,3.5rem);font-weight:900;letter-spacing:-0.5px;line-height:0.95;color:#fff;margin-bottom:1rem;text-transform:uppercase}
+.section-sub{font-size:1rem;color:rgba(255,255,255,0.4);max-width:520px;line-height:1.9;margin-bottom:4rem}
+
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,0.05);margin-top:4rem}
+.step{background:var(--dark);padding:3rem 2.5rem;position:relative;overflow:hidden;transition:background 0.2s}
+.step:hover{background:#181818}
+.step::after{content:attr(data-n);position:absolute;bottom:-20px;right:10px;font-family:'Barlow Condensed',sans-serif;font-size:9rem;font-weight:900;color:rgba(232,160,32,0.04);line-height:1;pointer-events:none;letter-spacing:-5px}
+.step-num{width:40px;height:40px;background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:2px;margin-bottom:2rem}
+.step-title{font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;font-weight:800;color:#fff;margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:1px}
+.step-desc{font-size:14px;color:rgba(255,255,255,0.4);line-height:1.85}
+.step-tag{display:inline-block;margin-top:1.25rem;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);background:var(--gold-dim);border:1px solid var(--gold-border);padding:4px 10px;border-radius:2px}
+
+/* ── FEATURES ── */
+.features-grid{display:flex;flex-direction:column;gap:0}
+.feature-row{display:grid;grid-template-columns:1fr 1fr;min-height:480px;border-bottom:1px solid rgba(255,255,255,0.05)}
+.feature-row:last-child{border-bottom:none}
+.feature-row.flip{direction:rtl}
+.feature-row.flip>*{direction:ltr}
+.feature-visual{background:var(--dark);display:flex;align-items:center;justify-content:center;padding:4rem;position:relative;overflow:hidden}
+.fv-inner{width:100%;max-width:340px}
+.fv-screen{background:#0d0d0d;border:1px solid rgba(255,255,255,0.08);border-radius:6px;overflow:hidden}
+.fv-bar{background:#1a1a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,0.05)}
+.fv-dot{width:8px;height:8px;border-radius:50%}
+.fv-title-bar{font-size:11px;font-weight:600;color:rgba(255,255,255,0.3);margin-left:4px;letter-spacing:0.5px}
+.fv-body{padding:1.25rem}
+.fv-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:3px;margin-bottom:6px;background:rgba(255,255,255,0.03)}
+.fv-row.highlight{background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.2)}
+.fv-row-left{display:flex;flex-direction:column;gap:3px}
+.fv-row-co{font-size:12px;font-weight:600;color:rgba(255,255,255,0.7)}
+.fv-row-lane{font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.5px}
+.fv-row-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.fv-row-status{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px}
+.status-sent{background:rgba(232,160,32,0.15);color:var(--gold)}
+.status-won{background:rgba(50,200,100,0.15);color:#32c864}
+.status-pending{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.3)}
+
+.feature-copy{padding:5rem 4rem;display:flex;flex-direction:column;justify-content:center}
+.feature-eyebrow{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:1.25rem;display:flex;align-items:center;gap:8px}
+.feature-eyebrow::before{content:'';width:16px;height:2px;background:var(--gold)}
+.feature-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(1.8rem,3vw,2.6rem);font-weight:900;color:#fff;margin-bottom:1.25rem;line-height:1;text-transform:uppercase;letter-spacing:0.5px}
+.feature-desc{font-size:14px;color:rgba(255,255,255,0.45);line-height:1.95;margin-bottom:2rem}
+.feature-bullets{list-style:none;display:flex;flex-direction:column;gap:0.65rem}
+.feature-bullets li{font-size:13px;color:rgba(255,255,255,0.55);display:flex;align-items:flex-start;gap:12px;line-height:1.6}
+.feature-bullets li::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:7px}
+
+/* ── PRICING ── */
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,0.05);margin-top:4rem}
+.pc{background:var(--dark);padding:2.75rem;position:relative;transition:background 0.2s}
+.pc:hover{background:#161616}
+.pc.featured{background:var(--dark2);outline:1px solid rgba(232,160,32,0.4);outline-offset:-1px;z-index:1}
+.pc-badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--black);font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:2px;white-space:nowrap;font-family:'Barlow Condensed',sans-serif}
+.pc-tier{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:1.5rem}
+.pc-price{font-family:'Barlow Condensed',sans-serif;font-size:4rem;font-weight:900;letter-spacing:-2px;color:#fff;line-height:1;margin-bottom:0.25rem}
+.pc-price span{font-size:1rem;font-weight:500;color:rgba(255,255,255,0.25);letter-spacing:0}
+.pc-tagline{font-size:13px;color:rgba(255,255,255,0.35);margin-bottom:2rem;line-height:1.65;min-height:40px}
+.pc-list{list-style:none;display:flex;flex-direction:column;gap:0.65rem;margin-bottom:2.5rem}
+.pc-list li{font-size:13px;color:rgba(255,255,255,0.5);display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+.pc-list li::before{content:'✓';color:var(--gold);font-weight:700;flex-shrink:0}
+.pc-list li.no{color:rgba(255,255,255,0.2)}
+.pc-list li.no::before{content:'—';color:rgba(255,255,255,0.1)}
+.pc-btn{display:block;width:100%;text-align:center;padding:14px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;transition:all 0.15s;cursor:pointer;border:none}
+.pc-btn-gold{background:var(--gold);color:var(--black)}
+.pc-btn-gold:hover{background:#f5b030}
+.pc-btn-outline{background:transparent;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.12)}
+.pc-btn-outline:hover{border-color:rgba(255,255,255,0.35);color:#fff}
+
+/* ── TESTIMONIALS ── */
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,0.05);margin-top:4rem}
+.testi{background:var(--dark);padding:2.5rem;transition:background 0.2s}
+.testi:hover{background:#161616}
+.testi-stars{color:var(--gold);font-size:14px;margin-bottom:1.25rem;letter-spacing:2px}
+.testi-text{font-size:15px;color:rgba(255,255,255,0.6);line-height:1.85;margin-bottom:1.75rem;font-style:italic}
+.testi-author{display:flex;align-items:center;gap:12px}
+.testi-avatar{width:40px;height:40px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold-border);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--gold)}
+.testi-name{font-size:13px;font-weight:700;color:#fff}
+.testi-role{font-size:11px;color:rgba(255,255,255,0.3);margin-top:2px;letter-spacing:0.5px}
+
+/* ── FAQ ── */
+.faq-list{max-width:800px;margin:4rem auto 0;display:flex;flex-direction:column;gap:1px;background:rgba(255,255,255,0.05)}
+.faq-item{background:var(--dark);overflow:hidden}
+.faq-q{width:100%;text-align:left;padding:1.5rem 2rem;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600;color:#fff;cursor:pointer;background:none;border:none;transition:background 0.15s;gap:1rem}
+.faq-q:hover{background:#161616}
+.faq-icon{width:24px;height:24px;border:1px solid rgba(255,255,255,0.15);border-radius:2px;display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0;font-size:16px;transition:transform 0.2s}
+.faq-a{padding:0 2rem 1.5rem;font-size:14px;color:rgba(255,255,255,0.45);line-height:1.9;display:none}
+.faq-item.open .faq-a{display:block}
+.faq-item.open .faq-icon{transform:rotate(45deg)}
+
+/* ── CTA BAND ── */
+.cta-band{background:var(--gold);padding:7rem 2.5rem;text-align:center;position:relative;overflow:hidden}
+.cta-band::before{content:'EDGE';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Barlow Condensed',sans-serif;font-size:20rem;font-weight:900;color:rgba(0,0,0,0.06);white-space:nowrap;pointer-events:none;line-height:1;letter-spacing:-10px}
+.cta-band-inner{position:relative}
+.cta-band h2{font-family:'Barlow Condensed',sans-serif;font-size:clamp(3rem,6vw,5.5rem);font-weight:900;color:var(--black);margin-bottom:0.75rem;line-height:0.95;text-transform:uppercase;letter-spacing:-1px}
+.cta-band p{font-size:1rem;color:rgba(0,0,0,0.45);margin-bottom:2.5rem;font-weight:500}
+.btn-dark{display:inline-flex;align-items:center;gap:12px;background:var(--black);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:20px 52px;border-radius:2px;transition:all 0.2s;cursor:pointer;border:none}
+.btn-dark:hover{background:#1a1a1a;transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+.cta-fine{font-size:10px;color:rgba(0,0,0,0.35);margin-top:1.5rem;letter-spacing:1px;text-transform:uppercase}
+
+/* ── FOOTER ── */
+footer{background:#080808;border-top:1px solid rgba(255,255,255,0.05);padding:4rem 2.5rem 2.5rem}
+.footer-inner{max-width:1320px;margin:0 auto}
+.footer-top{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:3rem;margin-bottom:3rem}
+.footer-brand .logo-text{font-size:1.4rem;margin-bottom:0.75rem}
+.footer-brand p{font-size:13px;color:rgba(255,255,255,0.3);line-height:1.8;max-width:220px;margin-top:0.75rem}
+.footer-col h4{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:1.25rem}
+.footer-col a{display:block;font-size:13px;color:rgba(255,255,255,0.35);margin-bottom:0.6rem;transition:color 0.15s}
+.footer-col a:hover{color:#fff}
+.footer-bottom{display:flex;align-items:center;justify-content:space-between;padding-top:2rem;border-top:1px solid rgba(255,255,255,0.05)}
+.footer-copy{font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:0.5px}
+.footer-trust{display:flex;gap:1.5rem;align-items:center}
+.trust-badge{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.2);display:flex;align-items:center;gap:6px}
+.trust-badge::before{content:'✓';color:var(--gold)}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:2rem;opacity:0;pointer-events:none;transition:opacity 0.25s;backdrop-filter:blur(8px)}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--dark);border:1px solid var(--gold-border);border-radius:4px;width:100%;max-width:500px;position:relative;overflow:hidden;transform:translateY(20px);transition:transform 0.25s}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-top{height:4px;background:var(--gold)}
+.modal-body{padding:2.5rem}
+.modal-close{position:absolute;top:1.25rem;right:1.25rem;background:rgba(255,255,255,0.06);border:none;color:rgba(255,255,255,0.4);font-size:18px;width:32px;height:32px;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.modal-close:hover{background:rgba(255,255,255,0.12);color:#fff}
+.modal-tag{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:0.75rem}
+.modal-title{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#fff;margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:1px;line-height:1}
+.modal-sub{font-size:13px;color:rgba(255,255,255,0.35);margin-bottom:2rem;line-height:1.6}
+.modal-success{text-align:center;padding:2rem 0}
+.modal-success-icon{font-size:3rem;margin-bottom:1rem}
+.modal-success h3{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:var(--gold);text-transform:uppercase;margin-bottom:0.5rem}
+.modal-success p{font-size:14px;color:rgba(255,255,255,0.4);line-height:1.7}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1024px){
+  .hero-content{grid-template-columns:1fr;gap:3rem}
+  .hero-card{max-width:520px}
+  .feature-row{grid-template-columns:1fr}
+  .feature-row.flip{direction:ltr}
+  .feature-visual{min-height:280px}
+  .footer-top{grid-template-columns:1fr 1fr}
+  .steps-grid,.pricing-grid,.testi-grid{grid-template-columns:1fr}
+  .stats-inner{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:640px){
+  .nav-links{display:none}
+  h1{font-size:3.5rem}
+  .hero-proof{flex-wrap:wrap;gap:1.5rem}
+  .form-row{grid-template-columns:1fr}
+  .footer-top{grid-template-columns:1fr}
+  .stats-inner{grid-template-columns:1fr 1fr}
+}
+
+/* animations */
+.fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="38" height="38" fill="#0a0a0a"/>
+          <!-- X mark — clean strokes, 8° lean, deep slate -->
+          <line x1="6" y1="6" x2="32" y2="32" stroke="#1E3550" stroke-width="7" stroke-linecap="square"/>
+          <line x1="32" y1="6" x2="6" y2="32" stroke="#1E3550" stroke-width="7" stroke-linecap="square"/>
+          <!-- highway double yellow line through center -->
+          <line x1="4" y1="19" x2="34" y2="19" stroke="#E8A020" stroke-width="1.5" stroke-linecap="square"/>
+          <line x1="4" y1="22" x2="34" y2="22" stroke="#E8A020" stroke-width="1.5" stroke-linecap="square"/>
+          <!-- center dashes -->
+          <line x1="15" y1="20.5" x2="18" y2="20.5" stroke="#0a0a0a" stroke-width="1"/>
+          <line x1="20" y1="20.5" x2="23" y2="20.5" stroke="#0a0a0a" stroke-width="1"/>
+        </svg>
+      </div>
+      <span class="logo-text"><em>EDGE</em></span>
+    </div>
+    <div class="nav-links">
+      <a href="#how">How ACE Works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <button class="nav-cta" onclick="openModal()">Get Started Free</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-stripe"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-left fade-up">
+      <div class="hero-badge">
+        <div class="hero-badge-dot"></div>
+        Now Active — Carrier Platform
+      </div>
+      <h1>
+        Carriers
+        <span class="gold">Gain An</span>
+        <span class="outline">Edge.</span>
+      </h1>
+      <p class="hero-sub">
+        Meet <strong>ACE</strong> — your Agentic Carrier Employee. Works 24/7 chasing brokers, parsing load boards, and firing SMS alerts the moment a matching load hits. 
+        <strong>$47/month vs. 6–10% dispatcher fee.</strong>
+      </p>
+      <div class="hero-btns">
+        <button class="btn-gold" onclick="openModal()">Start Free Trial →</button>
+        <a href="#how" class="btn-ghost">See How It Works</a>
+      </div>
+      <div class="hero-proof">
+        <div class="proof-item">
+          <div class="proof-num">24/7</div>
+          <div class="proof-label">Broker Outreach</div>
+        </div>
+        <div class="proof-div"></div>
+        <div class="proof-item">
+          <div class="proof-num">$47</div>
+          <div class="proof-label">Per Month</div>
+        </div>
+        <div class="proof-div"></div>
+        <div class="proof-item">
+          <div class="proof-num">8,000+</div>
+          <div class="proof-label">Broker Network</div>
+        </div>
+        <div class="proof-div"></div>
+        <div class="proof-item">
+          <div class="proof-num">&lt;60s</div>
+          <div class="proof-label">Load Alerts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HERO SIGNUP CARD -->
+    <div class="hero-card fade-up" style="animation-delay:0.2s">
+      <div class="card-tag">Carrier Registration</div>
+      <div class="card-title">Get ACE Working Tonight</div>
+      <div class="card-sub">Set up in minutes. ACE starts your broker outreach at 7AM tomorrow.</div>
+
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" placeholder="Mike Donovan">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" placeholder="mike@trucking.com">
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" placeholder="(214) 555-0100">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Equipment Type</label>
+        <select>
+          <option value="">Select your truck</option>
+          <option>Box Truck / Straight Truck</option>
+          <option>Dry Van</option>
+          <option>Reefer</option>
+          <option>Flatbed</option>
+          <option>Step Deck</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Choose Your Plan</label>
+      </div>
+      <div class="tier-select">
+        <div class="tier-opt active" onclick="selectTier(this)">
+          <div class="tier-opt-name">Base — ACE</div>
+          <div class="tier-opt-price">$47<span style="font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.3)">/mo</span></div>
+        </div>
+        <div class="tier-opt" onclick="selectTier(this)">
+          <div class="tier-opt-name">Custom — ACE+</div>
+          <div class="tier-opt-price">$97<span style="font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.3)">/mo</span></div>
+        </div>
+      </div>
+
+      <button class="btn-signup" onclick="handleSignup()">Activate ACE →</button>
+      <div class="card-fine">No credit card required to start &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Setup in 5 minutes</div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat">
+      <div class="stat-num">$47</div>
+      <div class="stat-label">vs 6–10% Dispatcher Fee</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">7AM</div>
+      <div class="stat-label">Daily Broker Outreach Starts</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">60s</div>
+      <div class="stat-label">Load Alert Response Time</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">100%</div>
+      <div class="stat-label">ACE Uptime Commitment</div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW ACE WORKS -->
+<section class="section section-dark" id="how">
+  <div class="section-inner">
+    <div class="eyebrow">How ACE Works</div>
+    <h2>Your Carrier Rep.<br>Never Calls In Sick.</h2>
+    <p class="section-sub">ACE runs your carrier operation in the background — broker outreach, load alerts, reply detection — while you focus on the road.</p>
+
+    <div class="steps-grid">
+      <div class="step" data-n="01">
+        <div class="step-num">01</div>
+        <div class="step-title">Connect & Configure</div>
+        <div class="step-desc">Connect your operations Gmail. Set your equipment type, home base, max mileage, and rate floor. Edge Tech Team walks you through setup on Concierge tier. Done in under 10 minutes.</div>
+        <div class="step-tag">One-Time Setup</div>
+      </div>
+      <div class="step" data-n="02">
+        <div class="step-num">02</div>
+        <div class="step-title">ACE Goes to Work</div>
+        <div class="step-desc">Every morning at 7AM, ACE fires outreach emails to your entire broker network — from your own Gmail, your name on every email. Brokers think it's you. Because professionally, it is.</div>
+        <div class="step-tag">Daily Automated</div>
+      </div>
+      <div class="step" data-n="03">
+        <div class="step-num">03</div>
+        <div class="step-title">You Get the Loads</div>
+        <div class="step-desc">Load board email hits your inbox — ACE parses it in seconds, matches against your profile, fires an SMS alert if it qualifies. You bid first. First bid wins.</div>
+        <div class="step-tag">Real-Time Alerts</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section section-black" id="features">
+  <div class="section-inner">
+    <div class="eyebrow">Platform Features</div>
+    <h2>Everything ACE Does<br>While You Drive.</h2>
+    <p class="section-sub">Base tier delivers immediate value Day 1. Custom tier unlocks real-time load board APIs and auto-bidding.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Feature 1 -->
+    <div class="feature-row">
+      <div class="feature-visual">
+        <div class="fv-inner">
+          <div class="fv-screen">
+            <div class="fv-bar">
+              <div class="fv-dot" style="background:#ff5f57"></div>
+              <div class="fv-dot" style="background:#febc2e"></div>
+              <div class="fv-dot" style="background:#28c840"></div>
+              <div class="fv-title-bar">ACE — Broker Outreach Log</div>
+            </div>
+            <div class="fv-body">
+              <div class="fv-row highlight">
+                <div class="fv-row-left">
+                  <div class="fv-row-co">Coyote Logistics</div>
+                  <div class="fv-row-lane">Dallas TX → OKC OK</div>
+                </div>
+                <div class="fv-row-right">
+                  <div class="fv-row-status status-won">REPLIED</div>
+                </div>
+              </div>
+              <div class="fv-row">
+                <div class="fv-row-left">
+                  <div class="fv-row-co">Echo Global Freight</div>
+                  <div class="fv-row-lane">Fort Worth TX → Houston TX</div>
+                </div>
+                <div class="fv-row-right">
+                  <div class="fv-row-status status-sent">SENT</div>
+                </div>
+              </div>
+              <div class="fv-row">
+                <div class="fv-row-left">
+                  <div class="fv-row-co">XPO Logistics</div>
+                  <div class="fv-row-lane">Dallas TX → Austin TX</div>
+                </div>
+                <div class="fv-row-right">
+                  <div class="fv-row-status status-sent">SENT</div>
+                </div>
+              </div>
+              <div class="fv-row">
+                <div class="fv-row-left">
+                  <div class="fv-row-co">CH Robinson</div>
+                  <div class="fv-row-lane">Irving TX → San Antonio TX</div>
+                </div>
+                <div class="fv-row-right">
+                  <div class="fv-row-status status-pending">PENDING</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="feature-copy">
+        <div class="feature-eyebrow">Broker Outreach</div>
+        <div class="feature-title">ACE Emails Your<br>Entire Broker Network<br>Every Morning.</div>
+        <div class="feature-desc">ACE sends outreach from your own Gmail — your name, your address, your reputation. Brokers see a consistent, professional carrier showing up every single day. You build relationships without making a single call.</div>
+        <ul class="feature-bullets">
+          <li>Daily 7AM automated outreach to full broker list</li>
+          <li>Emails sent from carrier's own Gmail — ACE is invisible</li>
+          <li>Reply detection — ACE flags load offers immediately</li>
+          <li>New broker contacts captured and classified automatically</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Feature 2 -->
+    <div class="feature-row flip">
+      <div class="feature-visual">
+        <div class="fv-inner">
+          <div class="fv-screen">
+            <div class="fv-bar">
+              <div class="fv-dot" style="background:#ff5f57"></div>
+              <div class="fv-dot" style="background:#febc2e"></div>
+              <div class="fv-dot" style="background:#28c840"></div>
+              <div class="fv-title-bar">ACE — Load Board Alerts</div>
+            </div>
+            <div class="fv-body">
+              <div style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.2);border-radius:4px;padding:14px;margin-bottom:10px">
+                <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px">SPOT ALERT — MATCHED ✓</div>
+                <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Dallas TX → Oklahoma City OK</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.4)">Box Truck &nbsp;·&nbsp; 244 mi &nbsp;·&nbsp; Pickup 4/27 &nbsp;·&nbsp; S3866353</div>
+                <div style="margin-top:10px;font-size:11px;font-weight:700;color:var(--gold)">↗ View on Spot Inc</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:4px;padding:12px;opacity:0.4">
+                <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:4px">NTG — NO MATCH</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.3)">Houston TX → Miami FL &nbsp;·&nbsp; 1,308 mi — exceeds max</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="feature-copy">
+        <div class="feature-eyebrow">Load Board Parsing</div>
+        <div class="feature-title">Your Load Board<br>Emails — Parsed<br>In Seconds.</div>
+        <div class="feature-desc">ACE monitors your Gmail for load board notification emails from Spot, NTG, DAT, Pride, Truckstop, and more. Every email parsed, filtered against your profile, and either SMS-alerted or silently discarded. No noise. Only loads that fit your truck.</div>
+        <ul class="feature-bullets">
+          <li>All load board email senders supported — Base tier Day 1</li>
+          <li>Filters by equipment, max mileage, and home base geography</li>
+          <li>SMS alert fired only on qualified matches</li>
+          <li>Custom tier unlocks real-time load board API — before the email arrives</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Feature 3 -->
+    <div class="feature-row">
+      <div class="feature-visual">
+        <div class="fv-inner">
+          <div class="fv-screen">
+            <div class="fv-bar">
+              <div class="fv-dot" style="background:#ff5f57"></div>
+              <div class="fv-dot" style="background:#febc2e"></div>
+              <div class="fv-dot" style="background:#28c840"></div>
+              <div class="fv-title-bar">ACE Dashboard — Load Wins</div>
+            </div>
+            <div class="fv-body">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.3)">This Month</div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold)">APR 2026</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+                <div style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.15);border-radius:3px;padding:12px;text-align:center">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:var(--gold);line-height:1">14</div>
+                  <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-top:3px">Load Wins</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border-radius:3px;padding:12px;text-align:center">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#fff;line-height:1">$8.4K</div>
+                  <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-top:3px">Revenue</div>
+                </div>
+              </div>
+              <div class="fv-row highlight">
+                <div class="fv-row-left">
+                  <div class="fv-row-co" style="color:rgba(255,255,255,0.9)">Echo Global — Dallas→OKC</div>
+                  <div class="fv-row-lane">244 mi · Box Truck · $680</div>
+                </div>
+                <div class="fv-row-right">
+                  <div class="fv-row-status status-won">WON</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="feature-copy">
+        <div class="feature-eyebrow">WIN Dashboard</div>
+        <div class="feature-title">Every Load Win.<br>Every Dollar.<br>All in One View.</div>
+        <div class="feature-desc">Your EDGE dashboard tracks every broker outreach, load alert, reply, and confirmed load win. See your revenue, your best lanes, your most responsive brokers — all at a glance. ACE learns which brokers perform and prioritizes them automatically.</div>
+        <ul class="feature-bullets">
+          <li>Real-time load win log with revenue tracking</li>
+          <li>Broker reply rates and response history</li>
+          <li>New broker inbox — review and add to your network</li>
+          <li>ACE performance metrics — outreach sent, matches fired, wins closed</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section section-dark" id="pricing">
+  <div class="section-inner">
+    <div class="eyebrow">Pricing</div>
+    <h2>One Flat Rate.<br>No Dispatcher Cut.</h2>
+    <p class="section-sub">ACE earns its fee on the first load it helps you win. No per-load fee. No percentage. No surprises.</p>
+
+    <div class="pricing-grid">
+      <div class="pc">
+        <div class="pc-tier">Base — ACE</div>
+        <div class="pc-price">$47<span>/mo</span></div>
+        <div class="pc-tagline">Broker outreach + load board email parsing. Immediate value Day 1. No integrations required.</div>
+        <ul class="pc-list">
+          <li>Daily 7AM broker outreach — full network</li>
+          <li>Load board email parsing (Spot, NTG, DAT, Pride +)</li>
+          <li>SMS load alerts on qualified matches</li>
+          <li>Broker reply detection and inbox</li>
+          <li>New broker contact capture</li>
+          <li>WIN dashboard — load wins + revenue</li>
+          <li>1 truck / 1 Gmail account</li>
+          <li class="no">Real-time load board API</li>
+          <li class="no">Auto-bid engine</li>
+          <li class="no">Lane intelligence</li>
+        </ul>
+        <button class="pc-btn pc-btn-outline" onclick="openModal()">Get Started</button>
+      </div>
+
+      <div class="pc featured">
+        <div class="pc-badge">Most Popular</div>
+        <div class="pc-tier">Custom — ACE+</div>
+        <div class="pc-price">$97<span>/mo</span></div>
+        <div class="pc-tagline">Everything in Base plus real-time DAT, Truckstop, and Highway API. The card up your sleeve.</div>
+        <ul class="pc-list">
+          <li>Everything in Base</li>
+          <li>Real-time DAT + Truckstop + Highway API</li>
+          <li>Auto-bid engine — first bid wins</li>
+          <li>Lane intelligence + rate optimization</li>
+          <li>ACE Level 2 broker learning + scoring</li>
+          <li>Up to 5 trucks</li>
+          <li>1 dispatcher — view only access</li>
+          <li>Full carrier profile + rate floor</li>
+        </ul>
+        <button class="pc-btn pc-btn-gold" onclick="openModal()">Get the Edge →</button>
+      </div>
+
+      <div class="pc">
+        <div class="pc-tier">Concierge</div>
+        <div class="pc-price" style="font-size:2.5rem">Custom</div>
+        <div class="pc-tagline">Edge Tech Team personally configures your ACE setup. White glove. Add to any tier.</div>
+        <ul class="pc-list">
+          <li>90-min live setup call + screen share</li>
+          <li>Custom broker list built from FMCSA database</li>
+          <li>Load board account review + email alert config</li>
+          <li>Lane strategy + rate floor consultation</li>
+          <li>7-day performance check-in call</li>
+          <li>Ongoing hourly Edge Tech Team support</li>
+          <li>$297 setup · $150–250/hr ongoing</li>
+        </ul>
+        <button class="pc-btn pc-btn-outline" onclick="openModal()">Contact Edge Tech Team</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section section-black">
+  <div class="section-inner">
+    <div class="eyebrow">Carrier Stories</div>
+    <h2>Real Carriers.<br>Real Loads Won.</h2>
+
+    <div class="testi-grid">
+      <div class="testi">
+        <div class="testi-stars">★★★★★</div>
+        <div class="testi-text">"ACE sent outreach to 40 brokers before I finished my morning coffee. Had two load offers by 8AM. Paid for itself in the first week."</div>
+        <div class="testi-author">
+          <div class="testi-avatar">MD</div>
+          <div>
+            <div class="testi-name">Mike D.</div>
+            <div class="testi-role">Box Truck Owner · Dallas, TX</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi">
+        <div class="testi-stars">★★★★★</div>
+        <div class="testi-text">"I was paying a dispatcher 8% and still chasing loads myself. EDGE cut that out completely. $47 a month is a no-brainer for what it does."</div>
+        <div class="testi-author">
+          <div class="testi-avatar">RL</div>
+          <div>
+            <div class="testi-name">Robert L.</div>
+            <div class="testi-role">Dry Van · Fort Worth, TX</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi">
+        <div class="testi-stars">★★★★★</div>
+        <div class="testi-text">"The load board alerts are the killer feature. NTG email comes in, I get a text in under a minute with exactly what I need to know. I bid first every time."</div>
+        <div class="testi-author">
+          <div class="testi-avatar">JT</div>
+          <div>
+            <div class="testi-name">James T.</div>
+            <div class="testi-role">Flatbed · Houston, TX</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-dark" id="faq">
+  <div class="section-inner">
+    <div class="eyebrow">FAQ</div>
+    <h2>Questions Carriers Ask.</h2>
+
+    <div class="faq-list">
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Do brokers know I'm using ACE?
+          <div class="faq-icon">+</div>
+        </button>
+        <div class="faq-a">No. ACE sends emails from your own Gmail account with your name and email address. To brokers, every outreach looks like you sent it personally. ACE is completely invisible. "Be the ACE card — not the one they see coming."</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          What load boards does ACE support?
+          <div class="faq-icon">+</div>
+        </button>
+        <div class="faq-a">On Base tier, ACE parses email notifications from any load board that sends structured emails — Spot Inc, NTG Freight, DAT, Pride Logistics, Truckstop, and more. If it sends an email with load details, ACE can parse it. Custom tier adds real-time API access to DAT, Truckstop, and Highway — before the email even arrives.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Do I need to change my load board accounts?
+          <div class="faq-icon">+</div>
+        </button>
+        <div class="faq-a">No. Base tier works with the email notifications your load boards already send. You keep your existing accounts exactly as they are. ACE monitors your Gmail inbox and filters the load alerts — no new accounts, no API keys required on Base tier.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          How does ACE know which loads to alert me on?
+          <div class="faq-icon">+</div>
+        </button>
+        <div class="faq-a">During onboarding you set your equipment type, home base zip code, max mileage radius, and preferred lanes. ACE filters every load alert against those criteria. Wrong equipment or out of range — silently discarded. Match — SMS fired immediately with load details and a direct link to bid.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          What is the Edge Tech Team?
+          <div class="faq-icon">+</div>
+        </button>
+        <div class="faq-a">The Edge Tech Team is the concierge service tier — a live 90-minute setup call where we personally configure your ACE account, build your broker list from the FMCSA database, configure your load board email alerts, and set your lane strategy. Available as an add-on to any subscription tier.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Can I cancel anytime?
+          <div class="faq-icon">+</div>
+        </button>
+        <div class="faq-a">Yes. Month-to-month on all tiers. No contracts, no cancellation fees. If ACE isn't winning you loads, you shouldn't pay for it — but we're confident it will.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BAND -->
+<section class="cta-band">
+  <div class="cta-band-inner">
+    <h2>First Bid Wins.<br>Be First.</h2>
+    <p>ACE starts your broker outreach at 7AM tomorrow. Set up takes 5 minutes.</p>
+    <button class="btn-dark" onclick="openModal()">Activate ACE Tonight →</button>
+    <div class="cta-fine">No credit card required &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Setup in 5 minutes</div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="logo-text"><em style="color:var(--gold)">EDGE</em></div>
+        <p>Agentic Carrier Employee. Works 24/7 so you don't have to chase loads, brokers, or dispatchers.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Platform</h4>
+        <a href="#how">How ACE Works</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="footer-col">
+        <h4>Plans</h4>
+        <a href="#pricing">Base — $47/mo</a>
+        <a href="#pricing">Custom — $97/mo</a>
+        <a href="#pricing">Concierge</a>
+        <a href="#" onclick="openModal()">Get Started</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+        <a href="mailto:support@xedge-ai.com">support@xedge-ai.com</a>
+        <a href="#">Edge Tech Team</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2026 XTX LLC DBA XTX-ai · All rights reserved · xedge-ai.com</div>
+      <div class="footer-trust">
+        <div class="trust-badge">Stripe Secured</div>
+        <div class="trust-badge">Gmail OAuth</div>
+        <div class="trust-badge">99.8% Uptime</div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- SIGNUP MODAL -->
+<div class="modal-overlay" id="signupModal" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-top"></div>
+    <div class="modal-body" id="modalBody">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-tag">Carrier Registration</div>
+      <div class="modal-title">Activate ACE</div>
+      <div class="modal-sub">Connect your Gmail and ACE goes to work tonight. Broker outreach starts at 7AM tomorrow.</div>
+
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" placeholder="Mike Donovan" id="m-name">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" placeholder="mike@trucking.com" id="m-email">
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" placeholder="(214) 555-0100">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Equipment Type</label>
+        <select>
+          <option value="">Select your truck</option>
+          <option>Box Truck / Straight Truck</option>
+          <option>Dry Van</option>
+          <option>Reefer</option>
+          <option>Flatbed</option>
+          <option>Step Deck</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Plan</label>
+        <select>
+          <option>Base — ACE ($47/mo)</option>
+          <option>Custom — ACE+ ($97/mo)</option>
+          <option>Concierge — Contact Edge Tech Team</option>
+        </select>
+      </div>
+      <button class="btn-signup" onclick="submitModal()" style="margin-top:1.5rem">Continue to Dashboard →</button>
+      <div class="card-fine">Clicking continue takes you to account setup. No charge until ACE is live.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// tier select
+function selectTier(el){
+  document.querySelectorAll('.tier-opt').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// modal
+function openModal(){
+  document.getElementById('signupModal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeModal(){
+  document.getElementById('signupModal').classList.remove('open');
+  document.body.style.overflow='';
+}
+function closeModalOutside(e){
+  if(e.target===document.getElementById('signupModal')) closeModal();
+}
+
+function submitModal(){
+  const name = document.getElementById('m-name').value;
+  const email = document.getElementById('m-email').value;
+  // In production this routes to edgeai-dashboard.vercel.app/login
+  // For demo — show success state
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-success">
+      <div class="modal-success-icon">⚡</div>
+      <h3>ACE Is Ready.</h3>
+      <p style="margin-bottom:1.5rem">Check your email to confirm your account, then connect your Gmail and ACE goes to work tonight.</p>
+      <a href="https://edgeai-dashboard.vercel.app/login" style="display:inline-block;background:var(--gold);color:#0a0a0a;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:14px 32px;border-radius:2px">Go to Dashboard →</a>
+      <div class="card-fine" style="margin-top:1rem">edgeai-dashboard.vercel.app</div>
+    </div>
+  `;
+}
+
+// faq
+function toggleFaq(btn){
+  const item = btn.parentElement;
+  const wasOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(f=>f.classList.remove('open'));
+  if(!wasOpen) item.classList.add('open');
+}
+
+// scroll animations
+const observer = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting) e.target.classList.add('visible');
+  });
+},{threshold:0.1});
+document.querySelectorAll('.fade-up').forEach(el=>observer.observe(el));
+</script>
+</body>
+</html>

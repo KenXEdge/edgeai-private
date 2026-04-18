@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE Dashboard — ACE Control Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#fff;overflow-x:hidden}
+
+:root{
+  --gold:#E8A020;
+  --gold-dim:rgba(232,160,32,0.12);
+  --gold-border:rgba(232,160,32,0.22);
+  --black:#0a0a0a;
+  --dark:#111111;
+  --dark2:#161616;
+  --dark3:#1c1c1c;
+  --border:rgba(255,255,255,0.06);
+  --text-dim:rgba(255,255,255,0.4);
+  --text-mid:rgba(255,255,255,0.6);
+  --sidebar-w:240px;
+}
+
+/* ── LAYOUT ── */
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:64px 1fr;height:100vh;overflow:hidden}
+
+/* ── TOPBAR ── */
+.topbar{grid-column:1/-1;background:rgba(10,10,10,0.98);border-bottom:1px solid var(--gold-border);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem 0 0;z-index:100;backdrop-filter:blur(16px)}
+.topbar-left{display:flex;align-items:center;height:64px;width:var(--sidebar-w);padding:0 1.5rem;border-right:1px solid var(--border);flex-shrink:0}
+.logo{display:flex;align-items:center;gap:6px}
+.logo-text{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:600;letter-spacing:5px;text-transform:uppercase}
+.logo-text em{color:var(--gold);font-style:normal}
+.logo-mark{width:30px;height:30px}
+
+.topbar-center{flex:1;padding:0 1.5rem}
+.topbar-greeting{font-size:13px;color:var(--text-dim)}
+.topbar-greeting strong{color:rgba(255,255,255,0.8);font-weight:600}
+
+.topbar-right{display:flex;align-items:center;gap:1rem}
+.ace-status{display:flex;align-items:center;gap:8px;background:var(--gold-dim);border:1px solid var(--gold-border);padding:7px 14px;border-radius:2px}
+.ace-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+.ace-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold)}
+
+.topbar-avatar{width:36px;height:36px;border-radius:2px;background:var(--dark3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--gold);cursor:pointer}
+
+/* ── SIDEBAR ── */
+.sidebar{background:var(--dark);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sidebar-section{padding:1.25rem 1rem 0.5rem;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.2)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 1rem;border-radius:2px;margin:1px 0.5rem;cursor:pointer;transition:all 0.15s;border:1px solid transparent;position:relative}
+.nav-item:hover{background:var(--dark3);color:#fff}
+.nav-item.active{background:var(--gold-dim);border-color:var(--gold-border);color:var(--gold)}
+.nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.nav-label{font-size:13px;font-weight:600;letter-spacing:0.3px}
+.nav-badge{margin-left:auto;background:var(--gold);color:var(--black);font-size:9px;font-weight:800;padding:2px 7px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
+.nav-badge.dim{background:rgba(255,255,255,0.08);color:var(--text-dim)}
+
+.sidebar-bottom{margin-top:auto;padding:1rem 0.5rem;border-top:1px solid var(--border)}
+.tier-card{background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:2px;padding:1rem;margin:0 0.5rem 0.75rem}
+.tier-card-name{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:4px}
+.tier-card-plan{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:800;color:#fff}
+.tier-card-price{font-size:11px;color:var(--text-dim);margin-top:2px}
+.upgrade-btn{width:100%;background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:9px;border-radius:2px;border:none;cursor:pointer;margin-top:8px;transition:background 0.15s}
+.upgrade-btn:hover{background:#f5b030}
+
+/* ── MAIN ── */
+.main{overflow-y:auto;background:var(--black)}
+.main-inner{padding:2rem;max-width:1400px;margin:0 auto}
+
+/* ── PAGE HEADER ── */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2rem}
+.page-title{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:1px;line-height:1}
+.page-sub{font-size:13px;color:var(--text-dim);margin-top:4px}
+.page-actions{display:flex;gap:0.75rem}
+.btn-sm{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:9px 18px;border-radius:2px;cursor:pointer;border:none;transition:all 0.15s}
+.btn-sm-gold{background:var(--gold);color:var(--black)}
+.btn-sm-gold:hover{background:#f5b030}
+.btn-sm-outline{background:transparent;color:var(--text-mid);border:1px solid var(--border)}
+.btn-sm-outline:hover{border-color:rgba(255,255,255,0.25);color:#fff}
+
+/* ── KPI GRID ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:2rem}
+.kpi{background:var(--dark);padding:1.5rem;position:relative;overflow:hidden;transition:background 0.15s}
+.kpi:hover{background:var(--dark2)}
+.kpi-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:0.5rem}
+.kpi-value{font-family:'Barlow Condensed',sans-serif;font-size:2.4rem;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px}
+.kpi-value.gold{color:var(--gold)}
+.kpi-delta{font-size:11px;margin-top:6px;display:flex;align-items:center;gap:5px}
+.kpi-delta.up{color:#32c864}
+.kpi-delta.neutral{color:var(--text-dim)}
+.kpi-sparkline{position:absolute;bottom:0;right:0;left:0;height:3px;background:var(--gold-dim)}
+.kpi-sparkline-fill{height:100%;background:var(--gold);width:0;transition:width 1s ease}
+
+/* ── GRID 2COL ── */
+.grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+
+/* ── PANEL ── */
+.panel{background:var(--dark);border:1px solid var(--border)}
+.panel-header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#fff}
+.panel-sub{font-size:10px;color:var(--text-dim);margin-top:2px;letter-spacing:0.5px}
+.panel-action{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gold);cursor:pointer;background:none;border:none;padding:0;transition:opacity 0.15s}
+.panel-action:hover{opacity:0.7}
+.panel-body{padding:1.25rem 1.5rem}
+
+/* ── ACE STATUS PANEL ── */
+.ace-mode{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--gold-dim);border-bottom:1px solid var(--gold-border)}
+.ace-mode-left{display:flex;align-items:center;gap:12px}
+.ace-mode-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+.ace-mode-label{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold)}
+.ace-mode-detail{font-size:11px;color:rgba(232,160,32,0.6);margin-top:1px}
+.ace-toggle{background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:7px 14px;border-radius:2px;border:none;cursor:pointer}
+
+/* ── OUTREACH TABLE ── */
+.outreach-table{width:100%;border-collapse:collapse}
+.outreach-table th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);padding:0.6rem 0;border-bottom:1px solid var(--border);text-align:left}
+.outreach-table td{padding:0.75rem 0;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle}
+.outreach-table tr:last-child td{border-bottom:none}
+.broker-name{font-size:13px;font-weight:600;color:rgba(255,255,255,0.8)}
+.broker-lane{font-size:11px;color:var(--text-dim);margin-top:2px;letter-spacing:0.3px}
+.status-pill{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 9px;border-radius:2px}
+.pill-sent{background:rgba(255,255,255,0.06);color:var(--text-dim)}
+.pill-replied{background:rgba(50,200,100,0.12);color:#32c864}
+.pill-offer{background:rgba(232,160,32,0.15);color:var(--gold)}
+.pill-won{background:rgba(50,200,100,0.2);color:#32c864;border:1px solid rgba(50,200,100,0.3)}
+.time-label{font-size:11px;color:var(--text-dim)}
+
+/* ── ALERT FEED ── */
+.alert-item{padding:1rem 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:12px;align-items:flex-start}
+.alert-item:last-child{border-bottom:none}
+.alert-icon{width:34px;height:34px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.alert-icon-match{background:rgba(232,160,32,0.12);border:1px solid var(--gold-border)}
+.alert-icon-broker{background:rgba(50,200,100,0.1);border:1px solid rgba(50,200,100,0.2)}
+.alert-icon-noise{background:rgba(255,255,255,0.04);border:1px solid var(--border)}
+.alert-body{flex:1;min-width:0}
+.alert-headline{font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:3px;line-height:1.4}
+.alert-detail{font-size:11px;color:var(--text-dim);line-height:1.5}
+.alert-time{font-size:10px;color:rgba(255,255,255,0.2);white-space:nowrap;margin-top:2px}
+.alert-badge{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;flex-shrink:0;margin-top:2px}
+.badge-match{background:rgba(232,160,32,0.15);color:var(--gold)}
+.badge-reply{background:rgba(50,200,100,0.12);color:#32c864}
+.badge-noise{background:rgba(255,255,255,0.05);color:var(--text-dim)}
+
+/* ── WIN LOG ── */
+.win-item{display:flex;align-items:center;justify-content:space-between;padding:0.875rem 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.win-item:last-child{border-bottom:none}
+.win-left{display:flex;flex-direction:column;gap:3px}
+.win-broker{font-size:13px;font-weight:600;color:rgba(255,255,255,0.8)}
+.win-lane{font-size:11px;color:var(--text-dim)}
+.win-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.win-amount{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:800;color:var(--gold);letter-spacing:-0.5px}
+.win-date{font-size:10px;color:rgba(255,255,255,0.2)}
+
+/* ── MINI CHART ── */
+.mini-chart{display:flex;align-items:flex-end;gap:4px;height:60px;padding:0 0 4px}
+.bar{flex:1;background:var(--gold-dim);border-radius:1px 1px 0 0;transition:background 0.15s;cursor:default;position:relative}
+.bar:hover{background:rgba(232,160,32,0.3)}
+.bar.active{background:var(--gold)}
+.chart-labels{display:flex;gap:4px;margin-top:6px}
+.chart-label{flex:1;text-align:center;font-size:9px;color:rgba(255,255,255,0.2);letter-spacing:0.5px}
+
+/* ── SETUP CHECKLIST ── */
+.setup-steps{display:flex;flex-direction:column;gap:0}
+.setup-step{display:flex;align-items:center;gap:14px;padding:0.875rem 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.setup-step:last-child{border-bottom:none}
+.step-check{width:26px;height:26px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.step-check.done{background:rgba(50,200,100,0.15);border:1px solid rgba(50,200,100,0.3);color:#32c864}
+.step-check.pending{background:var(--gold-dim);border:1px solid var(--gold-border);color:var(--gold)}
+.step-check.locked{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text-dim)}
+.step-text{flex:1}
+.step-name{font-size:13px;font-weight:600;color:rgba(255,255,255,0.75)}
+.step-name.dim{color:rgba(255,255,255,0.3)}
+.step-detail{font-size:11px;color:var(--text-dim);margin-top:2px}
+.step-action{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);cursor:pointer;background:none;border:none;padding:0;white-space:nowrap}
+
+/* ── TABS ── */
+.tabs{display:flex;border-bottom:1px solid var(--border);gap:0}
+.tab{padding:0.875rem 1.5rem;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s}
+.tab:hover{color:rgba(255,255,255,0.7)}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-count{margin-left:6px;background:var(--gold);color:var(--black);font-size:9px;font-weight:800;padding:1px 6px;border-radius:2px;font-family:'Barlow Condensed',sans-serif}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">
+        <svg class="logo-mark" viewBox="160 90 290 310" xmlns="http://www.w3.org/2000/svg" style="width:44px;height:44px">
+          <rect x="-0.5" y="19.3" width="599.5" height="520" fill="#0a0a0a" rx="12"/>
+          <g transform="matrix(0.789252,0,0,0.95394961,305.23108,281.09146)">
+            <polygon points="-93,-70 -155,-172 -62,-172 0,-70" fill="#E8A020" transform="translate(-1.0162992,35.06232)"/>
+            <polygon points="-93,-172 -28,-84 -64,-84 -128,-172" fill="#0a0a0a" transform="translate(-5.0814956,34.554171)"/>
+            <polygon points="0,-70 93,-70 155,-172 62,-172" fill="#E8A020" transform="translate(0.50814957,35.06232)"/>
+            <polygon points="28,-84 64,-84 128,-172 93,-172" fill="#0a0a0a" transform="translate(0.50814957,35.06232)"/>
+            <polygon points="-62,172 0,70 -93,70 -155,172" fill="#E8A020" transform="translate(0.50814959,-71.64909)"/>
+            <polygon points="-93,172 -28,84 -64,84 -128,172" fill="#0a0a0a" transform="translate(0.50814959,-71.64909)"/>
+            <polygon points="0,70 93,70 170,188 65,172" fill="#E8A020" transform="translate(-0.50814961,-71.64909)"/>
+            <polygon points="28,84 64,84 140,188 95,172" fill="#0a0a0a" transform="translate(-0.50814961,-71.64909)"/>
+          </g>
+          <line x1="235.9" y1="255.0" x2="373.4" y2="255.0" stroke="#E8A020" stroke-width="2.5" stroke-linecap="square"/>
+          <line x1="236.5" y1="271.6" x2="372.9" y2="271.6" stroke="#E8A020" stroke-width="2.5" stroke-linecap="square"/>
+        </svg>
+        <span class="logo-text"><em>EDGE</em></span>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <div class="topbar-greeting">Good morning, <strong>Ken</strong> — ACE is running your 7AM outreach</div>
+    </div>
+    <div class="topbar-right">
+      <div class="ace-status">
+        <div class="ace-dot"></div>
+        <div class="ace-label">ACE Active</div>
+      </div>
+      <div class="topbar-avatar">KK</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">Operations</div>
+    <div class="nav-item active">
+      <div class="nav-icon">⚡</div>
+      <div class="nav-label">Dashboard</div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">📨</div>
+      <div class="nav-label">Broker Outreach</div>
+      <div class="nav-badge">42</div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">🚛</div>
+      <div class="nav-label">Load Alerts</div>
+      <div class="nav-badge">3</div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">📥</div>
+      <div class="nav-label">Inbox</div>
+      <div class="nav-badge">7</div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">🏆</div>
+      <div class="nav-label">Load Wins</div>
+      <div class="nav-badge dim">14</div>
+    </div>
+
+    <div class="sidebar-section">Network</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">🤝</div>
+      <div class="nav-label">Brokers</div>
+      <div class="nav-badge dim">265</div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">❓</div>
+      <div class="nav-label">Unknown Brokers</div>
+      <div class="nav-badge">2</div>
+    </div>
+
+    <div class="sidebar-section">Account</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">⚙️</div>
+      <div class="nav-label">ACE Settings</div>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon">👤</div>
+      <div class="nav-label">Profile</div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="tier-card">
+        <div class="tier-card-name">Current Plan</div>
+        <div class="tier-card-plan">Base — ACE</div>
+        <div class="tier-card-price">$47 / month</div>
+        <button class="upgrade-btn">Upgrade to ACE+ →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="main-inner">
+
+      <!-- ACE MODE BAR -->
+      <div class="ace-mode" style="margin-bottom:1.5rem;border:1px solid var(--gold-border)">
+        <div class="ace-mode-left">
+          <div class="ace-mode-dot"></div>
+          <div>
+            <div class="ace-mode-label">ACE Running — Morning Outreach Active</div>
+            <div class="ace-mode-detail">42 broker emails sent · 7:04 AM · Next run tomorrow 7:00 AM</div>
+          </div>
+        </div>
+        <button class="ace-toggle">Pause ACE</button>
+      </div>
+
+      <!-- PAGE HEADER -->
+      <div class="page-header">
+        <div>
+          <div class="page-title">Command Center</div>
+          <div class="page-sub">Friday, April 18, 2026 &nbsp;·&nbsp; Box Truck &nbsp;·&nbsp; Dallas, TX 50mi radius</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn-sm btn-sm-outline">View Logs</button>
+          <button class="btn-sm btn-sm-gold">+ Add Broker</button>
+        </div>
+      </div>
+
+      <!-- KPI STRIP -->
+      <div class="kpi-grid" style="margin-bottom:1.5rem">
+        <div class="kpi">
+          <div class="kpi-label">Emails Sent Today</div>
+          <div class="kpi-value">42</div>
+          <div class="kpi-delta up">↑ +8 vs last week</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:70%"></div></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Broker Replies</div>
+          <div class="kpi-value gold">7</div>
+          <div class="kpi-delta up">↑ 16.6% reply rate</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:45%"></div></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Load Wins — April</div>
+          <div class="kpi-value">14</div>
+          <div class="kpi-delta up">↑ Best month so far</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:60%"></div></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Revenue — April</div>
+          <div class="kpi-value gold">$8.4K</div>
+          <div class="kpi-delta neutral">Est. $12K by month end</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:55%"></div></div>
+        </div>
+      </div>
+
+      <!-- 2 COL: OUTREACH + LIVE FEED -->
+      <div class="grid-2">
+
+        <!-- Outreach Log -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Today's Outreach</div>
+              <div class="panel-sub">42 sent · 7 replied · 3 load offers</div>
+            </div>
+            <button class="panel-action">View All</button>
+          </div>
+          <div class="tabs">
+            <div class="tab active">All <span class="tab-count">42</span></div>
+            <div class="tab">Replied <span class="tab-count" style="background:rgba(50,200,100,0.2);color:#32c864">7</span></div>
+            <div class="tab">Offers <span class="tab-count">3</span></div>
+          </div>
+          <div class="panel-body" style="padding:0 1.5rem">
+            <table class="outreach-table">
+              <thead>
+                <tr>
+                  <th>Broker</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="broker-name">Coyote Logistics</div><div class="broker-lane">Dallas TX → OKC OK</div></td>
+                  <td><div class="status-pill pill-offer">📦 Load Offer</div></td>
+                  <td><div class="time-label">7:42am</div></td>
+                </tr>
+                <tr>
+                  <td><div class="broker-name">Echo Global Freight</div><div class="broker-lane">Fort Worth TX → Houston TX</div></td>
+                  <td><div class="status-pill pill-replied">✓ Replied</div></td>
+                  <td><div class="time-label">7:38am</div></td>
+                </tr>
+                <tr>
+                  <td><div class="broker-name">Arrive Logistics</div><div class="broker-lane">Dallas TX → Austin TX</div></td>
+                  <td><div class="status-pill pill-offer">📦 Load Offer</div></td>
+                  <td><div class="time-label">7:31am</div></td>
+                </tr>
+                <tr>
+                  <td><div class="broker-name">XPO Logistics</div><div class="broker-lane">Irving TX → San Antonio TX</div></td>
+                  <td><div class="status-pill pill-sent">→ Sent</div></td>
+                  <td><div class="time-label">7:18am</div></td>
+                </tr>
+                <tr>
+                  <td><div class="broker-name">CH Robinson</div><div class="broker-lane">Dallas TX → Abilene TX</div></td>
+                  <td><div class="status-pill pill-sent">→ Sent</div></td>
+                  <td><div class="time-label">7:12am</div></td>
+                </tr>
+                <tr>
+                  <td><div class="broker-name">Total Quality Logistics</div><div class="broker-lane">Plano TX → Tulsa OK</div></td>
+                  <td><div class="status-pill pill-replied">✓ Replied</div></td>
+                  <td><div class="time-label">7:09am</div></td>
+                </tr>
+                <tr>
+                  <td><div class="broker-name">RXO Transport</div><div class="broker-lane">Dallas TX → Shreveport LA</div></td>
+                  <td><div class="status-pill pill-offer">📦 Load Offer</div></td>
+                  <td><div class="time-label">7:05am</div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live ACE Feed -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">ACE Live Feed</div>
+              <div class="panel-sub">Real-time inbox activity</div>
+            </div>
+            <button class="panel-action">Inbox →</button>
+          </div>
+          <div class="panel-body">
+            <div class="alert-item">
+              <div class="alert-icon alert-icon-match">🚛</div>
+              <div class="alert-body">
+                <div class="alert-headline">SPOT ALERT — Dallas TX → OKC OK</div>
+                <div class="alert-detail">Box Truck · 244 mi · Pickup 4/18 · Shipment S3866353</div>
+                <div class="alert-time">2 min ago · SMS fired ✓</div>
+              </div>
+              <div class="alert-badge badge-match">MATCH</div>
+            </div>
+            <div class="alert-item">
+              <div class="alert-icon alert-icon-broker">✉️</div>
+              <div class="alert-body">
+                <div class="alert-headline">Coyote Logistics — Load Offer Reply</div>
+                <div class="alert-detail">Dallas → OKC · Box Truck · $680 flat</div>
+                <div class="alert-time">8 min ago · Classified: Load Offer</div>
+              </div>
+              <div class="alert-badge badge-reply">OFFER</div>
+            </div>
+            <div class="alert-item">
+              <div class="alert-icon alert-icon-match">🚛</div>
+              <div class="alert-body">
+                <div class="alert-headline">NTG ALERT — Houston TX → Miami FL</div>
+                <div class="alert-detail">1,308 mi · Exceeds 50mi max radius — discarded</div>
+                <div class="alert-time">14 min ago · No SMS — filtered out</div>
+              </div>
+              <div class="alert-badge badge-noise">NO MATCH</div>
+            </div>
+            <div class="alert-item">
+              <div class="alert-icon alert-icon-broker">👤</div>
+              <div class="alert-body">
+                <div class="alert-headline">New Broker Contact — Freight Connections LLC</div>
+                <div class="alert-detail">Inbound inquiry — Dallas lanes · Add to network?</div>
+                <div class="alert-time">22 min ago · Pending review</div>
+              </div>
+              <div class="alert-badge badge-reply">NEW</div>
+            </div>
+            <div class="alert-item">
+              <div class="alert-icon alert-icon-noise">🔕</div>
+              <div class="alert-body">
+                <div class="alert-headline">Apple iCloud — Storage notification</div>
+                <div class="alert-detail">Noise detected — silently discarded</div>
+                <div class="alert-time">31 min ago</div>
+              </div>
+              <div class="alert-badge badge-noise">NOISE</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 3 COL: WIN LOG + CHART + SETUP -->
+      <div class="grid-3">
+
+        <!-- Load Wins -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Load Wins</div>
+              <div class="panel-sub">April 2026 · 14 confirmed</div>
+            </div>
+            <button class="panel-action">All Wins</button>
+          </div>
+          <div class="panel-body">
+            <div class="win-item">
+              <div class="win-left">
+                <div class="win-broker">Echo Global Freight</div>
+                <div class="win-lane">Dallas → OKC · 244 mi · Box Truck</div>
+              </div>
+              <div class="win-right">
+                <div class="win-amount">$680</div>
+                <div class="win-date">Apr 17</div>
+              </div>
+            </div>
+            <div class="win-item">
+              <div class="win-left">
+                <div class="win-broker">Arrive Logistics</div>
+                <div class="win-lane">Fort Worth → Houston · 262 mi</div>
+              </div>
+              <div class="win-right">
+                <div class="win-amount">$720</div>
+                <div class="win-date">Apr 16</div>
+              </div>
+            </div>
+            <div class="win-item">
+              <div class="win-left">
+                <div class="win-broker">Coyote Logistics</div>
+                <div class="win-lane">Dallas → Austin · 195 mi</div>
+              </div>
+              <div class="win-right">
+                <div class="win-amount">$540</div>
+                <div class="win-date">Apr 15</div>
+              </div>
+            </div>
+            <div class="win-item">
+              <div class="win-left">
+                <div class="win-broker">TQL</div>
+                <div class="win-lane">Irving → San Antonio · 263 mi</div>
+              </div>
+              <div class="win-right">
+                <div class="win-amount">$695</div>
+                <div class="win-date">Apr 14</div>
+              </div>
+            </div>
+            <div class="win-item">
+              <div class="win-left">
+                <div class="win-broker">RXO Transport</div>
+                <div class="win-lane">Plano → Shreveport · 197 mi</div>
+              </div>
+              <div class="win-right">
+                <div class="win-amount">$510</div>
+                <div class="win-date">Apr 13</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Chart -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Weekly Outreach</div>
+              <div class="panel-sub">Emails sent per day</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1.25rem">
+              <div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:2.5rem;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px">267</div>
+                <div style="font-size:10px;color:var(--text-dim);margin-top:4px;letter-spacing:1px;text-transform:uppercase">Emails This Week</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:13px;font-weight:700;color:#32c864">↑ 12%</div>
+                <div style="font-size:10px;color:var(--text-dim)">vs last week</div>
+              </div>
+            </div>
+            <div class="mini-chart">
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:70%"></div>
+              <div class="bar" style="height:60%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar active" style="height:90%"></div>
+            </div>
+            <div class="chart-labels">
+              <div class="chart-label">MON</div>
+              <div class="chart-label">TUE</div>
+              <div class="chart-label">WED</div>
+              <div class="chart-label">THU</div>
+              <div class="chart-label">FRI</div>
+              <div class="chart-label">SAT</div>
+              <div class="chart-label" style="color:var(--gold)">TODAY</div>
+            </div>
+            <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.6rem">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:12px;color:var(--text-dim)">Avg reply rate</div>
+                <div style="font-size:13px;font-weight:700;color:#fff">16.6%</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:12px;color:var(--text-dim)">Best broker</div>
+                <div style="font-size:13px;font-weight:700;color:var(--gold)">Coyote</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:12px;color:var(--text-dim)">Active brokers</div>
+                <div style="font-size:13px;font-weight:700;color:#fff">265</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Setup Checklist -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Setup Progress</div>
+              <div class="panel-sub">3 of 6 steps complete</div>
+            </div>
+          </div>
+          <div class="panel-body" style="padding:0 1.5rem">
+            <div class="setup-steps">
+              <div class="setup-step">
+                <div class="step-check done">✓</div>
+                <div class="step-text">
+                  <div class="step-name">Account Created</div>
+                  <div class="step-detail">Email confirmed · Active</div>
+                </div>
+              </div>
+              <div class="setup-step">
+                <div class="step-check done">✓</div>
+                <div class="step-text">
+                  <div class="step-name">Plan Selected</div>
+                  <div class="step-detail">Base — ACE · $47/mo</div>
+                </div>
+              </div>
+              <div class="setup-step">
+                <div class="step-check done">✓</div>
+                <div class="step-text">
+                  <div class="step-name">Carrier Profile</div>
+                  <div class="step-detail">Box Truck · Dallas 50mi · Set</div>
+                </div>
+              </div>
+              <div class="setup-step">
+                <div class="step-check pending">→</div>
+                <div class="step-text">
+                  <div class="step-name">Connect Gmail</div>
+                  <div class="step-detail">ACE needs your ops Gmail to start</div>
+                </div>
+                <button class="step-action">Connect →</button>
+              </div>
+              <div class="setup-step">
+                <div class="step-check locked">○</div>
+                <div class="step-text">
+                  <div class="step-name dim">Import Broker List</div>
+                  <div class="step-detail">Unlocks after Gmail connected</div>
+                </div>
+              </div>
+              <div class="setup-step">
+                <div class="step-check locked">○</div>
+                <div class="step-text">
+                  <div class="step-name dim">ACE Goes Live</div>
+                  <div class="step-detail">Broker outreach begins at 7AM</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- /main-inner -->
+  </div><!-- /main -->
+
+</div><!-- /app -->
+
+<script>
+function setActive(el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// animate kpi sparklines on load
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    document.querySelectorAll('.kpi-sparkline-fill').forEach(el=>{
+      el.style.width = el.style.width; // trigger
+    });
+  },300);
+});
+</script>
+</body>
+</html>

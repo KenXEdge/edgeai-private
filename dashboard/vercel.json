@@ -1,1 +1,7 @@
-{"rewrites":[{"source":"/((?!api/).*)","destination":"/index.html"}]}
+{
+  "routes": [
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/dashboard", "destination": "/dashboard.html" }
+  ],
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+}
