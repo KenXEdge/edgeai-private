@@ -39,6 +39,8 @@ html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;col
 .topbar-right{display:flex;align-items:center;gap:1rem}
 .topbar-label{font-size:12px;color:var(--text-dim);letter-spacing:0.5px}
 .topbar-avatar{width:36px;height:36px;border-radius:2px;background:var(--dark3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--gold)}
+.theme-toggle{width:34px;height:34px;border-radius:2px;background:var(--dark3);border:1px solid var(--border);color:rgba(255,255,255,0.55);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border 0.15s,color 0.15s;flex-shrink:0;line-height:1}
+.theme-toggle:hover{border-color:rgba(255,255,255,0.2);color:#fff}
 
 /* ── PROGRESS BAR ── */
 .progress-wrap{background:var(--dark);border-bottom:1px solid var(--border);padding:0 2rem}
@@ -193,6 +195,7 @@ html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;col
 
 <!-- TOPBAR -->
 <div class="topbar">
+  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">☀️</button>
   <div class="logo">
     <svg viewBox="0 0 600 530" xmlns="http://www.w3.org/2000/svg" style="width:72px;height:72px;flex-shrink:0">
       <rect width="599.49182" height="520" fill="#0a0a0a" rx="11.989837" x="0.50814956" y="12.195591"/>
@@ -415,6 +418,12 @@ function buildGrid(containerId, countId) {
 function updateCount(containerId, countId) {
   const n = document.querySelectorAll(`#${containerId} .state-btn.on`).length;
   document.getElementById(countId).textContent = n;
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('light-mode');
+  document.getElementById('theme-toggle').textContent =
+    document.body.classList.contains('light-mode') ? '🌙' : '☀️';
 }
 
 buildGrid('pickup-grid', 'pickup-count');
