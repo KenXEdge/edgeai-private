@@ -234,14 +234,6 @@ body.light .logo-bg-rect{fill:#f5f3ef}
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&display=swap" rel="stylesheet">
 </head>
 <body>
-<!-- Theme Toggle -->
-<div class="theme-toggle" id="themeToggle">
-  <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
-  <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
-    <div class="toggle-thumb" id="toggleThumb"></div>
-  </div>
-  <span class="toggle-label" id="label-light">Light</span>
-</div>
 <div class="app">
 
   <!-- TOPBAR -->
@@ -258,6 +250,13 @@ body.light .logo-bg-rect{fill:#f5f3ef}
       <div class="ace-status">
         <div class="ace-dot"></div>
         <div class="ace-label">ACE Active</div>
+      </div>
+      <div class="theme-toggle" id="themeToggle" style="position:static;background:none;border:none;backdrop-filter:none;padding:0;gap:8px">
+        <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
+        <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
+          <div class="toggle-thumb" id="toggleThumb"></div>
+        </div>
+        <span class="toggle-label" id="label-light">Light</span>
       </div>
       <div class="topbar-avatar">KK</div>
     </div>
