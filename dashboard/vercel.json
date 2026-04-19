@@ -9,5 +9,13 @@
     { "source": "/onboard/rates", "destination": "/onboard-rates.html" },
     { "source": "/onboard/gmail", "destination": "/onboard-gmail.html" }
   ],
-  "rewrites": [{ "source": "/((?!api/|assets/).*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!api/|assets/).*)", "destination": "/index.html" }],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    }
+  ]
 }

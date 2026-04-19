@@ -248,7 +248,7 @@ body.light .logo-bg-rect{fill:#f5f3ef}
   <div class="topbar">
     <div class="topbar-left">
       <div class="logo">
-      <img id="logo-img" src="/assets/logo-edge-white.png" style="height:72px;width:auto;display:block" alt="EDGE">
+      <img id="logo-img" src="/assets/logo-edge-white.png" style="height:54px;width:auto;display:block" alt="EDGE">
       </div>
     </div>
     <div class="topbar-center">
@@ -721,7 +721,7 @@ function toggleTheme() {
   var logoImg = document.getElementById('logo-img');
   if (logoImg) logoImg.src = isLight ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png';
 }
-(function(){
+document.addEventListener('DOMContentLoaded', function() {
   var t = localStorage.getItem('edgeTheme');
   if (t === 'light') {
     document.body.classList.add('light');
@@ -735,7 +735,7 @@ function toggleTheme() {
     var logoImg = document.getElementById('logo-img');
     if (logoImg) logoImg.src = '/assets/logo-edge-black.png';
   }
-})();
+});
 </script>
 </body>
 </html>

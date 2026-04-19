@@ -551,7 +551,7 @@ function toggleTheme() {
   var logoImg = document.getElementById('logo-img');
   if (logoImg) logoImg.src = isLight ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png';
 }
-(function(){
+document.addEventListener('DOMContentLoaded', function() {
   var t = localStorage.getItem('edgeTheme');
   if (t === 'light') {
     document.body.classList.add('light');
@@ -565,7 +565,7 @@ function toggleTheme() {
     var logoImg = document.getElementById('logo-img');
     if (logoImg) logoImg.src = '/assets/logo-edge-black.png';
   }
-})();
+});
 
 </script>
 </body>
