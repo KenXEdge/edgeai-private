@@ -273,7 +273,7 @@ footer{background:#080808;border-top:1px solid rgba(255,255,255,0.05);padding:4r
 .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
 .fade-up.visible{opacity:1;transform:translateY(0)}
 /* ── THEME TOGGLE ── */
-.theme-toggle{position:fixed;top:1.25rem;right:calc(1.5rem + 216px);z-index:500;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:4px 9px}
+.theme-toggle{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:4px 9px}
 body.light .theme-toggle{background:rgba(0,0,0,0.06);border-color:rgba(0,0,0,0.1)}
 .toggle-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.5)}
 body.light .toggle-label{color:rgba(0,0,0,0.35)}
@@ -406,15 +406,6 @@ body.light h1 .gold{color:#a07010}
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&display=swap" rel="stylesheet">
 </head>
 <body>
-<!-- Theme Toggle -->
-<div class="theme-toggle" id="themeToggle">
-  <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
-  <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
-    <div class="toggle-thumb" id="toggleThumb"></div>
-  </div>
-  <span class="toggle-label" id="label-light">Light</span>
-</div>
-
 <!-- NAV -->
 <nav>
   <div class="nav-inner">
@@ -426,6 +417,13 @@ body.light h1 .gold{color:#a07010}
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
+    </div>
+    <div class="theme-toggle" id="themeToggle">
+      <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
+      <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
+        <div class="toggle-thumb" id="toggleThumb"></div>
+      </div>
+      <span class="toggle-label" id="label-light">Light</span>
     </div>
     <button class="nav-cta" onclick="openModal()">Get Started Free</button>
   </div>
