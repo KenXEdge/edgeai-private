@@ -220,20 +220,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="logo">
-    <svg viewBox="0 0 600 530" xmlns="http://www.w3.org/2000/svg" style="width:72px;height:72px;flex-shrink:0">
-      <rect width="599.49182" height="520" fill="#0a0a0a" rx="11.989837" x="0.50814956" y="12.195591"/>
-      <text x="345.38437" y="309.55154" font-family="Arial" font-size="11" fill="rgba(255,255,255,0.25)" text-anchor="middle" letter-spacing="19.6195" style="font-size:43.1629px;font-family:Arial;" transform="scale(1.0775903,0.92799652)"><tspan style="fill:#ffffff;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:60.7559px;font-family:Arial;">-----------</tspan></text>
-      <g transform="matrix(1.5136007,0,0,1.6146727,289.17129,301.27229)">
-        <polygon points="0,-70 -93,-70 -155,-172 -62,-172" style="fill:#b38f00" transform="translate(-1.0162992,35.06232)"/>
-        <polygon points="-128,-172 -93,-172 -28,-84 -64,-84" style="fill:#0a0a0a" transform="translate(-5.0814956,34.554171)"/>
-        <polygon points="62,-172 0,-70 93,-70 155,-172" style="fill:#b59000" transform="translate(0.50814957,35.06232)"/>
-        <polygon points="93,-172 28,-84 64,-84 128,-172" style="fill:#0a0a0a" transform="translate(0.50814957,35.06232)"/>
-        <polygon points="-155,172 -62,172 0,70 -93,70" style="fill:#b39000" transform="translate(0.50814959,-71.64909)"/>
-        <polygon points="-128,172 -93,172 -28,84 -64,84" style="fill:#0a0a0a" transform="translate(0.50814959,-71.64909)"/>
-        <polygon points="65,172 0,70 93,70 170,188" style="fill:#b38e00" transform="translate(-0.50814961,-71.64909)"/>
-        <polygon points="95,172 28,84 64,84 140,188" style="fill:#0a0a0a" transform="translate(-0.50814961,-71.64909)"/>
-      </g>
-    </svg>
+    <img id="logo-img" src="/assets/edge_refined_roadline1.png" style="width:72px;height:72px;flex-shrink:0">
     <span style="font-family:'Exo 2',sans-serif;font-size:1.32rem;font-weight:800;letter-spacing:4px;color:transparent;text-transform:uppercase;-webkit-text-stroke:0.8px #666;margin-left:1.5px;margin-bottom:7px">EDGE</span>
   </div>
   <div class="topbar-right">
@@ -456,6 +443,8 @@ function toggleTheme() {
   if (!isLight) { labelDark.style.color='#E8A020'; labelLight.style.color=''; }
   else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
   localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
+  var logoImg = document.getElementById('logo-img');
+  if (logoImg) logoImg.src = isLight ? '/assets/X_yellow_dash_tranp.png' : '/assets/edge_refined_roadline1.png';
 }
 (function(){
   var t = localStorage.getItem('edgeTheme');
@@ -468,6 +457,8 @@ function toggleTheme() {
     if (track) track.classList.add('light-on');
     if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
     if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
+    var logoImg = document.getElementById('logo-img');
+    if (logoImg) logoImg.src = '/assets/X_yellow_dash_tranp.png';
   }
 })();
 
