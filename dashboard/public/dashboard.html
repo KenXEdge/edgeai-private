@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+(function(){
+  var t = localStorage.getItem("edgeTheme");
+  if(t === "light") document.documentElement.classList.add("light");
+})();
+</script>
 <title>EDGE Dashboard — ACE Control Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -189,10 +195,30 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+/* ── THEME TOGGLE ── */
+.theme-toggle{position:fixed;top:1.25rem;right:1.5rem;z-index:500;display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 14px}
+body.light .theme-toggle{background:rgba(0,0,0,0.06);border-color:rgba(0,0,0,0.1)}
+.theme-toggle .toggle-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5)}
+body.light .theme-toggle .toggle-label{color:rgba(0,0,0,0.35)}
+.theme-toggle .toggle-label.active{color:#E8A020}
+body.light .theme-toggle .toggle-label.active{color:#a07010}
+.toggle-track{width:36px;height:20px;background:rgba(255,255,255,0.12);border-radius:10px;position:relative;cursor:pointer;transition:background 0.25s;flex-shrink:0;border:1px solid rgba(255,255,255,0.15)}
+body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.12)}
+.toggle-track.light-on{background:rgba(232,160,32,0.3);border-color:rgba(232,160,32,0.4)}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform 0.25s;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.toggle-track.light-on .toggle-thumb{transform:translateX(16px);background:#E8A020}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&display=swap" rel="stylesheet">
 </head>
 <body>
+<!-- Theme Toggle -->
+<div class="theme-toggle" id="themeToggle">
+  <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
+  <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
+    <div class="toggle-thumb" id="toggleThumb"></div>
+  </div>
+  <span class="toggle-label" id="label-light">Light</span>
+</div>
 <div class="app">
 
   <!-- TOPBAR -->
@@ -669,6 +695,34 @@ window.addEventListener('load',()=>{
     });
   },300);
 });
+
+function toggleTheme() {
+  const body = document.body;
+  const track = document.getElementById('toggleTrack');
+  const labelDark = document.getElementById('label-dark');
+  const labelLight = document.getElementById('label-light');
+  const isLight = body.classList.toggle('light');
+  document.documentElement.classList.toggle('light', isLight);
+  track.classList.toggle('light-on', isLight);
+  labelDark.classList.toggle('active', !isLight);
+  labelLight.classList.toggle('active', isLight);
+  if (!isLight) { labelDark.style.color='#E8A020'; labelLight.style.color=''; }
+  else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
+  localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
+}
+(function(){
+  var t = localStorage.getItem('edgeTheme');
+  if (t === 'light') {
+    document.body.classList.add('light');
+    document.documentElement.classList.add('light');
+    var track = document.getElementById('toggleTrack');
+    var labelDark = document.getElementById('label-dark');
+    var labelLight = document.getElementById('label-light');
+    if (track) track.classList.add('light-on');
+    if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
+    if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
+  }
+})();
 </script>
 </body>
 </html>

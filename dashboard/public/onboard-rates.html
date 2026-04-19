@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+(function(){
+  var t = localStorage.getItem("edgeTheme");
+  if(t === "light") document.documentElement.classList.add("light");
+})();
+</script>
 <title>EDGE — Rate Preferences</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -398,12 +404,27 @@ function toggleTheme() {
   const labelDark = document.getElementById('label-dark');
   const labelLight = document.getElementById('label-light');
   const isLight = body.classList.toggle('light');
+  document.documentElement.classList.toggle('light', isLight);
   track.classList.toggle('light-on', isLight);
   labelDark.classList.toggle('active', !isLight);
   labelLight.classList.toggle('active', isLight);
   if (!isLight) { labelDark.style.color='#E8A020'; labelLight.style.color=''; }
   else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
+  localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
 }
+(function(){
+  var t = localStorage.getItem('edgeTheme');
+  if (t === 'light') {
+    document.body.classList.add('light');
+    document.documentElement.classList.add('light');
+    var track = document.getElementById('toggleTrack');
+    var labelDark = document.getElementById('label-dark');
+    var labelLight = document.getElementById('label-light');
+    if (track) track.classList.add('light-on');
+    if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
+    if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
+  }
+})();
 
 const radioGroups = {};
 
