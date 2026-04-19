@@ -284,6 +284,29 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 .toggle-track.light-on{background:rgba(232,160,32,0.3);border-color:rgba(232,160,32,0.4)}
 .toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform 0.25s;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
 .toggle-track.light-on .toggle-thumb{transform:translateX(16px);background:#E8A020}
+
+/* ── LIGHT MODE ── */
+body.light{
+  --black:#f5f3ef;
+  --dark:#ffffff;
+  --dark2:#f0ede8;
+  --border:rgba(0,0,0,0.09);
+  --text-dim:rgba(0,0,0,0.4);
+  --text-mid:rgba(0,0,0,0.6);
+  --gold-dim:rgba(232,160,32,0.1);
+  --gold-border:rgba(232,160,32,0.3);
+  background:#f5f3ef;
+  color:#0a0a0a;
+}
+body.light .logo-text{color:#0a0a0a}
+body.light .proof-label{color:rgba(0,0,0,0.35)}
+body.light .proof-div{background:rgba(0,0,0,0.1)}
+body.light .form-group label{color:rgba(0,0,0,0.45)}
+body.light .form-group input,body.light .form-group select{background:#f8f8f8;border-color:#e0e0e0;color:#0a0a0a}
+body.light .form-group input::placeholder{color:rgba(0,0,0,0.2)}
+body.light .form-divider::before,body.light .form-divider::after{background:#eee}
+body.light .form-divider span{color:#ccc}
+body.light .logo-bg-rect{fill:#f5f3ef}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&display=swap" rel="stylesheet">
 </head>
@@ -300,9 +323,8 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <!-- NAV -->
 <nav>
   <div class="nav-inner">
-    <div class="logo" style="display:flex;align-items:flex-end;gap:1.5px">
-      <img id="logo-img" src="/assets/edge_refined_roadline1.png" style="width:72px;height:72px;flex-shrink:0">
-      <span style="font-family:'Exo 2',sans-serif;font-size:1.32rem;font-weight:800;letter-spacing:4px;color:transparent;text-transform:uppercase;-webkit-text-stroke:0.8px #666;margin-left:1.5px;margin-bottom:7px">EDGE</span>
+    <div class="logo">
+      <img id="logo-img" src="/assets/logo-edge-white.png" style="height:72px;width:auto;display:block" alt="EDGE">
     </div>
     <div class="nav-links">
       <a href="#how">How ACE Works</a>
@@ -960,7 +982,7 @@ function toggleTheme() {
   else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
   localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
   var logoImg = document.getElementById('logo-img');
-  if (logoImg) logoImg.src = isLight ? '/assets/X_yellow_dash_tranp.png' : '/assets/edge_refined_roadline1.png';
+  if (logoImg) logoImg.src = isLight ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png';
 }
 (function(){
   var t = localStorage.getItem('edgeTheme');
@@ -974,7 +996,7 @@ function toggleTheme() {
     if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
     if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
     var logoImg = document.getElementById('logo-img');
-    if (logoImg) logoImg.src = '/assets/X_yellow_dash_tranp.png';
+    if (logoImg) logoImg.src = '/assets/logo-edge-black.png';
   }
 })();
 </script>
