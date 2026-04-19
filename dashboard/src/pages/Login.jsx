@@ -93,10 +93,11 @@ export default function Login() {
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0C447C] mb-4">
-            <span className="text-white text-2xl font-bold">E</span>
-          </div>
-          <h1 className="text-2xl font-bold text-[#0C447C]">EDGEai</h1>
+          <img
+            src="/assets/x-full-logo-blk.svg"
+            alt="XEdge Logo"
+            className="h-16 w-auto mb-4"
+          />
           <p className="text-slate-500 text-sm mt-1">Carrier Engagement Platform</p>
         </div>
 
