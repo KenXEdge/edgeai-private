@@ -273,17 +273,17 @@ footer{background:#080808;border-top:1px solid rgba(255,255,255,0.05);padding:4r
 .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
 .fade-up.visible{opacity:1;transform:translateY(0)}
 /* ── THEME TOGGLE ── */
-.theme-toggle{position:fixed;top:1.25rem;right:calc(1.5rem + 216px);z-index:500;display:flex;align-items:center;gap:5px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:3px 7px}
+.theme-toggle{position:fixed;top:1.25rem;right:calc(1.5rem + 216px);z-index:500;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:4px 9px}
 body.light .theme-toggle{background:rgba(0,0,0,0.06);border-color:rgba(0,0,0,0.1)}
-.toggle-label{font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.5)}
+.toggle-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.5)}
 body.light .toggle-label{color:rgba(0,0,0,0.35)}
 .toggle-label.active{color:#E8A020}
 body.light .toggle-label.active{color:#a07010}
-.toggle-track{width:18px;height:10px;background:rgba(255,255,255,0.12);border-radius:5px;position:relative;cursor:pointer;transition:background 0.25s;flex-shrink:0;border:1px solid rgba(255,255,255,0.15)}
+.toggle-track{width:22px;height:12px;background:rgba(255,255,255,0.12);border-radius:6px;position:relative;cursor:pointer;transition:background 0.25s;flex-shrink:0;border:1px solid rgba(255,255,255,0.15)}
 body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.12)}
 .toggle-track.light-on{background:rgba(232,160,32,0.3);border-color:rgba(232,160,32,0.4)}
-.toggle-thumb{position:absolute;top:1px;left:1px;width:7px;height:7px;border-radius:50%;background:#fff;transition:transform 0.25s;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
-.toggle-track.light-on .toggle-thumb{transform:translateX(8px);background:#E8A020}
+.toggle-thumb{position:absolute;top:1px;left:1px;width:9px;height:9px;border-radius:50%;background:#fff;transition:transform 0.25s;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.toggle-track.light-on .toggle-thumb{transform:translateX(10px);background:#E8A020}
 
 /* ── LIGHT MODE ── */
 body.light{
@@ -343,6 +343,9 @@ body.light .feature-mini-item{color:rgba(0,0,0,0.5)}
 body.light .feature-mini-item::before{color:#E8A020}
 /* light mode logo bg fix */
 body.light .logo-bg-rect{fill:#f5f3ef}
+body.light nav{background:rgba(255,255,255,0.98);border-bottom:1px solid rgba(0,0,0,0.1)}
+body.light .nav-links a{color:rgba(0,0,0,0.6)}
+body.light .nav-links a:hover{color:#0a0a0a}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&display=swap" rel="stylesheet">
 </head>
