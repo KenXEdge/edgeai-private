@@ -264,9 +264,8 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
     <div class="left-content">
       <!-- Logo -->
-      <div class="logo" style="display:flex;align-items:flex-end;gap:1.5px">
-      <img id="logo-img" src="/assets/edge_refined_roadline1.png" style="width:72px;height:72px;flex-shrink:0">
-      <span style="font-family:'Exo 2',sans-serif;font-size:1.32rem;font-weight:800;letter-spacing:4px;color:transparent;text-transform:uppercase;-webkit-text-stroke:0.8px #666;margin-left:1.5px;margin-bottom:7px">EDGE</span>
+      <div class="logo">
+      <img id="logo-img" src="/assets/x-full-logo-wht.svg" style="height:52px;width:auto" alt="EDGE">
       </div>
 
       <!-- Hero Copy -->
@@ -550,7 +549,7 @@ function toggleTheme() {
   else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
   localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
   var logoImg = document.getElementById('logo-img');
-  if (logoImg) logoImg.src = isLight ? '/assets/X_yellow_dash_tranp.png' : '/assets/edge_refined_roadline1.png';
+  if (logoImg) logoImg.src = isLight ? '/assets/x-full-logo-blk.svg' : '/assets/x-full-logo-wht.svg';
 }
 (function(){
   var t = localStorage.getItem('edgeTheme');
@@ -564,7 +563,7 @@ function toggleTheme() {
     if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
     if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
     var logoImg = document.getElementById('logo-img');
-    if (logoImg) logoImg.src = '/assets/X_yellow_dash_tranp.png';
+    if (logoImg) logoImg.src = '/assets/x-full-logo-blk.svg';
   }
 })();
 
