@@ -39,8 +39,17 @@ html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;col
 .topbar-right{display:flex;align-items:center;gap:1rem}
 .topbar-label{font-size:12px;color:var(--text-dim);letter-spacing:0.5px}
 .topbar-avatar{width:36px;height:36px;border-radius:2px;background:var(--dark3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--gold)}
-.theme-toggle{width:34px;height:34px;border-radius:2px;background:var(--dark3);border:1px solid var(--border);color:rgba(255,255,255,0.55);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border 0.15s,color 0.15s;flex-shrink:0;line-height:1}
-.theme-toggle:hover{border-color:rgba(255,255,255,0.2);color:#fff}
+.theme-toggle{position:fixed;top:1.25rem;right:1.5rem;z-index:500;display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 14px}
+body.light .theme-toggle{background:rgba(0,0,0,0.06);border-color:rgba(0,0,0,0.1)}
+.toggle-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5)}
+body.light .toggle-label{color:rgba(0,0,0,0.35)}
+.toggle-label.active{color:#E8A020}
+body.light .toggle-label.active{color:#a07010}
+.toggle-track{width:36px;height:20px;background:rgba(255,255,255,0.12);border-radius:10px;position:relative;cursor:pointer;transition:background 0.25s;flex-shrink:0;border:1px solid rgba(255,255,255,0.15)}
+body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.12)}
+.toggle-track.light-on{background:rgba(232,160,32,0.3);border-color:rgba(232,160,32,0.4)}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform 0.25s;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.toggle-track.light-on .toggle-thumb{transform:translateX(16px);background:#E8A020}
 
 /* ── PROGRESS BAR ── */
 .progress-wrap{background:var(--dark);border-bottom:1px solid var(--border);padding:0 2rem}
@@ -188,9 +197,17 @@ html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;col
 </head>
 <body>
 
+<!-- Theme Toggle -->
+<div class="theme-toggle" id="themeToggle">
+  <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
+  <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
+    <div class="toggle-thumb" id="toggleThumb"></div>
+  </div>
+  <span class="toggle-label" id="label-light">Light</span>
+</div>
+
 <!-- TOPBAR -->
 <div class="topbar">
-  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">☀️</button>
   <div class="logo">
     <svg viewBox="0 0 600 530" xmlns="http://www.w3.org/2000/svg" style="width:72px;height:72px;flex-shrink:0">
       <rect width="599.49182" height="520" fill="#0a0a0a" rx="11.989837" x="0.50814956" y="12.195591"/>
@@ -437,9 +454,16 @@ function handleContinue() {
 }
 
 function toggleTheme() {
-  document.body.classList.toggle('light-mode');
-  document.getElementById('theme-toggle').textContent =
-    document.body.classList.contains('light-mode') ? '🌙' : '☀️';
+  const body = document.body;
+  const track = document.getElementById('toggleTrack');
+  const labelDark = document.getElementById('label-dark');
+  const labelLight = document.getElementById('label-light');
+  const isLight = body.classList.toggle('light');
+  track.classList.toggle('light-on', isLight);
+  labelDark.classList.toggle('active', !isLight);
+  labelLight.classList.toggle('active', isLight);
+  if (!isLight) { labelDark.style.color='#E8A020'; labelLight.style.color=''; }
+  else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
 }
 
 function highlight(id, msg) {
