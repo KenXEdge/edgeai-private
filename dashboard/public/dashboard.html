@@ -276,7 +276,7 @@ body.light .logo-bg-rect{fill:#f5f3ef}
   <div class="topbar">
     <div class="topbar-left">
       <div class="logo">
-      <img id="logo-img" src="/assets/logo-edge-white.png" style="display:block" alt="EDGE">
+      <img id="logo-img" src="/assets/logo-edge-white.png?v=2" style="display:block" alt="EDGE">
       </div>
     </div>
     <div class="topbar-center">
@@ -754,7 +754,7 @@ function toggleTheme() {
   else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
   localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
   var logoImg = document.getElementById('logo-img');
-  if (logoImg) logoImg.src = isLight ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png';
+  if (logoImg) logoImg.src = isLight ? '/assets/logo-edge-black.png?v=2' : '/assets/logo-edge-white.png?v=2';
 }
 document.addEventListener('DOMContentLoaded', function() {
   var t = localStorage.getItem('edgeTheme');
@@ -768,7 +768,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
     if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
     var logoImg = document.getElementById('logo-img');
-    if (logoImg) logoImg.src = '/assets/logo-edge-black.png';
+    if (logoImg) logoImg.src = '/assets/logo-edge-black.png?v=2';
   }
 });
 </script>
