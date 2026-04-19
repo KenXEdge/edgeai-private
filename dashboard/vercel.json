@@ -3,7 +3,10 @@
     { "source": "/", "destination": "/home.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/dashboard", "destination": "/dashboard.html" },
-    { "source": "/marketing", "destination": "/marketing.html" }
+    { "source": "/marketing", "destination": "/marketing.html" },
+    { "source": "/onboard", "destination": "/onboard.html" },
+    { "source": "/onboard/lanes", "destination": "/onboard-lanes.html" },
+    { "source": "/onboard/rates", "destination": "/onboard-rates.html" }
   ],
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE — Rate Preferences</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#fff}
+
+:root{
+  --gold:#E8A020;
+  --gold-dim:rgba(232,160,32,0.12);
+  --gold-border:rgba(232,160,32,0.22);
+  --black:#0a0a0a;
+  --dark:#111111;
+  --dark2:#161616;
+  --dark3:#1c1c1c;
+  --border:rgba(255,255,255,0.06);
+  --text-dim:rgba(255,255,255,0.4);
+  --text-mid:rgba(255,255,255,0.65);
+}
+
+/* ── TOPBAR ── */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(10,10,10,0.97);
+  border-bottom:1px solid var(--gold-border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 2rem;height:64px;
+  backdrop-filter:blur(16px);
+}
+.logo{display:flex;align-items:flex-end;gap:1.5px}
+.topbar-right{display:flex;align-items:center;gap:1rem}
+.topbar-label{font-size:12px;color:var(--text-dim);letter-spacing:0.5px}
+.topbar-avatar{width:36px;height:36px;border-radius:2px;background:var(--dark3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--gold)}
+
+/* ── PROGRESS ── */
+.progress-wrap{background:var(--dark);border-bottom:1px solid var(--border);padding:0 2rem}
+.progress-inner{max-width:680px;margin:0 auto;padding:1rem 0}
+.progress-steps{display:flex;align-items:center;margin-bottom:0.6rem}
+.progress-step{flex:1;display:flex;flex-direction:column;align-items:center;position:relative}
+.progress-step:not(:last-child)::after{
+  content:'';position:absolute;top:13px;left:50%;width:100%;height:1px;
+  background:var(--border);z-index:0;
+}
+.progress-step.done::after{background:var(--gold)}
+.step-dot{
+  width:26px;height:26px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;
+  position:relative;z-index:1;transition:all 0.2s;
+}
+.step-dot.active{background:var(--gold);color:#000;box-shadow:0 0 12px rgba(232,160,32,0.4)}
+.step-dot.done{background:rgba(50,200,100,0.2);border:1px solid rgba(50,200,100,0.4);color:#32c864}
+.step-dot.pending{background:var(--dark3);border:1px solid var(--border);color:var(--text-dim)}
+.step-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:5px;color:var(--text-dim);white-space:nowrap}
+.step-label.active{color:var(--gold)}
+.progress-bar-track{height:3px;background:var(--border);border-radius:2px;margin-top:0.75rem}
+.progress-bar-fill{height:100%;background:var(--gold);border-radius:2px;width:60%;transition:width 0.4s ease}
+
+/* ── PAGE ── */
+.page{max-width:680px;margin:0 auto;padding:2.5rem 2rem 6rem}
+.page-header{margin-bottom:2.25rem}
+.page-eyebrow{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem}
+.page-title{font-family:'Barlow Condensed',sans-serif;font-size:2.4rem;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:1px;line-height:1}
+.page-sub{font-size:14px;color:var(--text-dim);margin-top:0.6rem;line-height:1.5}
+
+/* ── SECTIONS ── */
+.form-section{background:var(--dark);border:1px solid var(--border);margin-bottom:1.25rem}
+.section-header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.section-icon{width:32px;height:32px;border-radius:2px;background:var(--gold-dim);border:1px solid var(--gold-border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.section-title{font-family:'Barlow Condensed',sans-serif;font-size:0.95rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#fff}
+.section-sub{font-size:10px;color:var(--text-dim);margin-top:1px}
+.section-body{padding:1.5rem}
+
+/* ── FIELDS ── */
+.field{display:flex;flex-direction:column;gap:5px}
+.field-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)}
+.field input{
+  background:var(--dark2);border:1px solid var(--border);
+  color:#fff;font-family:'Barlow',sans-serif;font-size:14px;
+  padding:10px 12px;border-radius:2px;outline:none;
+  transition:border 0.15s,background 0.15s;width:100%;
+}
+.field input::placeholder{color:var(--text-dim)}
+.field input:focus{border-color:var(--gold-border);background:rgba(232,160,32,0.04)}
+.field-hint{font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.4}
+
+.field-row{display:grid;gap:0.875rem;margin-bottom:0;padding:0}
+.field-row.cols-2{grid-template-columns:1fr 1fr}
+
+/* ── PREFIX/SUFFIX INPUTS ── */
+.input-wrap{position:relative;display:flex;align-items:center}
+.input-prefix{position:absolute;left:12px;font-size:14px;font-weight:700;color:var(--gold);pointer-events:none}
+.input-suffix{position:absolute;right:12px;font-size:11px;color:var(--text-dim);pointer-events:none}
+.input-wrap input{width:100%}
+.input-wrap.has-prefix input{padding-left:26px}
+.input-wrap.has-suffix input{padding-right:52px}
+
+/* ── RADIO GROUP ── */
+.radio-group{display:flex;flex-direction:column;gap:0.625rem}
+.radio-row{display:grid;grid-template-columns:1fr 1fr;gap:0.625rem}
+.radio-item{
+  display:flex;align-items:center;gap:12px;
+  background:var(--dark2);border:1px solid var(--border);
+  padding:0.875rem 1rem;cursor:pointer;transition:all 0.15s;border-radius:2px;
+}
+.radio-item:hover{border-color:rgba(255,255,255,0.15)}
+.radio-item.on{background:var(--gold-dim);border-color:var(--gold-border)}
+.radio-circle{width:18px;height:18px;border-radius:50%;flex-shrink:0;border:1.5px solid var(--border);background:var(--dark3);display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.radio-item.on .radio-circle{border-color:var(--gold);background:var(--gold)}
+.radio-dot{width:7px;height:7px;border-radius:50%;background:#000;opacity:0;transition:opacity 0.15s}
+.radio-item.on .radio-dot{opacity:1}
+.radio-text{display:flex;flex-direction:column;gap:2px}
+.radio-label{font-size:13px;font-weight:600;color:var(--text-mid)}
+.radio-item.on .radio-label{color:#fff}
+.radio-desc{font-size:10px;color:var(--text-dim)}
+
+/* ── BOTTOM BAR ── */
+.bottom-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(10,10,10,0.97);border-top:1px solid var(--gold-border);
+  padding:1rem 2rem;backdrop-filter:blur(16px);z-index:50;
+}
+.bottom-inner{max-width:680px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.bottom-step-info{display:flex;flex-direction:column;gap:2px}
+.bottom-step-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)}
+.bottom-step-name{font-size:13px;font-weight:600;color:rgba(255,255,255,0.7)}
+.bottom-step-next{font-size:11px;color:var(--text-dim);margin-top:1px}
+.bottom-actions{display:flex;align-items:center;gap:0.75rem}
+.btn-back{
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;
+  background:transparent;color:var(--text-dim);
+  padding:12px 20px;border-radius:2px;border:1px solid var(--border);cursor:pointer;
+  transition:all 0.15s;
+}
+.btn-back:hover{border-color:rgba(255,255,255,0.2);color:#fff}
+.btn-continue{
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
+  letter-spacing:2px;text-transform:uppercase;
+  background:var(--gold);color:#000;
+  padding:12px 32px;border-radius:2px;border:none;cursor:pointer;
+  transition:background 0.15s,transform 0.1s;
+  display:flex;align-items:center;gap:8px;
+}
+.btn-continue:hover{background:#f5b030}
+.btn-continue:active{transform:scale(0.98)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <svg viewBox="0 0 600 530" xmlns="http://www.w3.org/2000/svg" style="width:72px;height:72px;flex-shrink:0">
+      <rect width="599.49182" height="520" fill="#0a0a0a" rx="11.989837" x="0.50814956" y="12.195591"/>
+      <text x="345.38437" y="309.55154" font-family="Arial" font-size="11" fill="rgba(255,255,255,0.25)" text-anchor="middle" letter-spacing="19.6195" style="font-size:43.1629px;font-family:Arial;" transform="scale(1.0775903,0.92799652)"><tspan style="fill:#ffffff;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:60.7559px;font-family:Arial;">-----------</tspan></text>
+      <g transform="matrix(1.5136007,0,0,1.6146727,289.17129,301.27229)">
+        <polygon points="0,-70 -93,-70 -155,-172 -62,-172" style="fill:#b38f00" transform="translate(-1.0162992,35.06232)"/>
+        <polygon points="-128,-172 -93,-172 -28,-84 -64,-84" style="fill:#0a0a0a" transform="translate(-5.0814956,34.554171)"/>
+        <polygon points="62,-172 0,-70 93,-70 155,-172" style="fill:#b59000" transform="translate(0.50814957,35.06232)"/>
+        <polygon points="93,-172 28,-84 64,-84 128,-172" style="fill:#0a0a0a" transform="translate(0.50814957,35.06232)"/>
+        <polygon points="-155,172 -62,172 0,70 -93,70" style="fill:#b39000" transform="translate(0.50814959,-71.64909)"/>
+        <polygon points="-128,172 -93,172 -28,84 -64,84" style="fill:#0a0a0a" transform="translate(0.50814959,-71.64909)"/>
+        <polygon points="65,172 0,70 93,70 170,188" style="fill:#b38e00" transform="translate(-0.50814961,-71.64909)"/>
+        <polygon points="95,172 28,84 64,84 140,188" style="fill:#0a0a0a" transform="translate(-0.50814961,-71.64909)"/>
+      </g>
+    </svg>
+    <span style="font-family:'Exo 2',sans-serif;font-size:1.32rem;font-weight:800;letter-spacing:4px;color:transparent;text-transform:uppercase;-webkit-text-stroke:0.8px #666;margin-left:1.5px;margin-bottom:7px">EDGE</span>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-label">Carrier Setup</div>
+    <div class="topbar-avatar">KK</div>
+  </div>
+</div>
+
+<!-- PROGRESS STEPS -->
+<div class="progress-wrap">
+  <div class="progress-inner">
+    <div class="progress-steps">
+      <div class="progress-step done">
+        <div class="step-dot done">✓</div>
+        <div class="step-label">Truck</div>
+      </div>
+      <div class="progress-step done">
+        <div class="step-dot done">✓</div>
+        <div class="step-label">Lanes</div>
+      </div>
+      <div class="progress-step">
+        <div class="step-dot active">3</div>
+        <div class="step-label active">Rates</div>
+      </div>
+      <div class="progress-step">
+        <div class="step-dot pending">4</div>
+        <div class="step-label">Gmail</div>
+      </div>
+      <div class="progress-step">
+        <div class="step-dot pending">5</div>
+        <div class="step-label">Review</div>
+      </div>
+    </div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <div class="page-header">
+    <div class="page-eyebrow">Step 3 of 5</div>
+    <div class="page-title">Rate Preferences</div>
+    <div class="page-sub">Set your minimums — ACE will automatically skip any load that doesn't meet your standards.</div>
+  </div>
+
+  <!-- SECTION 1 — Rate Floor -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">💵</div>
+      <div>
+        <div class="section-title">Rate Floor</div>
+        <div class="section-sub">Minimum acceptable rate per mile</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <div class="field-label">Minimum Rate per Mile</div>
+        <div class="input-wrap has-prefix has-suffix">
+          <span class="input-prefix">$</span>
+          <input type="number" id="rate-floor" min="0" step="0.01" placeholder="2.50">
+          <span class="input-suffix">/ mile</span>
+        </div>
+        <div class="field-hint">ACE will not accept load offers below this rate.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2 — Preferred Load Value -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">📋</div>
+      <div>
+        <div class="section-title">Preferred Load Value</div>
+        <div class="section-sub">Minimum total payout per load</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <div class="field-label">Minimum Load Value ($)</div>
+        <div class="input-wrap has-prefix">
+          <span class="input-prefix">$</span>
+          <input type="number" id="min-load-value" min="0" step="1" placeholder="500">
+        </div>
+        <div class="field-hint">Minimum total payout per load — ACE filters out loads below this amount.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3 — Deadhead Tolerance -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">🛣️</div>
+      <div>
+        <div class="section-title">Deadhead Tolerance</div>
+        <div class="section-sub">Max empty miles to reach a pickup</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <div class="field-label">Maximum Deadhead Miles</div>
+        <div class="input-wrap has-suffix">
+          <input type="number" id="deadhead" min="0" step="1" placeholder="e.g. 50">
+          <span class="input-suffix">miles</span>
+        </div>
+        <div class="field-hint">How far will you drive empty to get a load?</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4 — Fuel Surcharge -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">⛽</div>
+      <div>
+        <div class="section-title">Fuel Surcharge</div>
+        <div class="section-sub">Do you require a fuel surcharge on loads?</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="radio-row">
+        <div class="radio-item" id="fuel-yes" onclick="selectRadio('fuel','fuel-yes')">
+          <div class="radio-circle"><div class="radio-dot"></div></div>
+          <div class="radio-text">
+            <div class="radio-label">Yes — Required</div>
+            <div class="radio-desc">Must include FSC</div>
+          </div>
+        </div>
+        <div class="radio-item" id="fuel-no" onclick="selectRadio('fuel','fuel-no')">
+          <div class="radio-circle"><div class="radio-dot"></div></div>
+          <div class="radio-text">
+            <div class="radio-label">No — Not Required</div>
+            <div class="radio-desc">FSC not needed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5 — Payment Terms -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">⚡</div>
+      <div>
+        <div class="section-title">Payment Terms</div>
+        <div class="section-sub">Preferred payment speed</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="radio-group">
+        <div class="radio-item" id="pay-quick" onclick="selectRadio('pay','pay-quick')">
+          <div class="radio-circle"><div class="radio-dot"></div></div>
+          <div class="radio-text">
+            <div class="radio-label">Quick Pay (1–3 days)</div>
+            <div class="radio-desc">Fee accepted for fast payment</div>
+          </div>
+        </div>
+        <div class="radio-item" id="pay-standard" onclick="selectRadio('pay','pay-standard')">
+          <div class="radio-circle"><div class="radio-dot"></div></div>
+          <div class="radio-text">
+            <div class="radio-label">Standard Pay (30 days)</div>
+            <div class="radio-desc">No fee — net 30</div>
+          </div>
+        </div>
+        <div class="radio-item" id="pay-either" onclick="selectRadio('pay','pay-either')">
+          <div class="radio-circle"><div class="radio-dot"></div></div>
+          <div class="radio-text">
+            <div class="radio-label">Either — Best Rate Wins</div>
+            <div class="radio-desc">ACE chooses based on load value</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <div class="bottom-inner">
+    <div class="bottom-step-info">
+      <div class="bottom-step-label">Step 3 of 5</div>
+      <div class="bottom-step-name">Rate Preferences</div>
+      <div class="bottom-step-next">Next: Gmail →</div>
+    </div>
+    <div class="bottom-actions">
+      <button class="btn-back" onclick="window.location.href='/onboard/lanes'">← Back</button>
+      <button class="btn-continue" onclick="handleContinue()">
+        Save &amp; Continue
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const radioGroups = {};
+
+function selectRadio(group, id) {
+  if (!radioGroups[group]) radioGroups[group] = [];
+  radioGroups[group].forEach(el => document.getElementById(el).classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  if (!radioGroups[group].includes(id)) radioGroups[group].push(id);
+}
+
+['fuel-yes','fuel-no'].forEach(id => { if(!radioGroups['fuel']) radioGroups['fuel']=[]; radioGroups['fuel'].push(id); });
+['pay-quick','pay-standard','pay-either'].forEach(id => { if(!radioGroups['pay']) radioGroups['pay']=[]; radioGroups['pay'].push(id); });
+
+function handleContinue() {
+  window.location.href = '/onboard/gmail';
+}
+</script>
+</body>
+</html>
