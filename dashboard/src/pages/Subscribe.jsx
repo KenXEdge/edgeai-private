@@ -202,7 +202,7 @@ export default function Subscribe() {
                 className={`w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-colors duration-150 disabled:opacity-50 ${
                   tier.highlight
                     ? 'bg-[#185FA5] hover:bg-[#0C447C] text-white'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                    : 'bg-[#185FA5] hover:bg-[#0C447C] text-white'
                 }`}
               >
                 {loading === tier.id ? 'Loading...' : tier.cta}
