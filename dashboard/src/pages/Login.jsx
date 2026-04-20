@@ -7,12 +7,26 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
+function getUrlParams() {
+  const p = new URLSearchParams(window.location.search)
+  return {
+    mode: p.get('mode') || 'signin',
+    first: p.get('first') || '',
+    last: p.get('last') || '',
+    company: p.get('company') || '',
+    email: p.get('email') || '',
+  }
+}
+
 export default function Login() {
-  const [mode, setMode] = useState('signin')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [company, setCompany] = useState('')
-  const [email, setEmail] = useState('')
+  const urlParams = getUrlParams()
+  const isSignupMode = urlParams.mode === 'signup'
+
+  const [mode, setMode] = useState(isSignupMode ? 'signup' : 'signin')
+  const [firstName, setFirstName] = useState(urlParams.first)
+  const [lastName, setLastName] = useState(urlParams.last)
+  const [company, setCompany] = useState(urlParams.company)
+  const [email, setEmail] = useState(urlParams.email)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState(null)
@@ -30,16 +44,6 @@ export default function Login() {
       setLogoSrc(isLight ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png')
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('mode') === 'signup') {
-      setMode('signup')
-      if (params.get('first')) setFirstName(params.get('first'))
-      if (params.get('last')) setLastName(params.get('last'))
-      if (params.get('company')) setCompany(params.get('company'))
-      if (params.get('email')) setEmail(params.get('email'))
-    }
-
     return () => observer.disconnect()
   }, [])
 
@@ -186,7 +190,7 @@ export default function Login() {
                 </div>
               ) : (
               <>
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <form onSubmit={handleSignUp} className="space-y-4" noValidate>
                 <div>
                   <label className={labelClass}>First name</label>
                   <input type="text" required value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Ken" className={inputClass} />
