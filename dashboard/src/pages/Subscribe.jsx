@@ -143,9 +143,7 @@ export default function Subscribe() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0C447C] mb-4">
-            <span className="text-white text-2xl font-bold">E</span>
-          </div>
+          <img src="/assets/logo-edge-black.png" alt="EDGE" className="h-14 w-auto mx-auto mb-4" />
           <h1 className="text-3xl font-bold mb-2" style={{color:'#ffffff'}}>Choose your ACE plan</h1>
           <p style={{color:'rgba(255,255,255,0.65)'}}>Start automating your broker outreach today. Cancel anytime.</p>
         </div>
