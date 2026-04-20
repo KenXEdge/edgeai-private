@@ -7,7 +7,8 @@
     { "source": "/onboard", "destination": "/onboard.html" },
     { "source": "/onboard/lanes", "destination": "/onboard-lanes.html" },
     { "source": "/onboard/rates", "destination": "/onboard-rates.html" },
-    { "source": "/onboard/gmail", "destination": "/onboard-gmail.html" }
+    { "source": "/onboard/gmail", "destination": "/onboard-gmail.html" },
+    { "source": "/verify", "destination": "/verify.html" }
   ],
   "rewrites": [{ "source": "/((?!api/|assets/).*)", "destination": "/index.html" }],
   "headers": [
