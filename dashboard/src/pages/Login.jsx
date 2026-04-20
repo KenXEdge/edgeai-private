@@ -132,7 +132,7 @@ export default function Login() {
                   Forgot password?
                 </button>
                 <button onClick={() => switchMode('signup')} className="text-sm text-[#185FA5] hover:text-[#0C447C] font-medium">
-                  Continue Registration? <span className="font-bold underline">Click Here</span>
+                  Continue Registration — <span className="font-bold underline">Click Here</span>
                 </button>
               </div>
 
