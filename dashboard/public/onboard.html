@@ -423,6 +423,32 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(async function authGate() {
+  const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQ0ODEsImV4cCI6MjA5MTM1MDQ4MX0.Ip6k_FlFeol25Kue6Hwq8MdD92Q_qc5QeGJBIVNgEtA';
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) {
+    window.location.replace('https://xedge-ai.com/auth');
+    return;
+  }
+
+  const { data: carrier } = await client
+    .from('carriers')
+    .select('subscription_status')
+    .eq('user_id', session.user.id)
+    .single();
+
+  if (!carrier || carrier.subscription_status !== 'active') {
+    window.location.replace('https://xedge-ai.com/subscribe');
+    return;
+  }
+})();
+</script>
+
 <script>
 function toggleItem(id) {
   document.getElementById(id).classList.toggle('on');
