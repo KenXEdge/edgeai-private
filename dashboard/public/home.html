@@ -497,47 +497,32 @@ body.light .btn-dark{background:#ffffff;color:#0a0a0a}
       <div class="card-title">Get ACE Working Tonight</div>
       <div class="card-sub">Set up in minutes. ACE starts your broker outreach at 7AM tomorrow.</div>
 
+      <div class="form-row">
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" id="card-first" placeholder="Mike">
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" id="card-last" placeholder="Donovan">
+        </div>
+      </div>
       <div class="form-group">
-        <label>Full Name</label>
-        <input type="text" placeholder="Mike Donovan">
+        <label>Company Name</label>
+        <input type="text" id="card-company" placeholder="Donovan Trucking LLC">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Email</label>
-          <input type="email" placeholder="mike@trucking.com">
+          <input type="email" id="card-email" placeholder="mike@trucking.com">
         </div>
         <div class="form-group">
           <label>Phone</label>
-          <input type="tel" placeholder="(214) 555-0100">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Equipment Type</label>
-        <select>
-          <option value="">Select your truck</option>
-          <option>Box Truck / Straight Truck</option>
-          <option>Dry Van</option>
-          <option>Reefer</option>
-          <option>Flatbed</option>
-          <option>Step Deck</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Choose Your Plan</label>
-      </div>
-      <div class="tier-select">
-        <div class="tier-opt active" onclick="selectTier(this)">
-          <div class="tier-opt-name">Base — ACE</div>
-          <div class="tier-opt-price">$47<span style="font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.3)">/mo</span></div>
-        </div>
-        <div class="tier-opt" onclick="selectTier(this)">
-          <div class="tier-opt-name">Custom — ACE+</div>
-          <div class="tier-opt-price">$97<span style="font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.3)">/mo</span></div>
+          <input type="tel" id="card-phone" placeholder="(214) 555-0100">
         </div>
       </div>
 
-      <button class="btn-signup" onclick="handleSignup()">Activate ACE →</button>
+      <button class="btn-signup" onclick="handleSignup()">CHOOSE YOUR PLAN →</button>
       <div class="card-fine">No credit card required to start &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Setup in 5 minutes</div>
     </div>
   </div>
@@ -1024,10 +1009,14 @@ body.light .btn-dark{background:#ffffff;color:#0a0a0a}
 </div>
 
 <script>
-// tier select
-function selectTier(el){
-  document.querySelectorAll('.tier-opt').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
+function handleSignup(){
+  var first   = document.getElementById('card-first').value.trim();
+  var last    = document.getElementById('card-last').value.trim();
+  var company = document.getElementById('card-company').value.trim();
+  var email   = document.getElementById('card-email').value.trim();
+  var phone   = document.getElementById('card-phone').value.trim();
+  var params  = new URLSearchParams({ first: first, last: last, company: company, email: email, phone: phone });
+  window.location.href = 'https://xedge-ai.com/subscribe?' + params.toString();
 }
 
 // modal
