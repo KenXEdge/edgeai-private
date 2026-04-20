@@ -138,7 +138,7 @@ export default function Subscribe() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-12">
+    <div className="min-h-screen px-4 py-12" style={{background:'#2a2a2a'}}>
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}
@@ -146,8 +146,8 @@ export default function Subscribe() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0C447C] mb-4">
             <span className="text-white text-2xl font-bold">E</span>
           </div>
-          <h1 className="text-3xl font-bold text-[#0C447C] mb-2">Choose your ACE plan</h1>
-          <p className="text-slate-500">Start automating your broker outreach today. Cancel anytime.</p>
+          <h1 className="text-3xl font-bold mb-2" style={{color:'#ffffff'}}>Choose your ACE plan</h1>
+          <p style={{color:'rgba(255,255,255,0.65)'}}>Start automating your broker outreach today. Cancel anytime.</p>
         </div>
 
         {cancelled && (
@@ -167,11 +167,12 @@ export default function Subscribe() {
           {TIERS.map(tier => (
             <div
               key={tier.id}
-              className={`bg-white rounded-2xl border p-6 flex flex-col ${
+              className={`rounded-2xl border p-6 flex flex-col ${
                 tier.highlight
                   ? 'border-[#185FA5] ring-2 ring-[#185FA5]/20'
                   : 'border-slate-200'
               }`}
+              style={{background:'#f0eeeb'}}
             >
               {tier.highlight && (
                 <div className="mb-4">
@@ -212,7 +213,7 @@ export default function Subscribe() {
           ))}
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-8">
+        <p className="text-center text-xs mt-8" style={{color:'rgba(255,255,255,0.4)'}}>
           Secure payments powered by Stripe. Cancel anytime. No hidden fees.
         </p>
       </div>
