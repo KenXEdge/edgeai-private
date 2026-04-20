@@ -68,6 +68,7 @@ export default function Login() {
   async function handleSignUp(e) {
     e.preventDefault()
     setError(null)
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Please enter a valid email address'); return }
     if (password !== confirm) { setError('Passwords do not match'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     setLoading(true)
@@ -205,7 +206,7 @@ export default function Login() {
                 </div>
                 <div>
                   <label className={labelClass}>Email</label>
-                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className={inputClass} />
+                  <input type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className={inputClass} />
                 </div>
                 <div>
                   <label className={labelClass}>Password</label>
