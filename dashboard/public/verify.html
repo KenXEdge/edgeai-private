@@ -29,7 +29,7 @@ html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;col
   border:1px solid var(--gold-border);
   border-radius:4px;
   padding:3.5rem 3rem;
-  max-width:500px;
+  max-width:520px;
   width:100%;
   position:relative;
   text-align:center;
@@ -48,35 +48,17 @@ html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;col
 
 .icon{font-size:3rem;margin-bottom:1.5rem;display:block;line-height:1}
 
-.eyebrow{
-  font-size:10px;font-weight:700;letter-spacing:2.5px;
-  text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem;
-}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem}
 
-.title{
-  font-family:'Barlow Condensed',sans-serif;
-  font-size:2.2rem;font-weight:900;
-  text-transform:uppercase;letter-spacing:1px;
-  color:#fff;line-height:1;margin-bottom:1.75rem;
-}
+.title{font-family:'Barlow Condensed',sans-serif;font-size:2.2rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#fff;line-height:1;margin-bottom:2rem}
 
-.message{
-  font-size:15px;line-height:1.9;
-  color:rgba(255,255,255,0.6);
-  margin-bottom:2.5rem;
-}
+.message{font-size:15px;line-height:1.9;color:rgba(255,255,255,0.65);margin-bottom:2.5rem}
 .message strong{color:#fff;font-weight:600}
 
 .divider{width:40px;height:1px;background:var(--gold-border);margin:0 auto 2rem}
 
 .resend{font-size:11px;color:rgba(255,255,255,0.28);letter-spacing:0.3px}
-.resend a{
-  color:rgba(255,255,255,0.4);
-  text-decoration:underline;
-  text-decoration-color:rgba(255,255,255,0.18);
-  cursor:pointer;
-  transition:color 0.15s;
-}
+.resend a{color:rgba(255,255,255,0.4);text-decoration:underline;text-decoration-color:rgba(255,255,255,0.18);cursor:pointer;transition:color 0.15s}
 .resend a:hover{color:rgba(255,255,255,0.75)}
 
 /* ── LIGHT MODE ── */
@@ -122,18 +104,14 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     </div>
 
     <span class="icon">📬</span>
-    <div class="eyebrow">One More Step</div>
-    <div class="title">Check Your Email</div>
+    <div class="eyebrow">Email Verification</div>
+    <div class="title">Check Your Inbox</div>
 
-    <div class="message" id="verify-msg">
-      Loading...
-    </div>
+    <div class="message" id="verify-msg"></div>
 
     <div class="divider"></div>
 
-    <div class="resend">
-      Didn't get the email? <a id="resend-link">Resend it.</a>
-    </div>
+    <div class="resend">Didn't get the email? <a id="resend-link">Resend it.</a></div>
 
   </div>
 </div>
@@ -144,20 +122,14 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
   var first = (params.get('first') || '').trim();
   var email = (params.get('email') || '').trim();
 
-  var greeting = first
-    ? 'Thank you for choosing EDGE, <strong>' + first + '</strong>!'
-    : 'Thank you for choosing EDGE!';
-
-  var emailLine = email
-    ? 'We just sent a verification link to <strong>' + email + '</strong>.'
-    : 'We just sent a verification link to your email address.';
-
   document.getElementById('verify-msg').innerHTML =
-    greeting + ' To get ACE working for you, we need to verify your email address. ' +
-    emailLine + ' Click it to continue. See you in a minute!';
+    'Thank you for choosing EDGE, <strong>' + (first || 'there') + '</strong>! ' +
+    'To get ACE working for you, we need to verify your email address. ' +
+    'We just sent a verification link to <strong>' + (email || 'your email address') + '</strong>. ' +
+    'Click it to continue. See you in a minute!';
 
   document.getElementById('resend-link').onclick = function() {
-    if (!email) { alert('No email address found. Please return to the sign-up page.'); return; }
+    if (!email) { alert('No email address found. Please return to sign up.'); return; }
     alert('Verification email resent to ' + email + '.');
   };
 })();
