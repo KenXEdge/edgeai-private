@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
 
@@ -19,7 +19,19 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
   const [signupSent, setSignupSent] = useState(false)
+  const [logoSrc, setLogoSrc] = useState('/assets/logo-edge-white.png')
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const t = localStorage.getItem('edgeTheme')
+    setLogoSrc(t === 'light' ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png')
+    const observer = new MutationObserver(() => {
+      const isLight = document.documentElement.classList.contains('light')
+      setLogoSrc(isLight ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png')
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   function switchMode(newMode) {
     setError(null)
@@ -95,11 +107,11 @@ export default function Login() {
 
         <div className="text-center mb-8">
           <img
-            src="/assets/x-full-logo-blk.svg"
-            alt="XEdge Logo"
-            className="h-16 w-auto mb-4"
+            src={logoSrc}
+            alt="EDGE Logo"
+            className="h-14 w-auto mb-4 mx-auto"
           />
-          <p className="text-slate-500 text-sm mt-1">Carrier Engagement Platform</p>
+          <p style={{fontFamily:"'Orbitron', sans-serif", fontSize:'11px', letterSpacing:'1.5px', color:'#64748b', marginTop:'4px'}}>Built by Carriers — For Carriers</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
