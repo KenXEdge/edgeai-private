@@ -122,11 +122,18 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
   var first = (params.get('first') || '').trim();
   var email = (params.get('email') || '').trim();
 
-  document.getElementById('verify-msg').innerHTML =
-    'Thank you for choosing EDGE, <strong>' + (first || 'there') + '</strong>! ' +
-    'To get ACE working for you, we need to verify your email address. ' +
-    'We just sent a verification link to <strong>' + (email || 'your email address') + '</strong>. ' +
-    'Click it to continue. See you in a minute!';
+  var type = params.get('type') || '';
+  if (type === 'reset') {
+    document.getElementById('verify-msg').innerHTML =
+      'We sent a password reset link to <strong>' + (email || 'your email address') + '</strong>. ' +
+      'Click it to continue.';
+  } else {
+    document.getElementById('verify-msg').innerHTML =
+      'Thank you for choosing EDGE, <strong>' + (first || 'there') + '</strong>! ' +
+      'To get ACE working for you, we need to verify your email address. ' +
+      'We just sent a verification link to <strong>' + (email || 'your email address') + '</strong>. ' +
+      'Click it to continue. See you in a minute!';
+  }
 
   document.getElementById('resend-link').onclick = function() {
     if (!email) { alert('No email address found. Please return to sign up.'); return; }

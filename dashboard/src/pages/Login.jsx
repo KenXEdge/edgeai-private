@@ -96,8 +96,9 @@ export default function Login() {
       redirectTo: 'https://edgeai-dashboard.vercel.app/reset-password'
     })
     setLoading(false)
-    if (error) setError(error.message)
-    else setForgotSent(true)
+    if (error) { setError(error.message); return }
+    const verifyParams = new URLSearchParams({ type: 'reset', email })
+    window.location.href = 'https://xedge-ai.com/verify?' + verifyParams.toString()
   }
 
   async function handleGoogle() {
