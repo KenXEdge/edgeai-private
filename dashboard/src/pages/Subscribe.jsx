@@ -173,15 +173,14 @@ export default function Subscribe() {
               }`}
               style={{background:'#f0eeeb'}}
             >
-              {tier.highlight && (
-                <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-lg font-bold text-slate-900">{tier.name}</h2>
+                {tier.highlight && (
                   <span className="text-xs font-semibold bg-[#185FA5] text-white px-3 py-1 rounded-full">
                     Most Popular
                   </span>
-                </div>
-              )}
-
-              <h2 className="text-lg font-bold text-slate-900 mb-1">{tier.name}</h2>
+                )}
+              </div>
               <div className="flex items-baseline gap-1 mb-3">
                 <span className="text-3xl font-bold text-[#0C447C]">{tier.price}</span>
                 <span className="text-slate-400 text-sm">{tier.period}</span>
