@@ -247,8 +247,8 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
-          &copy; {new Date().getFullYear()} EDGEai — All rights reserved
+        <p className="text-center text-xs text-slate-500 mt-6">
+          &copy; 2026 XTX LLC — All rights reserved
         </p>
       </div>
     </div>
