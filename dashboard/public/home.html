@@ -522,6 +522,7 @@ body.light .btn-dark{background:#ffffff;color:#0a0a0a}
         </div>
       </div>
 
+      <div id="card-error" style="display:none;color:#e05c5c;font-size:12px;margin-bottom:0.75rem;font-weight:600;letter-spacing:0.3px"></div>
       <button class="btn-signup" onclick="handleSignup()">CHOOSE YOUR PLAN →</button>
       <div class="card-fine">ACE can start working for you by morning!</div>
     </div>
@@ -1015,8 +1016,15 @@ function handleSignup(){
   var company = document.getElementById('card-company').value.trim();
   var email   = document.getElementById('card-email').value.trim();
   var phone   = document.getElementById('card-phone').value.trim();
-  var params  = new URLSearchParams({ first: first, last: last, company: company, email: email, phone: phone });
-  window.location.href = 'https://xedge-ai.com/subscribe?' + params.toString();
+  var errEl   = document.getElementById('card-error');
+  if (!first || !last || !company || !email || !phone) {
+    errEl.textContent = 'Please fill in all fields to continue.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  var params = new URLSearchParams({ mode:'signup', first:first, last:last, company:company, email:email, phone:phone });
+  window.location.href = 'https://xedge-ai.com/auth?' + params.toString();
 }
 
 // modal

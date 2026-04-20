@@ -30,6 +30,16 @@ export default function Login() {
       setLogoSrc(isLight ? '/assets/logo-edge-black.png' : '/assets/logo-edge-white.png')
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('mode') === 'signup') {
+      setMode('signup')
+      if (params.get('first')) setFirstName(params.get('first'))
+      if (params.get('last')) setLastName(params.get('last'))
+      if (params.get('company')) setCompany(params.get('company'))
+      if (params.get('email')) setEmail(params.get('email'))
+    }
+
     return () => observer.disconnect()
   }, [])
 
