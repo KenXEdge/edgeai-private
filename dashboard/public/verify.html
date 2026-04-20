@@ -9,57 +9,88 @@
   if(t === "light") document.documentElement.classList.add("light");
 })();
 </script>
-<title>EDGE — Verify Your Email</title>
+<title>EDGE — Check Your Email</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#fff;overflow-x:hidden}
-a{text-decoration:none;color:inherit}
+html,body{min-height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#fff;overflow-x:hidden}
 
 :root{
   --gold:#E8A020;
   --gold-dim:rgba(232,160,32,0.12);
   --gold-border:rgba(232,160,32,0.22);
-  --black:#0a0a0a;
-  --dark:#111111;
-  --border:rgba(255,255,255,0.07);
-  --text-dim:rgba(255,255,255,0.4);
-  --text-mid:rgba(255,255,255,0.6);
 }
 
-.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem;position:relative}
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
 
-.card{background:#111111;border:1px solid var(--gold-border);border-radius:4px;padding:3rem 3.5rem;max-width:520px;width:100%;position:relative;text-align:center}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold);border-radius:4px 4px 0 0}
+.card{
+  background:#111111;
+  border:1px solid var(--gold-border);
+  border-radius:4px;
+  padding:3.5rem 3rem;
+  max-width:500px;
+  width:100%;
+  position:relative;
+  text-align:center;
+}
+.card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:3px;
+  background:var(--gold);
+  border-radius:4px 4px 0 0;
+}
 
-.logo-wrap{margin-bottom:2rem;display:flex;justify-content:center}
-.logo-wrap img{height:44px;width:auto;display:block}
+.logo-wrap{display:flex;justify-content:center;margin-bottom:2.5rem}
+.logo-wrap img{height:40px;width:auto;display:block}
 
-.verify-icon{font-size:3rem;margin-bottom:1.25rem;display:block}
+.icon{font-size:3rem;margin-bottom:1.5rem;display:block;line-height:1}
 
-.verify-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:0.75rem}
+.eyebrow{
+  font-size:10px;font-weight:700;letter-spacing:2.5px;
+  text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem;
+}
 
-.verify-title{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:1px;line-height:1.1;margin-bottom:1.5rem}
+.title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:2.2rem;font-weight:900;
+  text-transform:uppercase;letter-spacing:1px;
+  color:#fff;line-height:1;margin-bottom:1.75rem;
+}
 
-.verify-message{font-size:15px;color:rgba(255,255,255,0.65);line-height:1.85;margin-bottom:2rem}
-.verify-message strong{color:#fff;font-weight:600}
+.message{
+  font-size:15px;line-height:1.9;
+  color:rgba(255,255,255,0.6);
+  margin-bottom:2.5rem;
+}
+.message strong{color:#fff;font-weight:600}
 
-.resend-link{font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:0.3px}
-.resend-link a{color:rgba(255,255,255,0.4);text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;transition:color 0.15s}
-.resend-link a:hover{color:rgba(255,255,255,0.7)}
+.divider{width:40px;height:1px;background:var(--gold-border);margin:0 auto 2rem}
 
-/* light mode */
+.resend{font-size:11px;color:rgba(255,255,255,0.28);letter-spacing:0.3px}
+.resend a{
+  color:rgba(255,255,255,0.4);
+  text-decoration:underline;
+  text-decoration-color:rgba(255,255,255,0.18);
+  cursor:pointer;
+  transition:color 0.15s;
+}
+.resend a:hover{color:rgba(255,255,255,0.75)}
+
+/* ── LIGHT MODE ── */
 body.light{background:#f5f3ef;color:#0a0a0a}
-body.light .card{background:#ffffff;border-color:rgba(0,0,0,0.12)}
-body.light .verify-title{color:#0a0a0a}
-body.light .verify-message{color:rgba(0,0,0,0.6)}
-body.light .verify-message strong{color:#0a0a0a}
-body.light .resend-link{color:rgba(0,0,0,0.3)}
-body.light .resend-link a{color:rgba(0,0,0,0.45);text-decoration-color:rgba(0,0,0,0.2)}
-body.light .resend-link a:hover{color:#0a0a0a}
+body.light .card{background:#ffffff;border-color:rgba(0,0,0,0.1)}
+body.light .title{color:#0a0a0a}
+body.light .message{color:rgba(0,0,0,0.55)}
+body.light .message strong{color:#0a0a0a}
+body.light .resend{color:rgba(0,0,0,0.3)}
+body.light .resend a{color:rgba(0,0,0,0.45);text-decoration-color:rgba(0,0,0,0.18)}
+body.light .resend a:hover{color:#0a0a0a}
+body.light .divider{background:rgba(0,0,0,0.1)}
 
-/* toggle */
+/* ── TOGGLE ── */
 .theme-toggle{position:fixed;top:1.25rem;right:1.5rem;z-index:500;display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 14px}
 body.light .theme-toggle{background:rgba(0,0,0,0.06);border-color:rgba(0,0,0,0.1)}
 .toggle-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5)}
@@ -75,7 +106,6 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 </head>
 <body>
 
-<!-- Theme Toggle -->
 <div class="theme-toggle" id="themeToggle">
   <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
   <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
@@ -86,40 +116,51 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
 <div class="page">
   <div class="card">
+
     <div class="logo-wrap">
       <img id="logo-img" src="/assets/logo-edge-white.png?v=2" alt="EDGE">
     </div>
 
-    <span class="verify-icon">📬</span>
-    <div class="verify-eyebrow">Email Verification</div>
-    <div class="verify-title">Check Your Inbox</div>
+    <span class="icon">📬</span>
+    <div class="eyebrow">One More Step</div>
+    <div class="title">Check Your Email</div>
 
-    <div class="verify-message" id="verify-message">
-      Thank you for choosing EDGE! To get ACE working for you, we need to verify your email address. We just sent a verification link to your email. Click it to continue. See you in a minute!
+    <div class="message" id="verify-msg">
+      Loading...
     </div>
 
-    <div class="resend-link">
-      Didn't get the email? <a onclick="resendEmail()">Resend it.</a>
+    <div class="divider"></div>
+
+    <div class="resend">
+      Didn't get the email? <a id="resend-link">Resend it.</a>
     </div>
+
   </div>
 </div>
 
 <script>
 (function(){
   var params = new URLSearchParams(window.location.search);
-  var first = params.get('first') || '';
-  var email = params.get('email') || 'your email';
-  var msg = document.getElementById('verify-message');
-  var nameStr = first ? 'Thank you for choosing EDGE, <strong>' + first + '</strong>!' : 'Thank you for choosing EDGE!';
-  msg.innerHTML = nameStr + ' To get ACE working for you, we need to verify your email address. We just sent a verification link to <strong>' + email + '</strong>. Click it to continue. See you in a minute!';
-})();
+  var first = (params.get('first') || '').trim();
+  var email = (params.get('email') || '').trim();
 
-function resendEmail() {
-  var params = new URLSearchParams(window.location.search);
-  var email = params.get('email') || '';
-  if (!email) { alert('No email address found. Please return to sign up.'); return; }
-  alert('Verification email resent to ' + email + '.');
-}
+  var greeting = first
+    ? 'Thank you for choosing EDGE, <strong>' + first + '</strong>!'
+    : 'Thank you for choosing EDGE!';
+
+  var emailLine = email
+    ? 'We just sent a verification link to <strong>' + email + '</strong>.'
+    : 'We just sent a verification link to your email address.';
+
+  document.getElementById('verify-msg').innerHTML =
+    greeting + ' To get ACE working for you, we need to verify your email address. ' +
+    emailLine + ' Click it to continue. See you in a minute!';
+
+  document.getElementById('resend-link').onclick = function() {
+    if (!email) { alert('No email address found. Please return to the sign-up page.'); return; }
+    alert('Verification email resent to ' + email + '.');
+  };
+})();
 
 function toggleTheme() {
   const body = document.body;
@@ -137,6 +178,7 @@ function toggleTheme() {
   var logoImg = document.getElementById('logo-img');
   if (logoImg) logoImg.src = isLight ? '/assets/logo-edge-black.png?v=2' : '/assets/logo-edge-white.png?v=2';
 }
+
 document.addEventListener('DOMContentLoaded', function() {
   var t = localStorage.getItem('edgeTheme');
   if (t === 'light') {
