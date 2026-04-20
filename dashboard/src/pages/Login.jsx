@@ -131,9 +131,7 @@ export default function Login() {
                 <button onClick={() => switchMode('forgot')} className="text-sm text-slate-400 hover:text-slate-600">
                   Forgot password?
                 </button>
-                <button onClick={() => switchMode('signup')} className="text-sm text-[#185FA5] hover:text-[#0C447C] font-medium">
-                  Continue Registration — <span className="font-bold underline">Click Here</span>
-                </button>
+                <button onClick={() => switchMode('signup')} className="text-sm text-[#185FA5] hover:text-[#0C447C] font-medium whitespace-nowrap">Continue Registration — <span className="font-bold underline">Click Here</span></button>
               </div>
 
               <div className="relative my-5">
