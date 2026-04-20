@@ -77,7 +77,7 @@ export default function Login() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } }
+      options: { data: { full_name: fullName }, emailRedirectTo: 'https://xedge-ai.com/subscribe' }
     })
 
     if (error) { setError(error.message); setLoading(false); return }
