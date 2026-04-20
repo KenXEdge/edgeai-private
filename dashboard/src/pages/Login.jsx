@@ -19,7 +19,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
   const [signupSent, setSignupSent] = useState(false)
-  const [logoSrc, setLogoSrc] = useState('/assets/logo-edge-white.png')
+  const [logoSrc, setLogoSrc] = useState('/assets/logo-edge-black.png')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export default function Login() {
   const labelClass = "block text-sm font-medium text-slate-700 mb-1"
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{background:'#0a0a0a'}}>
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-8">
