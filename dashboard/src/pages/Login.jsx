@@ -84,7 +84,8 @@ export default function Login() {
     if (error) { setError(error.message); setLoading(false); return }
 
     setLoading(false)
-    setSignupSent(true)
+    const verifyParams = new URLSearchParams({ first: firstName, email })
+    window.location.href = 'https://xedge-ai.com/verify?' + verifyParams.toString()
   }
 
   async function handleForgot(e) {
