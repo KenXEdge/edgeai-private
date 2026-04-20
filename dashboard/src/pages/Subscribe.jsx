@@ -146,7 +146,7 @@ export default function Subscribe() {
           <img src="/assets/logo-edge-black.png" alt="EDGE" className="h-14 w-auto mx-auto mb-4" />
           <h1 className="text-3xl font-bold mb-2" style={{color:'#ffffff'}}>Choose Your Plan</h1>
           <p style={{color:'rgba(255,255,255,0.65)', fontFamily:"'Orbitron', sans-serif", fontWeight:700}}>Designed By Carriers For Carriers</p>
-          <p style={{color:'rgba(255,255,255,0.65)', fontSize:'0.85rem', marginTop:'0.4rem'}}>You're About to Hire the Most Productive Employee — EVER!</p>
+          <p style={{color:'rgba(255,255,255,0.65)', fontSize:'0.85rem', marginTop:'0.4rem'}}>You're About to Hire Your Most Productive Employee — EVER!</p>
         </div>
 
         {cancelled && (
