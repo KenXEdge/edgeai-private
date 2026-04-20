@@ -102,7 +102,7 @@ export default function Login() {
   const labelClass = "block text-sm font-medium text-slate-700 mb-1"
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{background:'#0a0a0a'}}>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{background:'#2a2a2a'}}>
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-8">
@@ -111,7 +111,7 @@ export default function Login() {
             alt="EDGE Logo"
             className="h-14 w-auto mb-4 mx-auto"
           />
-          <p style={{fontFamily:"'Orbitron', sans-serif", fontSize:'11px', letterSpacing:'1.5px', color:'#64748b', marginTop:'4px'}}>Built by Carriers — For Carriers</p>
+          <p style={{fontFamily:"'Orbitron', sans-serif", fontSize:'11px', fontWeight:600, letterSpacing:'1.5px', color:'#64748b', marginTop:'4px'}}>Built by Carriers — For Carriers</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
