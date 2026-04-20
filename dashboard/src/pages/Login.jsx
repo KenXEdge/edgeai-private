@@ -11,6 +11,7 @@ export default function Login() {
   const [mode, setMode] = useState('signin')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [company, setCompany] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -131,7 +132,7 @@ export default function Login() {
                   Forgot password?
                 </button>
                 <button onClick={() => switchMode('signup')} className="text-sm text-[#185FA5] hover:text-[#0C447C] font-medium">
-                  New? Register <span className="font-bold underline">HERE</span>
+                  Continue Registration? <span className="font-bold underline">Click Here</span>
                 </button>
               </div>
 
@@ -173,6 +174,10 @@ export default function Login() {
                 <div>
                   <label className={labelClass}>Last name</label>
                   <input type="text" required value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Korbel" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Company name</label>
+                  <input type="text" value={company} onChange={e => setCompany(e.target.value)} placeholder="Korbel Trucking LLC" className={inputClass} />
                 </div>
                 <div>
                   <label className={labelClass}>Email</label>
