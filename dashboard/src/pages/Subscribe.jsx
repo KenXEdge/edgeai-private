@@ -74,10 +74,8 @@ export default function Subscribe() {
   const cancelled = searchParams.get('cancelled')
 
   useEffect(() => {
-    // Check if already subscribed — create carriers row if new user
-    async function checkSubscription() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { navigate('/login'); return }
+    async function checkSubscription(session) {
+      if (!session) { navigate('/auth'); return }
 
       const { data } = await supabase
         .from('carriers')
@@ -103,7 +101,18 @@ export default function Subscribe() {
         }, { onConflict: 'id' })
       }
     }
-    checkSubscription()
+
+    // Handles already-logged-in users arriving at /subscribe directly
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) checkSubscription(session)
+    })
+
+    // Catches the #access_token hash Supabase appends after email confirmation
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') checkSubscription(session)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSelect(tierId) {
