@@ -75,6 +75,7 @@ export default function Subscribe() {
 
   useEffect(() => {
     async function checkSubscription(session) {
+      console.log('[Subscribe] checkSubscription called — session:', session)
       if (!session) { navigate('/auth'); return }
 
       const userId = session?.user?.id
@@ -99,7 +100,11 @@ export default function Subscribe() {
         ignoreDuplicates: true,
       })
 
-      if (upsertError) console.error('[Subscribe] upsert error:', upsertError.message)
+      if (upsertError) {
+        console.error('[Subscribe] upsert error:', upsertError.message, upsertError)
+      } else {
+        console.log('[Subscribe] upsert success — userId:', userId, 'email:', userEmail)
+      }
 
       const { data } = await supabase
         .from('carriers')
@@ -116,6 +121,7 @@ export default function Subscribe() {
     // catches the case where #access_token hash was fully processed before this listener ran.
     // SIGNED_IN fires when the async token exchange completes after hash processing.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Subscribe] onAuthStateChange — event:', event, '| session:', session ? 'populated' : 'null')
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session) checkSubscription(session)
       }
@@ -129,7 +135,7 @@ export default function Subscribe() {
     setLoading(tierId)
 
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { navigate('/login'); return }
+    if (!session) { navigate('/auth'); return }
 
     try {
       const res = await fetch('/api/create-checkout-session', {
