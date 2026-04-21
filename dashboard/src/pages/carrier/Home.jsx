@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+import { supabase } from '../../lib/supabase'
 
 const CARRIER_UUID = 'e84dfb58-d265-4a75-a7da-161b667a0208'
 

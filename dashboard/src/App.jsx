@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from './lib/supabase'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import Subscribe from './pages/Subscribe'
 import CarrierHome from './pages/carrier/Home'
 import Layout from './components/Layout'
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
 
 function MarketingPage() {
   useEffect(() => { window.location.replace('/home.html') }, [])
