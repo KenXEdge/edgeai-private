@@ -77,6 +77,23 @@ export default function Subscribe() {
     async function checkSubscription(session) {
       if (!session) { navigate('/auth'); return }
 
+      const fullName = session.user.user_metadata?.full_name || ''
+
+      // Insert-only upsert — ignoreDuplicates means existing rows are never touched
+      const { error: upsertError } = await supabase.from('carriers').upsert({
+        id: session.user.id,
+        email: session.user.email,
+        name: fullName || null,
+        subscription_status: 'trial',
+        ace_status: 'inactive',
+        onboarding_complete: false,
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: true,
+      })
+
+      if (upsertError) console.error('[Subscribe] upsert error:', upsertError.message)
+
       const { data } = await supabase
         .from('carriers')
         .select('subscription_status')
@@ -85,20 +102,6 @@ export default function Subscribe() {
 
       if (data?.[0]?.subscription_status === 'active') {
         navigate('/carrier')
-        return
-      }
-
-      if (!data || data.length === 0) {
-        const fullName = session.user.user_metadata?.full_name || ''
-        await supabase.from('carriers').upsert({
-          id: session.user.id,
-          name: fullName,
-          email: session.user.email,
-          subscription_status: 'trial',
-          subscription_tier: 'base',
-          ace_status: 'inactive',
-          onboarding_complete: false,
-        }, { onConflict: 'id' })
       }
     }
 
