@@ -77,12 +77,19 @@ export default function Subscribe() {
     async function checkSubscription(session) {
       if (!session) { navigate('/auth'); return }
 
-      const fullName = session.user.user_metadata?.full_name || ''
+      const userId = session?.user?.id
+      const userEmail = session?.user?.email
+      const fullName = session?.user?.user_metadata?.full_name || ''
+
+      if (!userId) {
+        console.error('[Subscribe] session present but user.id missing — skipping upsert', session)
+        return
+      }
 
       // Insert-only upsert — ignoreDuplicates means existing rows are never touched
       const { error: upsertError } = await supabase.from('carriers').upsert({
-        id: session.user.id,
-        email: session.user.email,
+        id: userId,
+        email: userEmail,
         name: fullName || null,
         subscription_status: 'trial',
         ace_status: 'inactive',
@@ -97,7 +104,7 @@ export default function Subscribe() {
       const { data } = await supabase
         .from('carriers')
         .select('subscription_status')
-        .eq('id', session.user.id)
+        .eq('id', userId)
         .limit(1)
 
       if (data?.[0]?.subscription_status === 'active') {
@@ -105,14 +112,13 @@ export default function Subscribe() {
       }
     }
 
-    // Handles already-logged-in users arriving at /subscribe directly
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) checkSubscription(session)
-    })
-
-    // Catches the #access_token hash Supabase appends after email confirmation
+    // INITIAL_SESSION fires immediately on registration with current session —
+    // catches the case where #access_token hash was fully processed before this listener ran.
+    // SIGNED_IN fires when the async token exchange completes after hash processing.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') checkSubscription(session)
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session) checkSubscription(session)
+      }
     })
 
     return () => subscription.unsubscribe()
