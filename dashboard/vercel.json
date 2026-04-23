@@ -19,8 +19,7 @@
       "permanent": true
     }
   ],
-  "routes": [
-    { "source": "/", "destination": "/home.html" },
+  "rewrites": [
     { "source": "/login", "destination": "/login.html" },
     { "source": "/dashboard", "destination": "/dashboard.html" },
     { "source": "/marketing", "destination": "/marketing.html" },
@@ -28,9 +27,10 @@
     { "source": "/onboard/lanes", "destination": "/onboard-lanes.html" },
     { "source": "/onboard/rates", "destination": "/onboard-rates.html" },
     { "source": "/onboard/gmail", "destination": "/onboard-gmail.html" },
-    { "source": "/verify", "destination": "/verify.html" }
+    { "source": "/verify", "destination": "/verify.html" },
+    { "source": "/", "destination": "/home.html" },
+    { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ],
-  "rewrites": [{ "source": "/((?!api/|assets/).*)", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/assets/(.*)",
