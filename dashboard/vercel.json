@@ -1,4 +1,18 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "xedge-ai.com" }],
+      "destination": "https://xtxtec.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "www.xedge-ai.com" }],
+      "destination": "https://xtxtec.com/$1",
+      "permanent": true
+    }
+  ],
   "routes": [
     { "source": "/", "destination": "/home.html" },
     { "source": "/login", "destination": "/login.html" },
