@@ -72,14 +72,14 @@ export default function Login() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName }, emailRedirectTo: 'https://xedge-ai.com/subscribe' }
+      options: { data: { full_name: fullName }, emailRedirectTo: 'https://xtxtec.com/subscribe' }
     })
 
     if (error) { setError(error.message); setLoading(false); return }
 
     setLoading(false)
     const verifyParams = new URLSearchParams({ first: firstName, email })
-    window.location.href = 'https://xedge-ai.com/verify?' + verifyParams.toString()
+    window.location.href = 'https://xtxtec.com/verify?' + verifyParams.toString()
   }
 
   async function handleForgot(e) {
@@ -92,7 +92,7 @@ export default function Login() {
     setLoading(false)
     if (error) { setError(error.message); return }
     const verifyParams = new URLSearchParams({ type: 'reset', email })
-    window.location.href = 'https://xedge-ai.com/verify?' + verifyParams.toString()
+    window.location.href = 'https://xtxtec.com/verify?' + verifyParams.toString()
   }
 
   async function handleGoogle() {
