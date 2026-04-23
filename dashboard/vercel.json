@@ -11,6 +11,12 @@
       "has": [{ "type": "host", "value": "www.xedge-ai.com" }],
       "destination": "https://xtxtec.com/$1",
       "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "www.xtxtec.com" }],
+      "destination": "https://xtxtec.com/$1",
+      "permanent": true
     }
   ],
   "routes": [
