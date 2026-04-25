@@ -1045,6 +1045,7 @@ async function handleSignup() {
   btn.disabled = true;
   const { error } = await _sbHome.auth.signInWithOtp({ email });
   if (error) {
+    console.error('signInWithOtp error:', error);
     errEl.textContent = error.message || 'Could not send code. Try again.';
     errEl.style.display = 'block';
     btn.textContent = 'REQUEST ACCESS →';
@@ -1055,6 +1056,7 @@ async function handleSignup() {
   _pendingFirst = first; _pendingLast = last;
   _pendingCompany = company; _pendingPhone = phone;
   _otpSource = 'card';
+  console.log('OTP sent successfully');
   document.getElementById('card-form-view').style.display = 'none';
   const otpDiv = document.createElement('div');
   otpDiv.id = 'card-otp-block';
