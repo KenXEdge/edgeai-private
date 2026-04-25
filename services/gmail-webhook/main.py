@@ -1460,6 +1460,7 @@ def create_checkout_session():
 
 
 @app.route("/stripe-webhook", methods=["POST"])
+@app.route("/api/stripe-webhook", methods=["POST"])
 def stripe_webhook():
     payload = request.get_data()
     sig_header = request.headers.get("Stripe-Signature")
