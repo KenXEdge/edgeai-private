@@ -327,41 +327,6 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     </div>
   </div>
 
-  <!-- SECTION 5 — Payment Terms -->
-  <div class="form-section">
-    <div class="section-header">
-      <div class="section-icon">⚡</div>
-      <div>
-        <div class="section-title">Payment Terms</div>
-        <div class="section-sub">Preferred payment speed</div>
-      </div>
-    </div>
-    <div class="section-body">
-      <div class="radio-group">
-        <div class="radio-item" id="pay-quick" onclick="selectRadio('pay','pay-quick')">
-          <div class="radio-circle"><div class="radio-dot"></div></div>
-          <div class="radio-text">
-            <div class="radio-label">Quick Pay (1–3 days)</div>
-            <div class="radio-desc">Fee accepted for fast payment</div>
-          </div>
-        </div>
-        <div class="radio-item" id="pay-standard" onclick="selectRadio('pay','pay-standard')">
-          <div class="radio-circle"><div class="radio-dot"></div></div>
-          <div class="radio-text">
-            <div class="radio-label">Standard Pay (30 days)</div>
-            <div class="radio-desc">No fee — net 30</div>
-          </div>
-        </div>
-        <div class="radio-item" id="pay-either" onclick="selectRadio('pay','pay-either')">
-          <div class="radio-circle"><div class="radio-dot"></div></div>
-          <div class="radio-text">
-            <div class="radio-label">Either — Best Rate Wins</div>
-            <div class="radio-desc">ACE chooses based on load value</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
 </div><!-- /page -->
 
@@ -458,7 +423,6 @@ function selectRadio(group, id) {
 }
 
 ['fuel-yes','fuel-no'].forEach(id => { if(!radioGroups['fuel']) radioGroups['fuel']=[]; radioGroups['fuel'].push(id); });
-['pay-quick','pay-standard','pay-either'].forEach(id => { if(!radioGroups['pay']) radioGroups['pay']=[]; radioGroups['pay'].push(id); });
 
 async function handleContinue() {
   if (!_session) { window.location.replace('https://xtxtec.com/auth'); return; }
@@ -467,30 +431,27 @@ async function handleContinue() {
   const minLoadValue = parseInt(document.getElementById('min-load-value').value) || null;
   const deadhead     = parseInt(document.getElementById('deadhead').value) || null;
 
-  const fuelEl    = document.querySelector('#fuel-yes.on, #fuel-no.on');
+  const fuelEl       = document.querySelector('#fuel-yes.on, #fuel-no.on');
   const fuelSurcharge = fuelEl ? fuelEl.id === 'fuel-yes' : null;
-
-  const payEl  = document.querySelector('#pay-quick.on, #pay-standard.on, #pay-either.on');
-  const payMap = { 'pay-quick': 'quick_pay', 'pay-standard': 'standard', 'pay-either': 'either' };
-  const paymentTerms = payEl ? payMap[payEl.id] : null;
 
   const btn = document.querySelector('.btn-continue');
   btn.disabled = true;
   btn.innerHTML = 'Saving… <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-  const { error } = await _sb
-    .from('carriers')
-    .update({
-      rate_floor:      rateFloor,
-      min_load_value:  minLoadValue,
-      deadhead_miles:  deadhead,
-      fuel_surcharge:  fuelSurcharge,
-      payment_terms:   paymentTerms,
-    })
-    .eq('id', _session.user.id);
-
-  if (error) console.error('[onboard-rates] update failed:', error.message);
-
+  try {
+    const { error } = await _sb
+      .from('carriers')
+      .update({
+        rate_floor:     rateFloor,
+        min_load_value: minLoadValue,
+        deadhead_miles: deadhead,
+        fuel_surcharge: fuelSurcharge,
+      })
+      .eq('id', _session.user.id);
+    if (error) console.error('[onboard-rates] update failed:', error.message);
+  } catch (err) {
+    console.error('[onboard-rates] exception:', err.message);
+  }
 
   window.location.href = '/onboard/gmail';
 }

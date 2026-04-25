@@ -528,16 +528,19 @@ async function handleContinue() {
   btn.disabled = true;
   btn.innerHTML = 'Saving… <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-  const { error } = await _sb
-    .from('carriers')
-    .update({
-      preferred_lanes: preferredLanes,
-      max_radius:      maxRadius,
-      load_types:      loadTypes || null,
-    })
-    .eq('id', _session.user.id);
-
-  if (error) console.error('[onboard-lanes] update failed:', error.message);
+  try {
+    const { error } = await _sb
+      .from('carriers')
+      .update({
+        preferred_lanes: preferredLanes,
+        max_radius:      maxRadius,
+        load_types:      loadTypes || null,
+      })
+      .eq('id', _session.user.id);
+    if (error) console.error('[onboard-lanes] update failed:', error.message);
+  } catch (err) {
+    console.error('[onboard-lanes] exception:', err.message);
+  }
 
   window.location.href = '/onboard/rates';
 }
