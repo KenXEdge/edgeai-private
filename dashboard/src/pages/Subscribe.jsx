@@ -77,18 +77,27 @@ export default function Subscribe() {
 
       const userId = session?.user?.id
       const userEmail = session?.user?.email
-      const fullName = session?.user?.user_metadata?.full_name || ''
 
       if (!userId) {
         console.error('[Subscribe] session present but user.id missing — skipping upsert', session)
         return
       }
 
+      // Read signup params passed from home.html OTP flow
+      const params = new URLSearchParams(window.location.search)
+      const first = params.get('first') || ''
+      const last  = params.get('last')  || ''
+      const company = params.get('company') || null
+      const phone   = params.get('phone')   || null
+      const fullName = first && last ? `${first} ${last}`.trim() : (first || last || null)
+
       // Insert-only upsert — ignoreDuplicates means existing rows are never touched
       const { error: upsertError } = await supabase.from('carriers').upsert({
         id: userId,
         email: userEmail,
-        name: fullName || null,
+        name: fullName,
+        company_name: company,
+        phone: phone,
         subscription_status: 'trial',
         ace_status: 'inactive',
         onboarding_complete: false,
@@ -110,7 +119,7 @@ export default function Subscribe() {
         .limit(1)
 
       if (data?.[0]?.subscription_status === 'active') {
-        navigate('/onboard')
+        window.location.href = '/onboard'
       }
     }
 
@@ -146,7 +155,7 @@ export default function Subscribe() {
         .limit(1)
 
       if (data?.[0]?.subscription_status === 'active') {
-        navigate('/onboard')
+        window.location.href = '/onboard'
       } else if (!stopped) {
         setTimeout(poll, 1500)
       }
