@@ -43,17 +43,17 @@ export default async function handler(req, res) {
 
       case 'checkout.session.completed': {
         const session = event.data.object
-        const email = session.customer_email || session.customer_details?.email
-        if (!email) {
-          console.warn('[stripe-webhook] checkout.session.completed: no email on session')
+        const carrierId = session.metadata?.carrier_id
+        if (!carrierId) {
+          console.warn('[stripe-webhook] checkout.session.completed: no carrier_id in metadata')
           break
         }
         const { error } = await supabase
           .from('carriers')
           .update({ subscription_status: 'active' })
-          .eq('email', email)
+          .eq('id', carrierId)
         if (error) console.error('[stripe-webhook] activate failed:', error.message)
-        else console.log('[stripe-webhook] activated:', email)
+        else console.log('[stripe-webhook] activated carrier:', carrierId)
         break
       }
 
