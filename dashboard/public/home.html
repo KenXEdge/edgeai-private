@@ -497,34 +497,36 @@ body.light .btn-dark{background:#ffffff;color:#0a0a0a}
       <div class="card-title">Get ACE Working Today</div>
       <div class="card-sub">Set up won't take long! ACE starts work at 7AM tomorrow.</div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>First Name</label>
-          <input type="text" id="card-first" placeholder="Mike">
+      <div id="card-form-view">
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name</label>
+            <input type="text" id="card-first" placeholder="Mike">
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input type="text" id="card-last" placeholder="Donovan">
+          </div>
         </div>
         <div class="form-group">
-          <label>Last Name</label>
-          <input type="text" id="card-last" placeholder="Donovan">
+          <label>Company Name</label>
+          <input type="text" id="card-company" placeholder="Donovan Trucking LLC">
         </div>
-      </div>
-      <div class="form-group">
-        <label>Company Name</label>
-        <input type="text" id="card-company" placeholder="Donovan Trucking LLC">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="card-email" placeholder="mike@trucking.com">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="card-email" placeholder="mike@trucking.com">
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="tel" id="card-phone" placeholder="(214) 555-0100">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Phone</label>
-          <input type="tel" id="card-phone" placeholder="(214) 555-0100">
-        </div>
-      </div>
 
-      <div id="card-error" style="display:none;color:#e05c5c;font-size:12px;margin-bottom:0.75rem;font-weight:600;letter-spacing:0.3px"></div>
-      <button class="btn-signup" id="card-submit" onclick="handleSignup()">REQUEST ACCESS →</button>
-      <div class="card-fine">ACE can start working for you by morning!</div>
+        <div id="card-error" style="display:none;color:#e05c5c;font-size:12px;margin-bottom:0.75rem;font-weight:600;letter-spacing:0.3px"></div>
+        <button class="btn-signup" id="card-submit" onclick="handleSignup()">REQUEST ACCESS →</button>
+        <div class="card-fine">ACE can start working for you by morning!</div>
+      </div>
     </div>
   </div>
 </section>
@@ -1053,11 +1055,7 @@ async function handleSignup() {
   _pendingFirst = first; _pendingLast = last;
   _pendingCompany = company; _pendingPhone = phone;
   _otpSource = 'card';
-  document.querySelector('.hero-card .form-row:first-of-type').style.display = 'none';
-  document.querySelectorAll('.hero-card .form-group').forEach(el => el.style.display = 'none');
-  errEl.style.display = 'none';
-  btn.style.display = 'none';
-  document.querySelector('.card-fine').style.display = 'none';
+  document.getElementById('card-form-view').style.display = 'none';
   const otpDiv = document.createElement('div');
   otpDiv.id = 'card-otp-block';
   otpDiv.innerHTML = `
@@ -1115,7 +1113,7 @@ async function verifyOtp(source) {
     return;
   }
   errEl.style.display = 'none';
-  const { error } = await _sbHome.auth.verifyOtp({ email: _otpEmail, token, type: 'email' });
+  const { error } = await _sbHome.auth.verifyOtp({ email: _otpEmail, token, type: 'signup' });
   if (error) {
     errEl.textContent = error.message || 'Invalid code. Try again.';
     errEl.style.display = 'block';
