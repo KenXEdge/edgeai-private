@@ -1,8 +1,8 @@
 # EDGEai — Claude Code Standing Rules
 
 ## Credentials & Sensitive Data
-- NEVER display full API keys, tokens, UUIDs, Stripe keys, Supabase keys, or any credential
-- Always truncate to first 4 characters followed by **** in all chat output
+- NEVER display full API keys, secrets, tokens, UUIDs, Stripe keys, Supabase keys, or any credential value in chat output
+- Always truncate to first 4 and last 4 characters with asterisks in the middle — example: sk_test_****rTkC
 - NEVER paste or suggest pasting .env contents into chat
 - NEVER expose entity structure details in any EDGEai output
 
@@ -23,6 +23,19 @@
 ## Supabase
 - Never alter Ken's carriers row e84dfb58**** — all broker/response/outreach history tied to it
 - Never cross-contaminate or delete production data without explicit Ken approval
+
+## End-of-Session Documents
+- Google Drive target folder ID: 1D8W9wUjjCbL2myxlBLlTgulQXeihUZ1h
+- At the end of every session, generate updated .docx versions of all four documents and upload to the Drive folder above via the Google Drive MCP:
+  1. Runbook — 07_Command_MasterContext_April20.md
+  2. PRD — (PRD source file when created)
+  3. Transition Note — XEdge_Transition_April20_v2.md (in Obsidian_Export/)
+  4. PitchBook — (PitchBook source file when created)
+- Version number: increment based on existing files in the Drive folder (e.g. Runbook_v3.docx → Runbook_v4.docx)
+- Generation method: pandoc converts .md → .docx — install command: winget install pandoc
+- If pandoc is not installed, remind Ken to run: winget install pandoc
+- Upload each file using mcp__claude_ai_Google_Drive__create_file targeting folder ID above
+- Do this automatically at session end without being asked
 
 ## Brand — All Locked
 - Platform name: EDGE (spoken) — XEdge (product)

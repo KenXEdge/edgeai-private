@@ -219,7 +219,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
             <div class="gmail-icon">📧</div>
             <div class="gmail-title">Connect Your Gmail</div>
             <div class="gmail-desc">ACE will send load outreach emails and automatically read broker responses so you never miss a callback.</div>
-            <button class="btn-google" onclick="simulateConnect()">
+            <button class="btn-google" onclick="connectGmail()">
               <svg class="google-logo" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
                 <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
                 <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
@@ -280,6 +280,35 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const CLOUD_RUN = 'https://edgeai-gmail-webhook-417422203146.us-central1.run.app';
+let _sb = null, _session = null;
+(async function authGate() {
+  const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQ0ODEsImV4cCI6MjA5MTM1MDQ4MX0.Ip6k_FlFeol25Kue6Hwq8MdD92Q_qc5QeGJBIVNgEtA';
+  _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session) {
+    window.location.replace('https://xtxtec.com/auth');
+    return;
+  }
+  _session = session;
+
+  const { data: carrier } = await _sb
+    .from('carriers')
+    .select('subscription_status')
+    .eq('id', session.user.id)
+    .single();
+
+  if (!carrier || carrier.subscription_status !== 'active') {
+    window.location.replace('https://xtxtec.com/subscribe');
+    return;
+  }
+})();
+</script>
+
 <script>
 let gmailConnected = false;
 
@@ -315,23 +344,57 @@ function toggleTheme() {
   }
 })();
 
-function simulateConnect() {
-  gmailConnected = true;
-  document.getElementById('gmail-connect-state').style.display = 'none';
-  const connectedEl = document.getElementById('gmail-connected-state');
-  connectedEl.classList.add('visible');
-  document.getElementById('gmail-email-display').textContent = 'Connected account will appear here';
+async function connectGmail() {
+  try {
+    const res  = await fetch(CLOUD_RUN + '/oauth/gmail/start?carrier_id=' + _session.user.id);
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+  } catch (err) {
+    console.error('[onboard-gmail] start failed:', err);
+  }
 }
 
-function disconnectGmail() {
+async function disconnectGmail() {
   gmailConnected = false;
   document.getElementById('gmail-connect-state').style.display = '';
   document.getElementById('gmail-connected-state').classList.remove('visible');
+  await _sb.from('carriers').update({ gmail_token: null, ace_status: 'inactive' }).eq('id', _session.user.id);
 }
 
-function handleContinue() {
-  window.location.href = '/onboard/review';
+async function handleContinue() {
+  if (!gmailConnected) {
+    alert('Please connect your Gmail account to continue.');
+    return;
+  }
+  const btn = document.getElementById('btn-continue');
+  btn.disabled = true;
+  btn.innerHTML = 'Starting ACE… <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  fetch(CLOUD_RUN + '/extract-brokers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ carrier_id: _session.user.id, days: 90 }),
+  }).catch(err => console.error('[onboard-gmail] extract-brokers fire failed:', err));
+  window.location.href = '/dashboard';
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('connected') === 'true') {
+    gmailConnected = true;
+    document.getElementById('gmail-connect-state').style.display = 'none';
+    document.getElementById('gmail-connected-state').classList.add('visible');
+    document.getElementById('gmail-email-display').textContent = 'Gmail account connected';
+  }
+  if (params.get('connected') === 'error') {
+    var card = document.querySelector('.gmail-card');
+    if (card) {
+      var errDiv = document.createElement('div');
+      errDiv.style.cssText = 'color:rgba(255,80,80,0.8);font-size:12px;margin-top:0.75rem;text-align:center';
+      errDiv.textContent = 'Authorization failed or was cancelled — please try again.';
+      card.appendChild(errDiv);
+    }
+  }
+});
 </script>
 </body>
 </html>

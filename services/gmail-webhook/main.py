@@ -15,7 +15,7 @@ from email.utils import parseaddr
 from flask_cors import CORS
 
 import anthropic
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 from supabase import create_client, Client
 from twilio.rest import Client as TwilioClient
 from google.oauth2.credentials import Credentials as OAuthCredentials
@@ -31,11 +31,17 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+_ALLOWED_ORIGINS = {"https://xtxtec.com", "https://edgeai-dashboard.vercel.app"}
+
+def _cors_origin():
+    o = request.headers.get("Origin", "")
+    return o if o in _ALLOWED_ORIGINS else "https://xtxtec.com"
+
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
         response = app.make_response("")
-        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
+        response.headers["Access-Control-Allow-Origin"] = _cors_origin()
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.status_code = 200
@@ -43,7 +49,7 @@ def handle_preflight():
 
 @app.after_request
 def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
+    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
@@ -1123,7 +1129,7 @@ def extract_brokers():
             "macropoint.com", "fourkites.com", "project44.com",
             "keeptruckin.com", "motive.com", "samsara.com",
             "irs.gov", "dol.gov", "fmcsa.dot.gov",
-            "xtxtransport.com", "xedge-ai.com",
+            "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
         }
         _CHUNK_SIZE = 100
 
@@ -1346,6 +1352,65 @@ def import_brokers():
             "total": total,
         }), 200
 
+# ── Gmail OAuth ──────────────────────────────────────────────────────────────
+from urllib.parse import urlencode
+import requests as _http
+
+_CLOUD_RUN_BASE = "https://edgeai-gmail-webhook-417422203146.us-central1.run.app"
+_OAUTH_REDIRECT = f"{_CLOUD_RUN_BASE}/oauth/gmail/callback"
+_GMAIL_SCOPE    = "https://www.googleapis.com/auth/gmail.modify"
+
+
+@app.route("/oauth/gmail/start", methods=["GET"])
+def oauth_gmail_start():
+    carrier_id = request.args.get("carrier_id")
+    if not carrier_id:
+        return jsonify({"error": "carrier_id required"}), 400
+    params = {
+        "client_id":     os.environ["GMAIL_CLIENT_ID"],
+        "redirect_uri":  _OAUTH_REDIRECT,
+        "response_type": "code",
+        "scope":         _GMAIL_SCOPE,
+        "access_type":   "offline",
+        "prompt":        "consent",
+        "state":         carrier_id,
+    }
+    return jsonify({"url": "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)})
+
+
+@app.route("/oauth/gmail/callback", methods=["GET"])
+def oauth_gmail_callback():
+    code       = request.args.get("code")
+    carrier_id = request.args.get("state")
+    error      = request.args.get("error")
+
+    if error or not code or not carrier_id:
+        log.error('"oauth_gmail_callback — denied or missing: error=%s"', error)
+        return redirect("https://xtxtec.com/onboard/gmail?connected=error")
+
+    token_resp    = _http.post("https://oauth2.googleapis.com/token", data={
+        "code":          code,
+        "client_id":     os.environ["GMAIL_CLIENT_ID"],
+        "client_secret": os.environ["GMAIL_CLIENT_SECRET"],
+        "redirect_uri":  _OAUTH_REDIRECT,
+        "grant_type":    "authorization_code",
+    })
+    tokens        = token_resp.json()
+    refresh_token = tokens.get("refresh_token")
+
+    if not refresh_token:
+        log.error('"oauth_gmail_callback — no refresh_token in response"')
+        return redirect("https://xtxtec.com/onboard/gmail?connected=error")
+
+    supabase_client().table("carriers").update({
+        "gmail_token": refresh_token,
+        "ace_status":  "pending",
+    }).eq("id", carrier_id).execute()
+
+    log.info('"oauth_gmail_callback — connected carrier_id=%s"', carrier_id)
+    return redirect("https://xtxtec.com/onboard/gmail?connected=true")
+
+
 # ── Stripe ───────────────────────────────────────────────────────────────────
 import stripe
 import os
@@ -1409,8 +1474,8 @@ def stripe_webhook():
     # Handle successful payment
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        carrier_id = session["metadata"].get("carrier_id")
-        tier = session["metadata"].get("tier")
+        carrier_id = session["metadata"]["carrier_id"] if "carrier_id" in session["metadata"] else None
+        tier = session["metadata"]["tier"] if "tier" in session["metadata"] else None
 
         if carrier_id:
             # Update carrier subscription in Supabase
@@ -1427,7 +1492,7 @@ def stripe_webhook():
                     "subscription_tier": tier,
                     "subscription_status": "active",
                     "subscription_start": "now()",
-                    "stripe_customer_id": session.get("customer"),
+                    "stripe_customer_id": session["customer"] if "customer" in session else None,
                 }).eq("id", carrier_id).execute()
 
             logging.info(f"[STRIPE] Payment complete — carrier {carrier_id} — tier {tier}")

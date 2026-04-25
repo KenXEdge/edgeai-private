@@ -425,21 +425,23 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+let _sb = null, _session = null;
 (async function authGate() {
   const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQ0ODEsImV4cCI6MjA5MTM1MDQ4MX0.Ip6k_FlFeol25Kue6Hwq8MdD92Q_qc5QeGJBIVNgEtA';
-  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const { data: { session } } = await client.auth.getSession();
+  const { data: { session } } = await _sb.auth.getSession();
   if (!session) {
     window.location.replace('https://xtxtec.com/auth');
     return;
   }
+  _session = session;
 
-  const { data: carrier } = await client
+  const { data: carrier } = await _sb
     .from('carriers')
     .select('subscription_status')
-    .eq('user_id', session.user.id)
+    .eq('id', session.user.id)
     .single();
 
   if (!carrier || carrier.subscription_status !== 'active') {
@@ -454,7 +456,7 @@ function toggleItem(id) {
   document.getElementById(id).classList.toggle('on');
 }
 
-function handleContinue() {
+async function handleContinue() {
   const truckType = document.getElementById('truck-type').value;
   const city      = document.getElementById('home-city').value.trim();
   const state     = document.getElementById('home-state').value;
@@ -466,6 +468,32 @@ function handleContinue() {
   if (!city || !state) {
     if (!city) highlight('home-city', 'Enter your home base city.');
     else       highlight('home-state', 'Select your state.');
+    return;
+  }
+
+  const btn = document.querySelector('.btn-continue');
+  btn.disabled = true;
+  btn.innerHTML = 'Saving… <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  const { error } = await _sb
+    .from('carriers')
+    .update({
+      truck_type:          truckType,
+      fleet_size:          parseInt(document.getElementById('num-units').value) || 1,
+      truck_length:        parseInt(document.getElementById('truck-length').value) || null,
+      max_load_weight:     parseInt(document.getElementById('max-weight').value) || null,
+      home_base_city:      city,
+      home_base_state:     state,
+      home_base_zip:       document.getElementById('home-zip').value.trim() || null,
+      rate_floor:          parseFloat(document.getElementById('rate-floor').value) || null,
+      onboarding_complete: false,
+    })
+    .eq('id', _session.user.id);
+
+  if (error) {
+    console.error('[onboard] update failed:', error.message);
+    btn.disabled = false;
+    btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     return;
   }
 

@@ -741,7 +741,7 @@ body.light .logo-bg-rect{fill:#f5f3ef}
   const { data: carrier } = await client
     .from('carriers')
     .select('subscription_status')
-    .eq('user_id', session.user.id)
+    .eq('id', session.user.id)
     .single();
 
   if (!carrier || carrier.subscription_status !== 'active') {

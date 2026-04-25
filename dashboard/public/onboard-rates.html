@@ -384,6 +384,34 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+let _sb = null, _session = null;
+(async function authGate() {
+  const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQ0ODEsImV4cCI6MjA5MTM1MDQ4MX0.Ip6k_FlFeol25Kue6Hwq8MdD92Q_qc5QeGJBIVNgEtA';
+  _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session) {
+    window.location.replace('https://xtxtec.com/auth');
+    return;
+  }
+  _session = session;
+
+  const { data: carrier } = await _sb
+    .from('carriers')
+    .select('subscription_status')
+    .eq('id', session.user.id)
+    .single();
+
+  if (!carrier || carrier.subscription_status !== 'active') {
+    window.location.replace('https://xtxtec.com/subscribe');
+    return;
+  }
+})();
+</script>
+
 <script>
 function toggleTheme() {
   const body = document.body;
@@ -429,7 +457,40 @@ function selectRadio(group, id) {
 ['fuel-yes','fuel-no'].forEach(id => { if(!radioGroups['fuel']) radioGroups['fuel']=[]; radioGroups['fuel'].push(id); });
 ['pay-quick','pay-standard','pay-either'].forEach(id => { if(!radioGroups['pay']) radioGroups['pay']=[]; radioGroups['pay'].push(id); });
 
-function handleContinue() {
+async function handleContinue() {
+  const rateFloor    = parseFloat(document.getElementById('rate-floor').value) || null;
+  const minLoadValue = parseInt(document.getElementById('min-load-value').value) || null;
+  const deadhead     = parseInt(document.getElementById('deadhead').value) || null;
+
+  const fuelEl    = document.querySelector('#fuel-yes.on, #fuel-no.on');
+  const fuelSurcharge = fuelEl ? fuelEl.id === 'fuel-yes' : null;
+
+  const payEl  = document.querySelector('#pay-quick.on, #pay-standard.on, #pay-either.on');
+  const payMap = { 'pay-quick': 'quick_pay', 'pay-standard': 'standard', 'pay-either': 'either' };
+  const paymentTerms = payEl ? payMap[payEl.id] : null;
+
+  const btn = document.querySelector('.btn-continue');
+  btn.disabled = true;
+  btn.innerHTML = 'Saving… <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  const { error } = await _sb
+    .from('carriers')
+    .update({
+      rate_floor:      rateFloor,
+      min_load_value:  minLoadValue,
+      deadhead_miles:  deadhead,
+      fuel_surcharge:  fuelSurcharge,
+      payment_terms:   paymentTerms,
+    })
+    .eq('id', _session.user.id);
+
+  if (error) {
+    console.error('[onboard-rates] update failed:', error.message);
+    btn.disabled = false;
+    btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return;
+  }
+
   window.location.href = '/onboard/gmail';
 }
 </script>
