@@ -28,7 +28,7 @@ export default function ResetPassword() {
       setError(error.message)
     } else {
       setDone(true)
-      setTimeout(() => navigate('/carrier'), 2000)
+      setTimeout(() => navigate('/dashboard'), 2000)
     }
   }
 

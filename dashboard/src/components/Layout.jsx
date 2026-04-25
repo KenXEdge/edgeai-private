@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 const NAV_ITEMS = [
   {
-    to: '/carrier',
+    to: '/dashboard',
     end: true,
     label: 'Home',
     icon: (

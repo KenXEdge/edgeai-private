@@ -60,19 +60,8 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/subscribe" element={<Subscribe />} />
 
-        <Route
-          path="/carrier"
-          element={
-            <RequireAuth>
-              <Layout role="carrier" />
-            </RequireAuth>
-          }
-        >
-          <Route index element={<CarrierHome />} />
-        </Route>
-
-        <Route path="/" element={<MarketingPage />} />
-        <Route path="*" element={<Navigate to="/carrier" replace />} />
+<Route path="/" element={<MarketingPage />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   )

@@ -108,7 +108,7 @@ export default function Subscribe() {
         .limit(1)
 
       if (data?.[0]?.subscription_status === 'active') {
-        navigate('/carrier')
+        navigate('/onboard')
       }
     }
 
