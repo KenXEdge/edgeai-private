@@ -216,7 +216,6 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <div class="topbar">
   <div class="logo">
     <img id="logo-img" src="/assets/edge_refined_roadline1.png" style="width:72px;height:72px;flex-shrink:0">
-    <span style="font-family:'Exo 2',sans-serif;font-size:1.32rem;font-weight:800;letter-spacing:4px;color:transparent;text-transform:uppercase;-webkit-text-stroke:0.8px #666;margin-left:1.5px;margin-bottom:7px">EDGE</span>
   </div>
   <div class="topbar-right">
     <div class="topbar-label">Carrier Setup</div>
@@ -427,6 +426,8 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <script>
 let _sb = null, _session = null;
 (async function authGate() {
+  document.body.style.visibility = 'hidden';
+
   const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQ0ODEsImV4cCI6MjA5MTM1MDQ4MX0.Ip6k_FlFeol25Kue6Hwq8MdD92Q_qc5QeGJBIVNgEtA';
   _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -448,6 +449,8 @@ let _sb = null, _session = null;
     window.location.replace('https://xtxtec.com/subscribe');
     return;
   }
+
+  document.body.style.visibility = '';
 })();
 </script>
 
@@ -457,6 +460,8 @@ function toggleItem(id) {
 }
 
 async function handleContinue() {
+  if (!_session) { window.location.replace('https://xtxtec.com/auth'); return; }
+
   const truckType = document.getElementById('truck-type').value;
   const city      = document.getElementById('home-city').value.trim();
   const state     = document.getElementById('home-state').value;
