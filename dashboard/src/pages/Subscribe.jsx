@@ -64,9 +64,11 @@ const TIERS = [
 export default function Subscribe() {
   const [loading, setLoading] = useState(null)
   const [error, setError] = useState(null)
+  const [waitingForWebhook, setWaitingForWebhook] = useState(false)
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const cancelled = searchParams.get('cancelled')
+  const sessionId = searchParams.get('session_id')
 
   useEffect(() => {
     async function checkSubscription(session) {
@@ -125,6 +127,42 @@ export default function Subscribe() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Poll for active status after returning from Stripe checkout.
+  // The webhook fires async — the first read on page load always sees 'trial'.
+  useEffect(() => {
+    if (!sessionId) return
+    let stopped = false
+    setWaitingForWebhook(true)
+
+    async function poll() {
+      if (stopped) return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session || stopped) return
+
+      const { data } = await supabase
+        .from('carriers')
+        .select('subscription_status')
+        .eq('id', session.user.id)
+        .limit(1)
+
+      if (data?.[0]?.subscription_status === 'active') {
+        navigate('/onboard')
+      } else if (!stopped) {
+        setTimeout(poll, 1500)
+      }
+    }
+
+    // Give the webhook a moment before the first poll
+    const firstPoll = setTimeout(poll, 1000)
+    // Stop polling after 30s to avoid infinite loops
+    const giveUp = setTimeout(() => {
+      stopped = true
+      setWaitingForWebhook(false)
+    }, 30000)
+
+    return () => { stopped = true; clearTimeout(firstPoll); clearTimeout(giveUp) }
+  }, [sessionId])
+
   async function handleSelect(tierId) {
     setError(null)
     setLoading(tierId)
@@ -167,6 +205,12 @@ export default function Subscribe() {
           <p style={{color:'rgba(255,255,255,0.65)', fontFamily:"'Orbitron', sans-serif", fontWeight:700}}>Designed By Carriers For Carriers</p>
           <p style={{color:'rgba(255,255,255,0.65)', fontSize:'0.85rem', marginTop:'0.4rem'}}>You're About to Hire Your Most Productive Employee — EVER!</p>
         </div>
+
+        {waitingForWebhook && (
+          <div className="mb-6 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm text-center max-w-lg mx-auto">
+            Payment received — activating your account…
+          </div>
+        )}
 
         {cancelled && (
           <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm text-center max-w-lg mx-auto">
