@@ -1,5 +1,5 @@
 # XEdge / EDGEai — SESSION HANDOFF NOTE
-## April 27, 2026 | Read This First | Before Doing Anything Else
+## April 26, 2026 v2 | Read This First | Before Doing Anything Else
 
 Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separate commands)
 
@@ -117,7 +117,7 @@ Verify row updated. `subscription_status = 'active'`, `subscription_tier = 'base
 
 ---
 
-## 9. System Status — April 27 2026
+## 9. System Status — April 26 2026
 
 | Component | Status | Detail |
 |-----------|--------|--------|
@@ -128,8 +128,7 @@ Verify row updated. `subscription_status = 'active'`, `subscription_tier = 'base
 | SMS | DISABLED | SMS_ENABLED=false — Telnyx pending |
 | Gmail Watch | PENDING | Depends on Ken production onboarding |
 | Google OAuth | PENDING | Needs Privacy Policy + Terms pages first |
-| Git staging | PENDING APPROVAL | 2 files staged, not pushed |
 
 ---
 
-*XEdge Transition Note | April 27 2026 | XTX LLC*
+*XEdge Transition Note | April 26 2026 v2 | XTX LLC*
