@@ -259,6 +259,8 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     </div>
   </div>
 
+  <div id="extract-status" style="display:none"></div>
+
 </div><!-- /page -->
 
 <!-- BOTTOM BAR -->
@@ -370,14 +372,57 @@ async function handleContinue() {
     return;
   }
   const btn = document.getElementById('btn-continue');
+  const statusEl = document.getElementById('extract-status');
+
+  function setStatus(msg, type) {
+    const base = 'display:block;margin:1rem 0;padding:12px 16px;border-radius:2px;font-size:13px;font-weight:600;text-align:center;';
+    const styles = {
+      info:    'background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.2);color:#E8A020',
+      success: 'background:rgba(50,200,100,0.1);border:1px solid rgba(50,200,100,0.3);color:#32c864',
+      error:   'background:rgba(255,60,60,0.1);border:1px solid rgba(255,60,60,0.3);color:rgba(255,100,100,0.9)',
+    };
+    statusEl.setAttribute('style', base + styles[type]);
+    statusEl.textContent = msg;
+  }
+
   btn.disabled = true;
-  btn.innerHTML = 'Starting ACE… <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  fetch(CLOUD_RUN + '/extract-brokers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ carrier_id: _session.user.id, days: 90 }),
-  }).catch(err => console.error('[onboard-gmail] extract-brokers fire failed:', err));
-  window.location.href = '/dashboard';
+  btn.innerHTML = 'Scanning sent mail…';
+
+  try {
+    setStatus('Scanning your sent mail for broker contacts…', 'info');
+
+    const extractRes = await fetch(CLOUD_RUN + '/extract-brokers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ carrier_id: _session.user.id, days: 90 }),
+    });
+    if (!extractRes.ok) throw new Error('Broker scan failed (HTTP ' + extractRes.status + ')');
+    const extractData = await extractRes.json();
+    if (!extractData.ok) throw new Error(extractData.error || 'Broker scan returned an error');
+
+    const brokers = extractData.brokers || [];
+    const total = brokers.length;
+
+    btn.innerHTML = 'Importing ' + total + ' brokers…';
+    setStatus('Found ' + total + ' brokers — importing to your network…', 'info');
+
+    const importRes = await fetch(CLOUD_RUN + '/import-brokers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ carrier_id: _session.user.id, brokers }),
+    });
+    if (!importRes.ok) throw new Error('Broker import failed (HTTP ' + importRes.status + ')');
+
+    setStatus('✓ ' + total + ' brokers imported — ACE is ready. Taking you to your dashboard…', 'success');
+    btn.innerHTML = 'Going to Dashboard…';
+    setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
+
+  } catch (err) {
+    console.error('[onboard-gmail] broker import failed:', err);
+    setStatus('Error: ' + err.message + ' — please try again.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function() {

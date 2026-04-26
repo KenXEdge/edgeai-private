@@ -287,6 +287,27 @@ body.light .chart-label{color:#111;font-weight:600}
 body.light .step-name{color:#111;font-weight:800}
 body.light .step-name.dim{color:#111;font-weight:800}
 body.light .tab:hover{color:#111;font-weight:900}
+/* ── ADD BROKER MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(4px)}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--dark);border:1px solid var(--gold-border);width:100%;max-width:440px;border-radius:2px}
+.modal-header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#fff}
+.modal-close{background:none;border:none;color:var(--text-dim);font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+.modal-close:hover{color:#fff}
+.modal-body{padding:1.5rem}
+.modal-field{margin-bottom:1rem}
+.modal-field label{display:block;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.modal-field input{width:100%;background:var(--dark2);border:1px solid var(--border);color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:10px 12px;border-radius:2px;outline:none;transition:border-color 0.15s}
+.modal-field input:focus{border-color:rgba(232,160,32,0.4)}
+.modal-field input::placeholder{color:var(--text-dim)}
+.modal-footer{padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;gap:0.75rem;justify-content:flex-end}
+.modal-err{font-size:12px;color:rgba(255,100,100,0.85);margin-top:0.5rem;display:none}
+body.light .modal{background:#fff;border-color:rgba(232,160,32,0.4)}
+body.light .modal-title{color:#111}
+body.light .modal-field label{color:rgba(0,0,0,0.6)}
+body.light .modal-field input{background:#f8f8f8;border-color:#e0e0e0;color:#111}
+body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&display=swap" rel="stylesheet">
 </head>
@@ -351,12 +372,12 @@ body.light .tab:hover{color:#111;font-weight:900}
     <div class="nav-item" onclick="setActive(this)">
       <div class="nav-icon">🤝</div>
       <div class="nav-label">Brokers</div>
-      <div class="nav-badge dim">265</div>
+      <div class="nav-badge dim" id="badge-brokers">—</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
       <div class="nav-icon">❓</div>
       <div class="nav-label">Unknown Brokers</div>
-      <div class="nav-badge">2</div>
+      <div class="nav-badge" id="badge-unknown">—</div>
     </div>
 
     <div class="sidebar-section">Account</div>
@@ -403,7 +424,7 @@ body.light .tab:hover{color:#111;font-weight:900}
         </div>
         <div class="page-actions">
           <button class="btn-sm btn-sm-outline">View Logs</button>
-          <button class="btn-sm btn-sm-gold">+ Add Broker</button>
+          <button class="btn-sm btn-sm-gold" onclick="openAddBrokerModal()">+ Add Broker</button>
         </div>
       </div>
 
@@ -461,42 +482,8 @@ body.light .tab:hover{color:#111;font-weight:900}
                   <th>Time</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td><div class="broker-name">Coyote Logistics</div><div class="broker-lane">Dallas TX → OKC OK</div></td>
-                  <td><div class="status-pill pill-offer">📦 Load Offer</div></td>
-                  <td><div class="time-label">7:42am</div></td>
-                </tr>
-                <tr>
-                  <td><div class="broker-name">Echo Global Freight</div><div class="broker-lane">Fort Worth TX → Houston TX</div></td>
-                  <td><div class="status-pill pill-replied">✓ Replied</div></td>
-                  <td><div class="time-label">7:38am</div></td>
-                </tr>
-                <tr>
-                  <td><div class="broker-name">Arrive Logistics</div><div class="broker-lane">Dallas TX → Austin TX</div></td>
-                  <td><div class="status-pill pill-offer">📦 Load Offer</div></td>
-                  <td><div class="time-label">7:31am</div></td>
-                </tr>
-                <tr>
-                  <td><div class="broker-name">XPO Logistics</div><div class="broker-lane">Irving TX → San Antonio TX</div></td>
-                  <td><div class="status-pill pill-sent">→ Sent</div></td>
-                  <td><div class="time-label">7:18am</div></td>
-                </tr>
-                <tr>
-                  <td><div class="broker-name">CH Robinson</div><div class="broker-lane">Dallas TX → Abilene TX</div></td>
-                  <td><div class="status-pill pill-sent">→ Sent</div></td>
-                  <td><div class="time-label">7:12am</div></td>
-                </tr>
-                <tr>
-                  <td><div class="broker-name">Total Quality Logistics</div><div class="broker-lane">Plano TX → Tulsa OK</div></td>
-                  <td><div class="status-pill pill-replied">✓ Replied</div></td>
-                  <td><div class="time-label">7:09am</div></td>
-                </tr>
-                <tr>
-                  <td><div class="broker-name">RXO Transport</div><div class="broker-lane">Dallas TX → Shreveport LA</div></td>
-                  <td><div class="status-pill pill-offer">📦 Load Offer</div></td>
-                  <td><div class="time-label">7:05am</div></td>
-                </tr>
+              <tbody id="broker-tbody">
+                <tr><td colspan="3" style="padding:2rem;text-align:center;color:var(--text-dim);font-size:13px">Loading brokers…</td></tr>
               </tbody>
             </table>
           </div>
@@ -748,20 +735,22 @@ body.light .tab:hover{color:#111;font-weight:900}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+let _sb = null, _session = null;
 (async function authGate() {
   document.body.style.visibility = 'hidden';
 
   const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQ0ODEsImV4cCI6MjA5MTM1MDQ4MX0.Ip6k_FlFeol25Kue6Hwq8MdD92Q_qc5QeGJBIVNgEtA';
-  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const { data: { session } } = await client.auth.getSession();
+  const { data: { session } } = await _sb.auth.getSession();
   if (!session) {
     window.location.replace('https://xtxtec.com/auth');
     return;
   }
+  _session = session;
 
-  const { data: carrier } = await client
+  const { data: carrier } = await _sb
     .from('carriers')
     .select('subscription_status')
     .eq('id', session.user.id)
@@ -773,6 +762,7 @@ body.light .tab:hover{color:#111;font-weight:900}
   }
 
   document.body.style.visibility = '';
+  loadDashboardData();
 })();
 </script>
 
@@ -832,6 +822,158 @@ document.addEventListener('DOMContentLoaded', function() {
     if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
   }
 });
+</script>
+<!-- ADD BROKER MODAL -->
+<div class="modal-overlay hidden" id="add-broker-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Broker</div>
+      <button class="modal-close" onclick="closeAddBrokerModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Broker Name</label>
+        <input id="modal-name" type="text" placeholder="Jane Smith" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>Company</label>
+        <input id="modal-company" type="text" placeholder="Coyote Logistics" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>Email</label>
+        <input id="modal-email" type="email" placeholder="broker@company.com" autocomplete="off">
+      </div>
+      <div class="modal-err" id="modal-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-sm-outline" onclick="closeAddBrokerModal()">Cancel</button>
+      <button class="btn-sm btn-sm-gold" id="modal-submit" onclick="submitAddBroker()">Add to Network</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function loadDashboardData() {
+  loadBrokers();
+  loadSidebarCounts();
+}
+
+async function loadBrokers() {
+  const tbody = document.getElementById('broker-tbody');
+  if (!tbody || !_sb || !_session) return;
+
+  const { data: brokers, error } = await _sb
+    .from('brokers')
+    .select('name, company, email, status, last_reply_at')
+    .eq('carrier_id', _session.user.id)
+    .order('last_reply_at', { ascending: false, nullsFirst: false })
+    .limit(50);
+
+  if (error) {
+    tbody.innerHTML = '<tr><td colspan="3" style="padding:2rem;text-align:center;color:rgba(255,100,100,0.8);font-size:13px">Failed to load brokers.</td></tr>';
+    return;
+  }
+  if (!brokers || brokers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="padding:2rem;text-align:center;color:var(--text-dim);font-size:13px">No brokers yet — complete Gmail setup to import your network.</td></tr>';
+    return;
+  }
+
+  const pillMap = {
+    hot:  '<div class="status-pill pill-offer">🔥 Hot</div>',
+    warm: '<div class="status-pill pill-replied">✓ Active</div>',
+    cold: '<div class="status-pill pill-sent">→ Cold</div>',
+  };
+
+  tbody.innerHTML = brokers.map(b => {
+    const pill = pillMap[b.status] || pillMap.cold;
+    const time = b.last_reply_at
+      ? new Date(b.last_reply_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : '—';
+    const name = escHtml(b.name || b.email || '—');
+    const sub  = b.company ? '<div class="broker-lane">' + escHtml(b.company) + '</div>' : '';
+    return '<tr>' +
+      '<td><div class="broker-name">' + name + '</div>' + sub + '</td>' +
+      '<td>' + pill + '</td>' +
+      '<td><div class="time-label">' + escHtml(time) + '</div></td>' +
+      '</tr>';
+  }).join('');
+}
+
+async function loadSidebarCounts() {
+  if (!_sb || !_session) return;
+  const uid = _session.user.id;
+
+  const [{ count: brokerCount }, { count: unknownCount }] = await Promise.all([
+    _sb.from('brokers').select('id', { count: 'exact', head: true }).eq('carrier_id', uid),
+    _sb.from('unknown_brokers_inbox').select('id', { count: 'exact', head: true }).eq('carrier_id', uid),
+  ]);
+
+  const bEl = document.getElementById('badge-brokers');
+  const uEl = document.getElementById('badge-unknown');
+  if (bEl) bEl.textContent = brokerCount ?? '—';
+  if (uEl) uEl.textContent = unknownCount ?? '0';
+}
+
+function openAddBrokerModal() {
+  document.getElementById('modal-name').value = '';
+  document.getElementById('modal-company').value = '';
+  document.getElementById('modal-email').value = '';
+  const errEl = document.getElementById('modal-err');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+  document.getElementById('add-broker-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('modal-name').focus(), 50);
+}
+
+function closeAddBrokerModal() {
+  document.getElementById('add-broker-modal').classList.add('hidden');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAddBrokerModal(); });
+
+async function submitAddBroker() {
+  const name    = document.getElementById('modal-name').value.trim();
+  const company = document.getElementById('modal-company').value.trim();
+  const email   = document.getElementById('modal-email').value.trim();
+  const errEl   = document.getElementById('modal-err');
+  const btn     = document.getElementById('modal-submit');
+
+  errEl.style.display = 'none';
+
+  if (!email) {
+    errEl.textContent = 'Email is required.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.textContent = 'Adding…';
+  btn.disabled = true;
+
+  const { error } = await _sb.from('brokers').insert({
+    carrier_id: _session.user.id,
+    name:    name    || null,
+    company: company || null,
+    email,
+    status: 'cold',
+  });
+
+  btn.textContent = 'Add to Network';
+  btn.disabled = false;
+
+  if (error) {
+    errEl.textContent = error.message || 'Insert failed — please try again.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  closeAddBrokerModal();
+  loadBrokers();
+  loadSidebarCounts();
+}
 </script>
 </body>
 </html>
