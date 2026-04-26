@@ -492,8 +492,8 @@ body.light .btn-dark{background:#ffffff;color:#0a0a0a}
     <!-- HERO SIGNUP CARD -->
     <div class="hero-card fade-up" style="animation-delay:0.2s">
       <div class="card-tag">Carrier Registration</div>
-      <div class="card-title">Check Your Inbox</div>
-      <div class="card-sub">Enter The OTP Code From Your Inbox Below</div>
+      <div class="card-title">Get ACE Working Today</div>
+      <div class="card-sub">Set up won't take long! ACE starts work at 7AM tomorrow.</div>
 
       <div id="card-form-view">
         <div class="form-row">
@@ -1055,6 +1055,8 @@ async function handleSignup() {
   _pendingCompany = company; _pendingPhone = phone;
   _otpSource = 'card';
   console.log('OTP sent successfully');
+  document.querySelector('.card-title').textContent = 'CHECK YOUR INBOX';
+  document.querySelector('.card-sub').textContent = 'Enter The OTP Code From Your Inbox Below';
   document.getElementById('card-form-view').style.display = 'none';
   const otpDiv = document.createElement('div');
   otpDiv.id = 'card-otp-block';
