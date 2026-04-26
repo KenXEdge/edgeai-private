@@ -34,7 +34,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:64px 1fr;height:100vh;overflow:hidden}
 
 /* ── TOPBAR ── */
-.topbar{grid-column:1/-1;background:rgba(10,10,10,0.98);border-bottom:1px solid var(--gold-border);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem 0 0;z-index:100;backdrop-filter:blur(16px)}
+.topbar{grid-column:1/-1;background:rgba(10,10,10,0.98);border-bottom:1px solid var(--gold-border);display:flex;align-items:center;justify-content:space-between;padding:0 2rem 0 0;z-index:100;backdrop-filter:blur(16px)}
 .topbar-left{display:flex;align-items:center;height:64px;width:var(--sidebar-w);padding:0 1.5rem;border-right:1px solid var(--border);flex-shrink:0}
 .logo{display:flex;align-items:center;gap:6px}
 .logo-text{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:600;letter-spacing:5px;text-transform:uppercase}
@@ -393,7 +393,7 @@ body.light .tab:hover{color:#111;font-weight:900}
             <div class="ace-mode-detail">42 broker emails sent · 7:04 AM · Next run tomorrow 7:00 AM</div>
           </div>
         </div>
-        <button class="ace-toggle">Pause ACE</button>
+        <button class="ace-toggle" onclick="toggleAce()">Pause ACE</button>
       </div>
 
       <!-- PAGE HEADER -->
@@ -778,6 +778,18 @@ body.light .tab:hover{color:#111;font-weight:900}
 </script>
 
 <script>
+let _acePaused = false;
+function toggleAce() {
+  _acePaused = !_acePaused;
+  document.querySelectorAll('.ace-dot, .ace-mode-dot').forEach(el => {
+    el.classList.toggle('paused', _acePaused);
+  });
+  const btn = document.querySelector('.ace-toggle');
+  btn.textContent = _acePaused ? 'Resume ACE' : 'Pause ACE';
+  const label = document.querySelector('.ace-mode-label');
+  if (label) label.textContent = _acePaused ? 'ACE Paused' : 'ACE Running — Morning Outreach Active';
+}
+
 function setActive(el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   el.classList.add('active');
