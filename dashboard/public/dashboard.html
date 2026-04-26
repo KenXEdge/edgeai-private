@@ -818,8 +818,6 @@ function toggleTheme() {
   if (!isLight) { labelDark.style.color='#E8A020'; labelLight.style.color=''; }
   else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
   localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
-  var logoImg = document.getElementById('logo-img');
-  if (logoImg) logoImg.src = isLight ? '/assets/logo-edge-black.png?v=2' : '/assets/logo-edge-white.png?v=2';
 }
 document.addEventListener('DOMContentLoaded', function() {
   var t = localStorage.getItem('edgeTheme');
@@ -832,8 +830,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (track) track.classList.add('light-on');
     if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
     if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
-    var logoImg = document.getElementById('logo-img');
-    if (logoImg) logoImg.src = '/assets/logo-edge-black.png?v=2';
   }
 });
 </script>
