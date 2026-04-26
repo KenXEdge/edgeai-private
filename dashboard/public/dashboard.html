@@ -34,7 +34,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:64px 1fr;height:100vh;overflow:hidden}
 
 /* ── TOPBAR ── */
-.topbar{grid-column:1/-1;background:rgba(10,10,10,0.98);border-bottom:1px solid var(--gold-border);display:flex;align-items:center;justify-content:space-between;padding:0 2rem 0 0;z-index:100;backdrop-filter:blur(16px)}
+.topbar{grid-column:1/-1;background:rgba(10,10,10,0.98);border-bottom:1px solid var(--gold-border);display:flex;align-items:center;justify-content:space-between;padding:0;z-index:100;backdrop-filter:blur(16px)}
 .topbar-left{display:flex;align-items:center;height:64px;width:var(--sidebar-w);padding:0 1.5rem;border-right:1px solid var(--border);flex-shrink:0}
 .logo{display:flex;align-items:center;gap:6px}
 .logo-text{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:600;letter-spacing:5px;text-transform:uppercase}
@@ -45,7 +45,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .topbar-greeting{font-size:13px;color:var(--text-dim)}
 .topbar-greeting strong{color:rgba(255,255,255,0.95);font-weight:800}
 
-.topbar-right{display:flex;align-items:center;gap:1rem;flex-shrink:0}
+.topbar-right{display:flex;align-items:center;gap:1rem;flex-shrink:0;padding-right:2rem}
 .ace-status{display:flex;align-items:center;gap:8px;background:var(--gold-dim);border:1px solid var(--gold-border);padding:7px 14px;border-radius:2px}
 .ace-dot{width:21px;height:21px;border-radius:50%;background:#00ff44;animation:pulse 2s ease-in-out infinite}
 .ace-dot.inactive{background:#ff2222}
