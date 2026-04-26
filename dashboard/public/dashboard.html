@@ -786,8 +786,10 @@ function toggleAce() {
   });
   const btn = document.querySelector('.ace-toggle');
   btn.textContent = _acePaused ? 'Resume ACE' : 'Pause ACE';
-  const label = document.querySelector('.ace-mode-label');
-  if (label) label.textContent = _acePaused ? 'ACE Paused' : 'ACE Running — Morning Outreach Active';
+  const aceLabel = document.querySelector('.ace-label');
+  if (aceLabel) aceLabel.textContent = _acePaused ? 'ACE Paused' : 'ACE Active';
+  const bannerLabel = document.querySelector('.ace-mode-label');
+  if (bannerLabel) bannerLabel.textContent = _acePaused ? 'ACE Paused' : 'ACE Running — Morning Outreach Active';
 }
 
 function setActive(el){
