@@ -45,7 +45,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .topbar-greeting{font-size:13px;color:var(--text-dim)}
 .topbar-greeting strong{color:rgba(255,255,255,0.95);font-weight:800}
 
-.topbar-right{display:flex;align-items:center;gap:1rem}
+.topbar-right{display:flex;align-items:center;gap:1rem;flex-shrink:0}
 .ace-status{display:flex;align-items:center;gap:8px;background:var(--gold-dim);border:1px solid var(--gold-border);padding:7px 14px;border-radius:2px}
 .ace-dot{width:21px;height:21px;border-radius:50%;background:#00ff44;animation:pulse 2s ease-in-out infinite}
 .ace-dot.inactive{background:#ff2222}
@@ -200,8 +200,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
 /* ── THEME TOGGLE ── */
-.theme-toggle{position:fixed;top:1.25rem;right:1.5rem;z-index:500;display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.25);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 14px}
-body.light .theme-toggle{background:rgba(0,0,0,0.06);border-color:rgba(0,0,0,0.1)}
+.theme-toggle{display:flex;align-items:center;gap:10px}
 .toggle-label{font-size:10px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.75)}
 body.light .toggle-label{color:rgba(0,0,0,0.65) !important;}
 .toggle-label.active{color:#E8A020}
@@ -309,7 +308,7 @@ body.light .tab:hover{color:#111;font-weight:900}
         <div class="ace-dot"></div>
         <div class="ace-label">ACE Active</div>
       </div>
-      <div class="theme-toggle" id="themeToggle" style="position:static;background:none;border:none;backdrop-filter:none;padding:0;gap:8px">
+      <div class="theme-toggle" id="themeToggle" style="gap:8px">
         <span class="toggle-label" id="label-dark" style="color:#E8A020">Dark</span>
         <div class="toggle-track" id="toggleTrack" onclick="toggleTheme()">
           <div class="toggle-thumb" id="toggleThumb"></div>
