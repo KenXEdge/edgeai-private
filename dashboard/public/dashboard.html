@@ -47,7 +47,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 
 .topbar-right{display:flex;align-items:center;gap:1rem}
 .ace-status{display:flex;align-items:center;gap:8px;background:var(--gold-dim);border:1px solid var(--gold-border);padding:7px 14px;border-radius:2px}
-.ace-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulse 2s ease-in-out infinite}
+.ace-dot{width:21px;height:21px;border-radius:50%;background:#00ff44;animation:pulse 2s ease-in-out infinite}
+.ace-dot.inactive{background:#ff2222}
+.ace-dot.paused{background:#ff8800}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
 .ace-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold)}
 
@@ -116,7 +118,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 /* ── ACE STATUS PANEL ── */
 .ace-mode{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--gold-dim);border-bottom:1px solid var(--gold-border)}
 .ace-mode-left{display:flex;align-items:center;gap:12px}
-.ace-mode-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+.ace-mode-dot{width:30px;height:30px;border-radius:50%;background:#00ff44;animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+.ace-mode-dot.inactive{background:#ff2222}
+.ace-mode-dot.paused{background:#ff8800}
 .ace-mode-label{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold)}
 .ace-mode-detail{font-size:11px;color:rgba(232,160,32,0.6);margin-top:1px}
 .ace-toggle{background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:7px 14px;border-radius:2px;border:none;cursor:pointer}
