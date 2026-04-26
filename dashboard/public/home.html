@@ -492,8 +492,8 @@ body.light .btn-dark{background:#ffffff;color:#0a0a0a}
     <!-- HERO SIGNUP CARD -->
     <div class="hero-card fade-up" style="animation-delay:0.2s">
       <div class="card-tag">Carrier Registration</div>
-      <div class="card-title">Get ACE Working Today</div>
-      <div class="card-sub">Set up won't take long! ACE starts work at 7AM tomorrow.</div>
+      <div class="card-title">Check Your Inbox</div>
+      <div class="card-sub">Enter The OTP Code From Your Inbox Below</div>
 
       <div id="card-form-view">
         <div class="form-row">
@@ -1008,7 +1008,7 @@ body.light .btn-dark{background:#ffffff;color:#0a0a0a}
         </div>
         <div id="m-otp-error" style="display:none;color:#e05c5c;font-size:12px;margin-bottom:0.75rem;font-weight:600;letter-spacing:0.3px"></div>
         <button class="btn-signup" onclick="verifyOtp()" style="margin-top:1.5rem">Verify & Continue →</button>
-        <div class="card-fine" style="margin-top:0.75rem">Didn't get it? <a href="#" onclick="resendOtp(event)" style="color:var(--gold)">Resend code</a></div>
+        <div class="card-fine" style="margin-top:0.75rem;font-size:14px">Didn't get it? <a href="#" onclick="resendOtp(event)" style="color:var(--gold)">Resend code</a></div>
       </div>
     </div>
   </div>
@@ -1066,7 +1066,7 @@ async function handleSignup() {
     </div>
     <div id="card-otp-error" style="display:none;color:#e05c5c;font-size:12px;margin-bottom:0.75rem;font-weight:600;letter-spacing:0.3px"></div>
     <button class="btn-signup" onclick="verifyOtp('card')" style="width:100%;margin-top:0.5rem">Verify & Continue →</button>
-    <div class="card-fine" style="margin-top:0.75rem">Didn't get it? <a href="#" onclick="resendOtp(event)" style="color:var(--gold)">Resend code</a></div>
+    <div class="card-fine" style="margin-top:0.75rem;font-size:14px">Didn't get it? <a href="#" onclick="resendOtp(event)" style="color:var(--gold)">Resend code</a></div>
   `;
   document.querySelector('.hero-card').appendChild(otpDiv);
 }
