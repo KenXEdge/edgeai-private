@@ -1131,6 +1131,8 @@ def extract_brokers():
         email_subjects: dict[str, list[str]] = {}
         # email -> display name captured from To: header
         email_names: dict[str, str] = {}
+        # email -> most recent message ID sent to that address (first seen = newest)
+        email_message_ids: dict[str, str] = {}
 
         _NOISE_DOMAINS = {
             "apple.com", "icloud.com", "google.com", "gmail.com",
@@ -1171,6 +1173,8 @@ def extract_brokers():
                 return
             if to_email not in email_names and to_name:
                 email_names[to_email] = to_name.strip()
+            if to_email not in email_message_ids:
+                email_message_ids[to_email] = request_id
             if to_email not in email_subjects:
                 email_subjects[to_email] = []
             if subject_val and subject_val not in email_subjects[to_email]:
@@ -1218,26 +1222,58 @@ def extract_brokers():
             already_in_network, len(unknown_emails),
         )
 
+        # ── Step 2.5: Fetch signature blocks for unknown brokers ──────────────
+        def _extract_body_text(msg):
+            def _get_text(part):
+                if part.get("mimeType") == "text/plain":
+                    data = part.get("body", {}).get("data", "")
+                    if data:
+                        return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
+                for subpart in part.get("parts", []):
+                    result = _get_text(subpart)
+                    if result:
+                        return result
+                return ""
+            return _get_text(msg.get("payload", {}))
+
+        def _fetch_sig(email):
+            msg_id = email_message_ids.get(email)
+            if not msg_id:
+                return email, ""
+            try:
+                msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
+                body = _extract_body_text(msg)
+                lines = [l.strip() for l in body.splitlines() if l.strip()]
+                return email, "\n".join(lines[-10:])
+            except Exception as exc:
+                log.error('"extract_brokers — sig fetch failed email=%s: %s"', email, exc)
+                return email, ""
+
+        email_signatures: dict[str, str] = {}
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            futures = {pool.submit(_fetch_sig, email): email for email in unknown_emails}
+            for future in as_completed(futures):
+                email, sig = future.result()
+                email_signatures[email] = sig
+        log.info('"extract_brokers — step2.5 done signatures_fetched=%d"', sum(1 for s in email_signatures.values() if s))
+
         # ── Step 4: Claude enrichment — parallel, up to 10 concurrent calls ────
         brokers = []
         enrich_count = 0
 
         def _enrich(email):
-            subjects_str = "; ".join(email_subjects[email][:5]) or "none"
             to_name = email_names.get(email)
+            signature = email_signatures.get(email, "")
             prompt_text = (
-                "Given the broker's email address, display name (if known), "
-                "and subjects of emails sent to them, extract what you can.\n\n"
+                "Extract contact details from the email signature block below.\n\n"
                 "Return a JSON object with exactly these fields:\n"
                 "{\"name\": \"first last or null\", "
                 "\"title\": \"job title or null\", "
                 "\"company\": \"company name or null\", "
-                "\"mobile\": \"mobile phone or null\", "
-                "\"direct\": \"direct phone or null\"}\n\n"
+                "\"email\": \"direct email or null\", "
+                "\"phone\": \"phone number or null\"}\n\n"
                 "Return ONLY valid JSON, no other text.\n\n"
-                f"Email: {email}\n"
-                f"Name hint: {to_name or ''}\n"
-                f"Subjects: {subjects_str}"
+                f"Signature:\n{signature or 'not available'}"
             )
             try:
                 claude_msg = anthropic_client().messages.create(
@@ -1262,8 +1298,7 @@ def extract_brokers():
                     "name": enriched.get("name") or to_name or None,
                     "title": enriched.get("title"),
                     "company": enriched.get("company"),
-                    "mobile": enriched.get("mobile"),
-                    "direct": enriched.get("direct"),
+                    "phone": enriched.get("phone"),
                 })
 
         log.info(
