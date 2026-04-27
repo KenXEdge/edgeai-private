@@ -1257,6 +1257,70 @@ def extract_brokers():
                 email_signatures[email] = sig
         log.info('"extract_brokers — step2.5 done signatures_fetched=%d"', sum(1 for s in email_signatures.values() if s))
 
+        # ── Step 3.5: Classify each unknown contact via Claude Haiku ─────────
+        def _classify(email):
+            signature = email_signatures.get(email, "")
+            prompt_text = (
+                "Classify this email contact as a freight industry professional.\n\n"
+                "Classification options:\n"
+                "- freight_broker: brokers who connect shippers with carriers. "
+                "Indicators: company names containing freight, logistics, transport, carrier, "
+                "trucking, brokerage, dispatch, loads, shipping, cargo; "
+                "job titles like broker, dispatcher, agent, coordinator, logistics manager.\n"
+                "- freight_dispatcher: dispatchers who manage carrier loads directly.\n"
+                "- load_board: contacts associated with load board platforms.\n"
+                "- unknown: insufficient information to classify with confidence.\n\n"
+                "Return a JSON object with exactly this field:\n"
+                "{\"classification\": \"freight_broker|freight_dispatcher|load_board|unknown\"}\n\n"
+                "Return ONLY valid JSON, no other text.\n\n"
+                f"Email: {email}\n"
+                f"Signature:\n{signature or 'not available'}"
+            )
+            try:
+                claude_msg = anthropic_client().messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=50,
+                    messages=[{"role": "user", "content": prompt_text}],
+                )
+                result = json.loads(claude_msg.content[0].text.strip())
+                return email, result.get("classification", "unknown")
+            except Exception as exc:
+                log.error('"extract_brokers — classify failed email=%s: %s"', email, exc)
+                return email, "unknown"
+
+        email_classifications: dict[str, str] = {}
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            futures = {pool.submit(_classify, email): email for email in unknown_emails}
+            for future in as_completed(futures):
+                email, classification = future.result()
+                email_classifications[email] = classification
+
+        _IMPORT_CLASSES = {"freight_broker", "freight_dispatcher"}
+        classified_emails = [e for e in unknown_emails if email_classifications.get(e) in _IMPORT_CLASSES]
+        inbox_emails = [e for e in unknown_emails if email_classifications.get(e) not in _IMPORT_CLASSES]
+
+        if inbox_emails:
+            inbox_rows = [
+                {
+                    "carrier_id": carrier_id,
+                    "email": e,
+                    "name": email_names.get(e),
+                    "classification": email_classifications.get(e, "unknown"),
+                }
+                for e in inbox_emails
+            ]
+            try:
+                supabase_client().table("unknown_brokers_inbox").upsert(
+                    inbox_rows, on_conflict="carrier_id,email"
+                ).execute()
+            except Exception as exc:
+                log.error('"extract_brokers — inbox insert failed: %s"', exc)
+
+        log.info(
+            '"extract_brokers — step3.5 done classified=%d routed_to_inbox=%d"',
+            len(classified_emails), len(inbox_emails),
+        )
+
         # ── Step 4: Claude enrichment — parallel, up to 10 concurrent calls ────
         brokers = []
         enrich_count = 0
@@ -1288,7 +1352,7 @@ def extract_brokers():
             return email, to_name, enriched
 
         with ThreadPoolExecutor(max_workers=10) as pool:
-            futures = {pool.submit(_enrich, email): email for email in unknown_emails}
+            futures = {pool.submit(_enrich, email): email for email in classified_emails}
             for future in as_completed(futures):
                 email, to_name, enriched = future.result()
                 if enriched:
