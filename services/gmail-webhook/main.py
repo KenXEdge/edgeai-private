@@ -54,7 +54,7 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
-CORS(app, origins=["https://edgeai-dashboard.vercel.app", "http://localhost:5173"])
+CORS(app, origins=["https://edgeai-dashboard.vercel.app", "http://localhost:5173", "https://xtxtec.com"])
 
 # ── Lazy singletons (initialised once per container cold start) ────────────────
 _supabase: Client | None = None
