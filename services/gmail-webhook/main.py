@@ -6,6 +6,7 @@ classifies broker replies using Claude, and triggers carrier actions.
 
 import os
 import json
+import re
 import base64
 import logging
 import sys
@@ -1223,28 +1224,82 @@ def extract_brokers():
         )
 
         # ── Step 2.5: Fetch signature blocks for unknown brokers ──────────────
-        def _extract_body_text(msg):
-            def _get_text(part):
-                if part.get("mimeType") == "text/plain":
-                    data = part.get("body", {}).get("data", "")
-                    if data:
-                        return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
-                for subpart in part.get("parts", []):
-                    result = _get_text(subpart)
-                    if result:
-                        return result
+        def _decode_part_data(data: str) -> str:
+            try:
+                return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
+            except Exception:
                 return ""
-            return _get_text(msg.get("payload", {}))
 
-        def _fetch_sig(email):
+        def _strip_html(html: str) -> str:
+            try:
+                html = re.sub(r'<(script|style)[^>]*?>.*?</(script|style)>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                html = re.sub(r'<(br|p|div|tr|li|h[1-6])[^>]*?>', '\n', html, flags=re.IGNORECASE)
+                html = re.sub(r'<[^>]+>', '', html)
+                html = html.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<') \
+                           .replace('&gt;', '>').replace('&quot;', '"').replace('&#39;', "'")
+                return html
+            except Exception:
+                return ""
+
+        def _extract_body_text(msg) -> str:
+            try:
+                def _get_text(part) -> str:
+                    mime = part.get("mimeType", "")
+                    data = part.get("body", {}).get("data", "")
+                    if mime == "text/plain":
+                        return _decode_part_data(data)
+                    if mime == "text/html":
+                        return _strip_html(_decode_part_data(data))
+                    parts = part.get("parts", [])
+                    if mime == "multipart/alternative":
+                        # Prefer plain text; fall back to HTML
+                        for subpart in parts:
+                            if subpart.get("mimeType") == "text/plain":
+                                text = _get_text(subpart)
+                                if text:
+                                    return text
+                        for subpart in parts:
+                            if subpart.get("mimeType") == "text/html":
+                                text = _get_text(subpart)
+                                if text:
+                                    return text
+                    # multipart/mixed, multipart/related, unknown — collect all text parts
+                    collected = []
+                    for subpart in parts:
+                        text = _get_text(subpart)
+                        if text:
+                            collected.append(text)
+                    return "\n".join(collected)
+                return _get_text(msg.get("payload", {}))
+            except Exception:
+                return ""
+
+        def _fetch_sig(email) -> tuple:
             msg_id = email_message_ids.get(email)
             if not msg_id:
                 return email, ""
             try:
                 msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
+
+                # Extract body text — handles plain, HTML, and multipart
                 body = _extract_body_text(msg)
                 lines = [l.strip() for l in body.splitlines() if l.strip()]
-                return email, "\n".join(lines[-10:])
+                sig = "\n".join(lines[-15:])
+
+                # Fallback: check From and Reply-To headers for name and email hint
+                header_hints = []
+                payload_headers = msg.get("payload", {}).get("headers", [])
+                for h in payload_headers:
+                    if h.get("name", "").lower() in ("from", "reply-to"):
+                        val = h.get("value", "").strip()
+                        if val:
+                            header_hints.append(val)
+                if header_hints and not sig:
+                    sig = "Header hints: " + " | ".join(header_hints)
+                elif header_hints:
+                    sig = sig + "\nHeader hints: " + " | ".join(header_hints)
+
+                return email, sig
             except Exception as exc:
                 log.error('"extract_brokers — sig fetch failed email=%s: %s"', email, exc)
                 return email, ""
