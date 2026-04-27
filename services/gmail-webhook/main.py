@@ -9,6 +9,7 @@ import json
 import base64
 import logging
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
 from email.utils import parseaddr
@@ -1118,9 +1119,10 @@ def extract_brokers():
                 '"extract_brokers — pages_fetched=%d page_size=%d total_ids=%d"',
                 pages_fetched, len(batch), len(message_ids),
             )
-            if not page_token:
+            if not page_token or len(message_ids) >= 500:
                 break
 
+        message_ids = message_ids[:500]
         log.info('"extract_brokers — step1 done pages=%d messages_scanned=%d"',
                  pages_fetched, len(message_ids))
 
@@ -1216,11 +1218,11 @@ def extract_brokers():
             already_in_network, len(unknown_emails),
         )
 
-        # ── Step 4: Claude enrichment — ONE call per unique unknown email ──────
+        # ── Step 4: Claude enrichment — parallel, up to 10 concurrent calls ────
         brokers = []
         enrich_count = 0
 
-        for email in unknown_emails:
+        def _enrich(email):
             subjects_str = "; ".join(email_subjects[email][:5]) or "none"
             to_name = email_names.get(email)
             prompt_text = (
@@ -1244,19 +1246,25 @@ def extract_brokers():
                     messages=[{"role": "user", "content": prompt_text}],
                 )
                 enriched = json.loads(claude_msg.content[0].text.strip())
-                enrich_count += 1
             except Exception as exc:
                 log.error('"extract_brokers — enrich failed email=%s: %s"', email, exc)
                 enriched = {}
+            return email, to_name, enriched
 
-            brokers.append({
-                "email": email,
-                "name": enriched.get("name") or to_name or None,
-                "title": enriched.get("title"),
-                "company": enriched.get("company"),
-                "mobile": enriched.get("mobile"),
-                "direct": enriched.get("direct"),
-            })
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            futures = {pool.submit(_enrich, email): email for email in unknown_emails}
+            for future in as_completed(futures):
+                email, to_name, enriched = future.result()
+                if enriched:
+                    enrich_count += 1
+                brokers.append({
+                    "email": email,
+                    "name": enriched.get("name") or to_name or None,
+                    "title": enriched.get("title"),
+                    "company": enriched.get("company"),
+                    "mobile": enriched.get("mobile"),
+                    "direct": enriched.get("direct"),
+                })
 
         log.info(
             '"extract_brokers — step4 done claude_enrichments=%d final_broker_count=%d"',
