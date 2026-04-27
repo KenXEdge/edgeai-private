@@ -12,7 +12,6 @@ import sys
 from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
 from email.utils import parseaddr
-from flask_cors import CORS
 
 import anthropic
 from flask import Flask, request, jsonify, redirect
@@ -54,7 +53,6 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
-CORS(app, origins=["https://edgeai-dashboard.vercel.app", "http://localhost:5173", "https://xtxtec.com"])
 
 # ── Lazy singletons (initialised once per container cold start) ────────────────
 _supabase: Client | None = None
