@@ -1045,60 +1045,61 @@ def renew_watches():
 def extract_brokers():
     """
     Scan SENT emails for broker contacts not yet in the brokers table.
-    Accepts JSON body: {"carrier_id": "<uuid>", "days": <int>}.
-
-    Pipeline:
-      1. Page through SENT message IDs (messages.list, no body download)
-      2. Metadata fetch per message (To: + Subject: headers only — fast path)
-      3. Deduplicate recipient emails; batch-check against brokers table
-      4. Claude called ONCE per unique unknown email to enrich contact details
-    Never returns 5xx.
+    Sequential only — reliability over speed.
+    Accepts JSON body: {"carrier_id": "<uuid>"}.
     """
     try:
         data = request.get_json(silent=True) or {}
-
         carrier_id = data.get("carrier_id")
         if not carrier_id:
-            return jsonify({"error": "carrier_id required"}), 400
+            return jsonify({"ok": False, "error": "carrier_id required", "brokers": []}), 400
 
-        carrier_resp = (
-            supabase_client()
-            .table("carriers")
-            .select("*")
-            .eq("id", carrier_id)
-            .limit(1)
-            .execute()
-        )
+        # ── Load carrier ──────────────────────────────────────────────────────
+        try:
+            carrier_resp = (
+                supabase_client()
+                .table("carriers")
+                .select("*")
+                .eq("id", carrier_id)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:
+            log.error('"extract_brokers — carrier lookup failed: %s"', exc)
+            return jsonify({"ok": False, "error": "carrier lookup failed", "brokers": []}), 200
+
         if not carrier_resp.data:
-            return jsonify({"error": "carrier not found"}), 404
+            return jsonify({"ok": False, "error": "carrier not found", "brokers": []}), 200
+
         carrier = carrier_resp.data[0]
-
-        days = int(data.get("days", 7))
-        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y/%m/%d")
-
-        # ── Build per-carrier Gmail service ───────────────────────────────────
         refresh_token = carrier.get("gmail_token")
         if not refresh_token:
-            return jsonify({"error": "carrier gmail_token not set"}), 400
-        import google.auth.transport.requests as google_requests
-        import requests as requests_lib
-        carrier_creds = OAuthCredentials(
-            token=None,
-            refresh_token=refresh_token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.environ["GMAIL_CLIENT_ID"],
-            client_secret=os.environ["GMAIL_CLIENT_SECRET"],
-            scopes=["https://www.googleapis.com/auth/gmail.modify"],
-        )
-        carrier_creds.refresh(google_requests.Request(session=requests_lib.Session()))
-        svc = build("gmail", "v1", credentials=carrier_creds, cache_discovery=False)
+            return jsonify({"ok": False, "error": "carrier gmail_token not set", "brokers": []}), 200
 
-        # ── Step 1: Page through SENT message IDs ─────────────────────────────
+        # ── Build Gmail service ───────────────────────────────────────────────
+        try:
+            import google.auth.transport.requests as google_requests
+            import requests as requests_lib
+            carrier_creds = OAuthCredentials(
+                token=None,
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=os.environ["GMAIL_CLIENT_ID"],
+                client_secret=os.environ["GMAIL_CLIENT_SECRET"],
+                scopes=["https://www.googleapis.com/auth/gmail.modify"],
+            )
+            carrier_creds.refresh(google_requests.Request(session=requests_lib.Session()))
+            svc = build("gmail", "v1", credentials=carrier_creds, cache_discovery=False)
+        except Exception as exc:
+            log.error('"extract_brokers — gmail auth failed: %s"', exc)
+            return jsonify({"ok": False, "error": "gmail auth failed", "brokers": []}), 200
+
+        # ── Step 1: Collect SENT message IDs — last 180 days, cap 500 ────────
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y/%m/%d")
         message_ids: list[str] = []
         page_token = None
-        pages_fetched = 0
 
-        while True:
+        while len(message_ids) < 500:
             list_kwargs: dict = {
                 "userId": "me",
                 "labelIds": ["SENT"],
@@ -1107,36 +1108,20 @@ def extract_brokers():
             }
             if page_token:
                 list_kwargs["pageToken"] = page_token
-
             try:
                 list_resp = svc.users().messages().list(**list_kwargs).execute()
             except Exception as exc:
-                log.error('"extract_brokers — gmail list failed page=%d: %s"', pages_fetched + 1, exc)
+                log.error('"extract_brokers — step1 list failed: %s"', exc)
                 break
-
-            pages_fetched += 1
-            batch = list_resp.get("messages", [])
-            message_ids.extend(m["id"] for m in batch)
+            message_ids.extend(m["id"] for m in list_resp.get("messages", []))
             page_token = list_resp.get("nextPageToken")
-            log.info(
-                '"extract_brokers — pages_fetched=%d page_size=%d total_ids=%d"',
-                pages_fetched, len(batch), len(message_ids),
-            )
-            if not page_token or len(message_ids) >= 500:
+            if not page_token:
                 break
 
         message_ids = message_ids[:500]
-        log.info('"extract_brokers — step1 done pages=%d messages_scanned=%d"',
-                 pages_fetched, len(message_ids))
+        log.info('"extract_brokers — step1 done messages=%d"', len(message_ids))
 
-        # ── Step 2: Metadata fetch — batched 100 IDs per chunk ───────────────────
-        # email -> list of unique subjects seen across all messages sent to them
-        email_subjects: dict[str, list[str]] = {}
-        # email -> display name captured from To: header
-        email_names: dict[str, str] = {}
-        # email -> most recent message ID sent to that address (first seen = newest)
-        email_message_ids: dict[str, str] = {}
-
+        # ── Noise domains ─────────────────────────────────────────────────────
         _NOISE_DOMAINS = {
             "apple.com", "icloud.com", "google.com", "gmail.com",
             "microsoft.com", "outlook.com", "hotmail.com",
@@ -1151,82 +1136,75 @@ def extract_brokers():
             "irs.gov", "dol.gov", "fmcsa.dot.gov",
             "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
         }
-        _CHUNK_SIZE = 100
+
+        # ── Step 2: Metadata fetch — sequential batches of 100 ───────────────
+        # Gmail returns messages newest-first; first occurrence of each email = most recent
+        email_names: dict[str, str] = {}
+        email_message_ids: dict[str, str] = {}
 
         def _handle_meta(request_id, response, exception):
             if exception or not response:
-                log.error('"extract_brokers — metadata fetch failed id=%s: %s"', request_id, exception)
+                log.error('"extract_brokers — meta fetch failed id=%s: %s"', request_id, exception)
                 return
-            headers = response.get("payload", {}).get("headers", [])
-            to_val = subject_val = ""
-            for h in headers:
-                name_lower = h.get("name", "").lower()
-                if name_lower == "to":
-                    to_val = h.get("value", "")
-                elif name_lower == "subject":
-                    subject_val = h.get("value", "")
-            if not to_val:
-                return
-            to_name, to_email = parseaddr(to_val)
-            to_email = to_email.lower().strip()
-            if not to_email:
-                return
-            domain = to_email.split("@")[-1] if "@" in to_email else ""
-            if domain in _NOISE_DOMAINS:
-                return
-            if to_email not in email_names and to_name:
-                email_names[to_email] = to_name.strip()
-            if to_email not in email_message_ids:
-                email_message_ids[to_email] = request_id
-            if to_email not in email_subjects:
-                email_subjects[to_email] = []
-            if subject_val and subject_val not in email_subjects[to_email]:
-                email_subjects[to_email].append(subject_val)
-
-        chunks = [message_ids[i:i + _CHUNK_SIZE] for i in range(0, len(message_ids), _CHUNK_SIZE)]
-        for chunk_idx, chunk in enumerate(chunks):
-            batch = svc.new_batch_http_request(callback=_handle_meta)
-            for msg_id in chunk:
-                batch.add(
-                    svc.users().messages().get(
-                        userId="me",
-                        id=msg_id,
-                        format="metadata",
-                        metadataHeaders=["To", "Subject"],
-                    ),
-                    request_id=msg_id,
-                )
             try:
-                batch.execute()
+                to_val = ""
+                for h in response.get("payload", {}).get("headers", []):
+                    if h.get("name", "").lower() == "to":
+                        to_val = h.get("value", "")
+                        break
+                if not to_val:
+                    return
+                to_name, to_email = parseaddr(to_val)
+                to_email = to_email.lower().strip()
+                if not to_email:
+                    return
+                domain = to_email.split("@")[-1] if "@" in to_email else ""
+                if domain in _NOISE_DOMAINS:
+                    return
+                if to_email not in email_names and to_name:
+                    email_names[to_email] = to_name.strip()
+                if to_email not in email_message_ids:
+                    email_message_ids[to_email] = request_id
             except Exception as exc:
-                log.error('"extract_brokers — batch execute failed chunk=%d: %s"', chunk_idx + 1, exc)
-            log.info(
-                '"extract_brokers — step2 chunk=%d/%d msgs_processed=%d unique_emails=%d"',
-                chunk_idx + 1, len(chunks), min((chunk_idx + 1) * _CHUNK_SIZE, len(message_ids)), len(email_subjects),
+                log.error('"extract_brokers — meta parse error id=%s: %s"', request_id, exc)
+
+        for chunk_start in range(0, len(message_ids), 100):
+            chunk = message_ids[chunk_start:chunk_start + 100]
+            try:
+                batch_req = svc.new_batch_http_request(callback=_handle_meta)
+                for msg_id in chunk:
+                    batch_req.add(
+                        svc.users().messages().get(
+                            userId="me", id=msg_id,
+                            format="metadata", metadataHeaders=["To"],
+                        ),
+                        request_id=msg_id,
+                    )
+                batch_req.execute()
+            except Exception as exc:
+                log.error('"extract_brokers — step2 batch failed chunk=%d: %s"', chunk_start, exc)
+
+        log.info('"extract_brokers — step2 done candidates=%d"', len(email_message_ids))
+
+        # ── Step 3: Exclude already-known brokers ─────────────────────────────
+        try:
+            known_resp = (
+                supabase_client()
+                .table("brokers")
+                .select("email")
+                .eq("carrier_id", carrier_id)
+                .execute()
             )
+            known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
+        except Exception as exc:
+            log.error('"extract_brokers — step3 known lookup failed: %s"', exc)
+            known_set = set()
 
-        unique_emails = list(email_subjects.keys())
-        log.info('"extract_brokers — step2 done unique_emails=%d"', len(unique_emails))
+        unknown_emails = [e for e in email_message_ids if e not in known_set]
+        log.info('"extract_brokers — step3 done unknown=%d"', len(unknown_emails))
 
-        # ── Step 3: Batch-check which recipients are already in network ────────
-        known_resp = (
-            supabase_client()
-            .table("brokers")
-            .select("email")
-            .eq("carrier_id", carrier_id)
-            .execute()
-        )
-        known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
-
-        unknown_emails = [e for e in unique_emails if e not in known_set]
-        already_in_network = len(unique_emails) - len(unknown_emails)
-        log.info(
-            '"extract_brokers — step3 done already_in_network=%d unknown=%d"',
-            already_in_network, len(unknown_emails),
-        )
-
-        # ── Step 2.5: Fetch signature blocks for unknown brokers ──────────────
-        def _decode_part_data(data: str) -> str:
+        # ── Signature extraction helpers ──────────────────────────────────────
+        def _decode_data(data: str) -> str:
             try:
                 return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
             except Exception:
@@ -1237,216 +1215,163 @@ def extract_brokers():
                 html = re.sub(r'<(script|style)[^>]*?>.*?</(script|style)>', '', html, flags=re.DOTALL | re.IGNORECASE)
                 html = re.sub(r'<(br|p|div|tr|li|h[1-6])[^>]*?>', '\n', html, flags=re.IGNORECASE)
                 html = re.sub(r'<[^>]+>', '', html)
-                html = html.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<') \
-                           .replace('&gt;', '>').replace('&quot;', '"').replace('&#39;', "'")
+                html = (html.replace('&nbsp;', ' ').replace('&amp;', '&')
+                            .replace('&lt;', '<').replace('&gt;', '>')
+                            .replace('&quot;', '"').replace('&#39;', "'"))
                 return html
             except Exception:
                 return ""
 
-        def _extract_body_text(msg) -> str:
+        def _get_body(part) -> str:
             try:
-                def _get_text(part) -> str:
-                    mime = part.get("mimeType", "")
-                    data = part.get("body", {}).get("data", "")
-                    if mime == "text/plain":
-                        return _decode_part_data(data)
-                    if mime == "text/html":
-                        return _strip_html(_decode_part_data(data))
-                    parts = part.get("parts", [])
-                    if mime == "multipart/alternative":
-                        # Prefer plain text; fall back to HTML
-                        for subpart in parts:
-                            if subpart.get("mimeType") == "text/plain":
-                                text = _get_text(subpart)
-                                if text:
-                                    return text
-                        for subpart in parts:
-                            if subpart.get("mimeType") == "text/html":
-                                text = _get_text(subpart)
-                                if text:
-                                    return text
-                    # multipart/mixed, multipart/related, unknown — collect all text parts
-                    collected = []
+                mime = part.get("mimeType", "")
+                data = part.get("body", {}).get("data", "")
+                if mime == "text/plain":
+                    return _decode_data(data)
+                if mime == "text/html":
+                    return _strip_html(_decode_data(data))
+                parts = part.get("parts", [])
+                if mime == "multipart/alternative":
                     for subpart in parts:
-                        text = _get_text(subpart)
-                        if text:
-                            collected.append(text)
-                    return "\n".join(collected)
-                return _get_text(msg.get("payload", {}))
+                        if subpart.get("mimeType") == "text/plain":
+                            text = _get_body(subpart)
+                            if text:
+                                return text
+                    for subpart in parts:
+                        if subpart.get("mimeType") == "text/html":
+                            text = _get_body(subpart)
+                            if text:
+                                return text
+                collected = []
+                for subpart in parts:
+                    text = _get_body(subpart)
+                    if text:
+                        collected.append(text)
+                return "\n".join(collected)
             except Exception:
                 return ""
 
-        def _fetch_sig(email) -> tuple:
-            msg_id = email_message_ids.get(email)
-            if not msg_id:
-                return email, ""
-            try:
-                # Gmail API fetch with exponential backoff on 429
-                msg = None
-                for attempt, delay in enumerate([0, 1, 2, 4]):
-                    if delay:
-                        time.sleep(delay)
-                    try:
-                        msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
-                        break
-                    except HttpError as exc:
-                        if exc.resp.status == 429 and attempt < 3:
-                            log.warning('"extract_brokers — Gmail 429 email=%s attempt=%d retrying in %ds"', email, attempt + 1, delay)
-                            continue
-                        raise
-                if msg is None:
-                    return email, ""
+        def _fetch_signature(msg_id: str, email: str) -> str:
+            for attempt, delay in enumerate([0, 1, 2, 4]):
+                if delay:
+                    time.sleep(delay)
+                try:
+                    msg = svc.users().messages().get(
+                        userId="me", id=msg_id, format="full"
+                    ).execute()
+                    body = _get_body(msg.get("payload", {}))
+                    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+                    sig = "\n".join(lines[-15:])
+                    hints = []
+                    for h in msg.get("payload", {}).get("headers", []):
+                        if h.get("name", "").lower() in ("from", "reply-to"):
+                            v = h.get("value", "").strip()
+                            if v:
+                                hints.append(v)
+                    if hints:
+                        hint_str = "Header hints: " + " | ".join(hints)
+                        sig = (sig + "\n" + hint_str) if sig else hint_str
+                    return sig
+                except HttpError as exc:
+                    if exc.resp.status == 429 and attempt < 3:
+                        log.warning('"extract_brokers — Gmail 429 email=%s attempt=%d retrying in %ds"',
+                                    email, attempt + 1, delay)
+                        continue
+                    log.error('"extract_brokers — sig fetch http error email=%s: %s"', email, exc)
+                    return ""
+                except Exception as exc:
+                    log.error('"extract_brokers — sig fetch failed email=%s: %s"', email, exc)
+                    return ""
+            return ""
 
-                # Extract body text — handles plain, HTML, and multipart
-                body = _extract_body_text(msg)
-                lines = [l.strip() for l in body.splitlines() if l.strip()]
-                sig = "\n".join(lines[-15:])
-
-                # Fallback: check From and Reply-To headers for name and email hint
-                header_hints = []
-                payload_headers = msg.get("payload", {}).get("headers", [])
-                for h in payload_headers:
-                    if h.get("name", "").lower() in ("from", "reply-to"):
-                        val = h.get("value", "").strip()
-                        if val:
-                            header_hints.append(val)
-                if header_hints and not sig:
-                    sig = "Header hints: " + " | ".join(header_hints)
-                elif header_hints:
-                    sig = sig + "\nHeader hints: " + " | ".join(header_hints)
-
-                return email, sig
-            except Exception as exc:
-                log.error('"extract_brokers — sig fetch failed email=%s: %s"', email, exc)
-                return email, ""
-
-        email_signatures: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            futures = {pool.submit(_fetch_sig, email): email for email in unknown_emails}
-            for future in as_completed(futures):
-                email, sig = future.result()
-                email_signatures[email] = sig
-        log.info('"extract_brokers — step2.5 done signatures_fetched=%d"', sum(1 for s in email_signatures.values() if s))
-
-        # ── Step 3.5: Classify each unknown contact via Claude Haiku ─────────
-        def _classify(email):
-            signature = email_signatures.get(email, "")
-            prompt_text = (
-                "Classify this email contact as a freight industry professional.\n\n"
-                "Classification options:\n"
-                "- freight_broker: brokers who connect shippers with carriers. "
-                "Indicators: company names containing freight, logistics, transport, carrier, "
-                "trucking, brokerage, dispatch, loads, shipping, cargo; "
-                "job titles like broker, dispatcher, agent, coordinator, logistics manager.\n"
-                "- freight_dispatcher: dispatchers who manage carrier loads directly.\n"
-                "- load_board: contacts associated with load board platforms.\n"
-                "- unknown: insufficient information to classify with confidence.\n\n"
-                "Return a JSON object with exactly this field:\n"
-                "{\"classification\": \"freight_broker|freight_dispatcher|load_board|unknown\"}\n\n"
-                "Return ONLY valid JSON, no other text.\n\n"
-                f"Email: {email}\n"
-                f"Signature:\n{signature or 'not available'}"
-            )
-            try:
-                claude_msg = anthropic_client().messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=50,
-                    messages=[{"role": "user", "content": prompt_text}],
-                )
-                result = json.loads(claude_msg.content[0].text.strip())
-                return email, result.get("classification", "unknown")
-            except Exception as exc:
-                log.error('"extract_brokers — classify failed email=%s: %s"', email, exc)
-                return email, "unknown"
-
-        email_classifications: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            futures = {pool.submit(_classify, email): email for email in unknown_emails}
-            for future in as_completed(futures):
-                email, classification = future.result()
-                email_classifications[email] = classification
-
+        # ── Steps 4+5: Sequential — fetch sig, classify+enrich via Claude ─────
         _IMPORT_CLASSES = {"freight_broker", "freight_dispatcher"}
-        classified_emails = [e for e in unknown_emails if email_classifications.get(e) in _IMPORT_CLASSES]
-        inbox_emails = [e for e in unknown_emails if email_classifications.get(e) not in _IMPORT_CLASSES]
+        brokers: list[dict] = []
+        inbox_rows: list[dict] = []
 
-        if inbox_emails:
-            inbox_rows = [
-                {
-                    "carrier_id": carrier_id,
-                    "email": e,
-                    "name": email_names.get(e),
-                    "classification": email_classifications.get(e, "unknown"),
-                }
-                for e in inbox_emails
-            ]
+        for email in unknown_emails:
+            to_name = email_names.get(email, "")
+            msg_id = email_message_ids.get(email, "")
+
+            # Fetch full body and extract last 15 lines as signature
+            signature = _fetch_signature(msg_id, email) if msg_id else ""
+
+            # Single Claude Haiku call — classify and extract contact details
+            classification = "unknown"
+            enriched: dict = {}
             try:
-                supabase_client().table("unknown_brokers_inbox").upsert(
-                    inbox_rows, on_conflict="carrier_id,email"
-                ).execute()
-            except Exception as exc:
-                log.error('"extract_brokers — inbox insert failed: %s"', exc)
-
-        log.info(
-            '"extract_brokers — step3.5 done classified=%d routed_to_inbox=%d"',
-            len(classified_emails), len(inbox_emails),
-        )
-
-        # ── Step 4: Claude enrichment — parallel, up to 10 concurrent calls ────
-        brokers = []
-        enrich_count = 0
-
-        def _enrich(email):
-            to_name = email_names.get(email)
-            signature = email_signatures.get(email, "")
-            prompt_text = (
-                "Extract contact details from the email signature block below.\n\n"
-                "Return a JSON object with exactly these fields:\n"
-                "{\"name\": \"first last or null\", "
-                "\"title\": \"job title or null\", "
-                "\"company\": \"company name or null\", "
-                "\"email\": \"direct email or null\", "
-                "\"phone\": \"phone number or null\"}\n\n"
-                "Return ONLY valid JSON, no other text.\n\n"
-                f"Signature:\n{signature or 'not available'}"
-            )
-            try:
+                prompt_text = (
+                    "Analyze this email contact and do two things in one response.\n\n"
+                    "1. Classify as one of:\n"
+                    "   - freight_broker: connects shippers with carriers. Indicators: company names with "
+                    "freight, logistics, transport, carrier, trucking, brokerage, dispatch, loads, shipping, cargo; "
+                    "titles like broker, agent, coordinator, logistics manager.\n"
+                    "   - freight_dispatcher: manages carrier loads directly.\n"
+                    "   - unknown: insufficient information to classify with confidence.\n\n"
+                    "2. Extract contact details from the signature block.\n\n"
+                    "Return a JSON object with exactly these fields:\n"
+                    "{\"classification\": \"freight_broker|freight_dispatcher|unknown\", "
+                    "\"name\": \"first last or null\", "
+                    "\"title\": \"job title or null\", "
+                    "\"company\": \"company name or null\", "
+                    "\"phone\": \"phone number or null\"}\n\n"
+                    "Return ONLY valid JSON, no other text.\n\n"
+                    f"Email: {email}\n"
+                    f"Name hint: {to_name or 'unknown'}\n"
+                    f"Signature:\n{signature or 'not available'}"
+                )
                 claude_msg = anthropic_client().messages.create(
                     model="claude-haiku-4-5-20251001",
                     max_tokens=200,
                     messages=[{"role": "user", "content": prompt_text}],
                 )
                 enriched = json.loads(claude_msg.content[0].text.strip())
+                classification = enriched.get("classification", "unknown")
             except Exception as exc:
-                log.error('"extract_brokers — enrich failed email=%s: %s"', email, exc)
-                enriched = {}
-            return email, to_name, enriched
+                log.error('"extract_brokers — claude failed email=%s: %s"', email, exc)
 
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            futures = {pool.submit(_enrich, email): email for email in classified_emails}
-            for future in as_completed(futures):
-                email, to_name, enriched = future.result()
-                if enriched:
-                    enrich_count += 1
-                brokers.append({
+            if classification in _IMPORT_CLASSES:
+                broker_row = {
+                    "carrier_id": carrier_id,
                     "email": email,
                     "name": enriched.get("name") or to_name or None,
                     "title": enriched.get("title"),
                     "company": enriched.get("company"),
                     "phone": enriched.get("phone"),
+                    "source": "gmail_scan",
+                }
+                brokers.append(broker_row)
+                try:
+                    supabase_client().table("brokers").upsert(
+                        broker_row, on_conflict="carrier_id,email"
+                    ).execute()
+                except Exception as exc:
+                    log.error('"extract_brokers — broker upsert failed email=%s: %s"', email, exc)
+            else:
+                inbox_rows.append({
+                    "carrier_id": carrier_id,
+                    "email": email,
+                    "name": enriched.get("name") or to_name or None,
+                    "classification": classification,
                 })
 
-        log.info(
-            '"extract_brokers — step4 done claude_enrichments=%d final_broker_count=%d"',
-            enrich_count, len(brokers),
-        )
+        # ── Batch insert unknowns to inbox ────────────────────────────────────
+        if inbox_rows:
+            try:
+                supabase_client().table("unknown_brokers_inbox").upsert(
+                    inbox_rows, on_conflict="carrier_id,email"
+                ).execute()
+            except Exception as exc:
+                log.error('"extract_brokers — inbox upsert failed: %s"', exc)
+
+        log.info('"extract_brokers — done brokers=%d inbox=%d scanned=%d"',
+                 len(brokers), len(inbox_rows), len(message_ids))
 
         return jsonify({
             "ok": True,
             "brokers": brokers,
             "total": len(brokers),
             "messages_scanned": len(message_ids),
-            "already_in_network": already_in_network,
         }), 200
 
     except Exception as exc:
