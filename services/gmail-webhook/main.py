@@ -1073,7 +1073,9 @@ def extract_brokers():
         cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y/%m/%d")
 
         # ── Build per-carrier Gmail service ───────────────────────────────────
-        refresh_token = carrier.get("gmail_token") or os.environ["GMAIL_OAUTH_REFRESH_TOKEN"]
+        refresh_token = carrier.get("gmail_token")
+        if not refresh_token:
+            return jsonify({"error": "carrier gmail_token not set"}), 400
         import google.auth.transport.requests as google_requests
         import requests as requests_lib
         carrier_creds = OAuthCredentials(
