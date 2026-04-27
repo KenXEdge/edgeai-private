@@ -10,6 +10,7 @@ import re
 import base64
 import logging
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
@@ -20,6 +21,7 @@ from flask import Flask, request, jsonify, redirect
 from supabase import create_client, Client
 from twilio.rest import Client as TwilioClient
 from google.oauth2.credentials import Credentials as OAuthCredentials
+from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 
 # ── Structured JSON logging for Cloud Run ─────────────────────────────────────
@@ -1279,7 +1281,21 @@ def extract_brokers():
             if not msg_id:
                 return email, ""
             try:
-                msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
+                # Gmail API fetch with exponential backoff on 429
+                msg = None
+                for attempt, delay in enumerate([0, 1, 2, 4]):
+                    if delay:
+                        time.sleep(delay)
+                    try:
+                        msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
+                        break
+                    except HttpError as exc:
+                        if exc.resp.status == 429 and attempt < 3:
+                            log.warning('"extract_brokers — Gmail 429 email=%s attempt=%d retrying in %ds"', email, attempt + 1, delay)
+                            continue
+                        raise
+                if msg is None:
+                    return email, ""
 
                 # Extract body text — handles plain, HTML, and multipart
                 body = _extract_body_text(msg)
@@ -1305,7 +1321,7 @@ def extract_brokers():
                 return email, ""
 
         email_signatures: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=10) as pool:
+        with ThreadPoolExecutor(max_workers=3) as pool:
             futures = {pool.submit(_fetch_sig, email): email for email in unknown_emails}
             for future in as_completed(futures):
                 email, sig = future.result()
@@ -1344,7 +1360,7 @@ def extract_brokers():
                 return email, "unknown"
 
         email_classifications: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=10) as pool:
+        with ThreadPoolExecutor(max_workers=3) as pool:
             futures = {pool.submit(_classify, email): email for email in unknown_emails}
             for future in as_completed(futures):
                 email, classification = future.result()
