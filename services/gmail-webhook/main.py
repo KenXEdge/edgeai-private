@@ -53,6 +53,19 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
+@app.errorhandler(404)
+def not_found(e):
+    response = jsonify({"error": "not found"})
+    response.status_code = 404
+    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
+    return response
+
+@app.errorhandler(500)
+def server_error(e):
+    response = jsonify({"error": "internal server error"})
+    response.status_code = 500
+    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
+    return response
 
 # ── Lazy singletons (initialised once per container cold start) ────────────────
 _supabase: Client | None = None
