@@ -1142,47 +1142,48 @@ def extract_brokers():
         email_names: dict[str, str] = {}
         email_message_ids: dict[str, str] = {}
 
-        def _handle_meta(request_id, response, exception):
-            if exception or not response:
-                log.error('"extract_brokers — meta fetch failed id=%s: %s"', request_id, exception)
-                return
-            try:
-                to_val = ""
-                for h in response.get("payload", {}).get("headers", []):
-                    if h.get("name", "").lower() == "to":
-                        to_val = h.get("value", "")
-                        break
-                if not to_val:
-                    return
-                to_name, to_email = parseaddr(to_val)
-                to_email = to_email.lower().strip()
-                if not to_email:
-                    return
-                domain = to_email.split("@")[-1] if "@" in to_email else ""
-                if domain in _NOISE_DOMAINS:
-                    return
-                if to_email not in email_names and to_name:
-                    email_names[to_email] = to_name.strip()
-                if to_email not in email_message_ids:
-                    email_message_ids[to_email] = request_id
-            except Exception as exc:
-                log.error('"extract_brokers — meta parse error id=%s: %s"', request_id, exc)
-
-        for chunk_start in range(0, len(message_ids), 100):
-            chunk = message_ids[chunk_start:chunk_start + 100]
-            try:
-                batch_req = svc.new_batch_http_request(callback=_handle_meta)
-                for msg_id in chunk:
-                    batch_req.add(
-                        svc.users().messages().get(
-                            userId="me", id=msg_id,
-                            format="metadata", metadataHeaders=["To"],
-                        ),
-                        request_id=msg_id,
-                    )
-                batch_req.execute()
-            except Exception as exc:
-                log.error('"extract_brokers — step2 batch failed chunk=%d: %s"', chunk_start, exc)
+        for msg_id in message_ids:
+            for attempt, delay in enumerate([0, 1, 2, 4]):
+                if delay:
+                    time.sleep(delay)
+                try:
+                    response = svc.users().messages().get(
+                        userId="me",
+                        id=msg_id,
+                        format="metadata",
+                        metadataHeaders=["To"],
+                    ).execute()
+                    try:
+                        to_val = ""
+                        for h in response.get("payload", {}).get("headers", []):
+                            if h.get("name", "").lower() == "to":
+                                to_val = h.get("value", "")
+                                break
+                        if not to_val:
+                            break
+                        to_name, to_email = parseaddr(to_val)
+                        to_email = to_email.lower().strip()
+                        if not to_email:
+                            break
+                        domain = to_email.split("@")[-1] if "@" in to_email else ""
+                        if domain in _NOISE_DOMAINS:
+                            break
+                        if to_email not in email_names and to_name:
+                            email_names[to_email] = to_name.strip()
+                        if to_email not in email_message_ids:
+                            email_message_ids[to_email] = msg_id
+                    except Exception as exc:
+                        log.error('"extract_brokers — meta parse error id=%s: %s"', msg_id, exc)
+                    break
+                except HttpError as exc:
+                    if exc.resp.status == 429 and attempt < 3:
+                        log.warning('"extract_brokers — Gmail 429 meta id=%s attempt=%d retrying in %ds"', msg_id, attempt + 1, delay)
+                        continue
+                    log.error('"extract_brokers — meta fetch failed id=%s: %s"', msg_id, exc)
+                    break
+                except Exception as exc:
+                    log.error('"extract_brokers — meta fetch failed id=%s: %s"', msg_id, exc)
+                    break
 
         log.info('"extract_brokers — step2 done candidates=%d"', len(email_message_ids))
 
