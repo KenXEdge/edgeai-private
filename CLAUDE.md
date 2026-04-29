@@ -21,21 +21,15 @@
 - n8n workflows are ARCHIVED — do not unarchive
 
 ## Supabase
-- Never alter Ken's carriers row e84dfb58**** — all broker/response/outreach history tied to it
+- Never alter Ken's carriers row (carrier UUID = auth.users.id for that carrier — never hardcode) — all broker/response/outreach history tied to it
 - Never cross-contaminate or delete production data without explicit Ken approval
 
 ## End-of-Session Documents
-- Google Drive target folder ID: 1D8W9wUjjCbL2myxlBLlTgulQXeihUZ1h
-- At the end of every session, generate updated .docx versions of all four documents and upload to the Drive folder above via the Google Drive MCP:
-  1. Runbook — 07_Command_MasterContext_April20.md
-  2. PRD — (PRD source file when created)
-  3. Transition Note — XEdge_Transition_April20_v2.md (in Obsidian_Export/)
-  4. PitchBook — (PitchBook source file when created)
-- Version number: increment based on existing files in the Drive folder (e.g. Runbook_v3.docx → Runbook_v4.docx)
-- Generation method: pandoc converts .md → .docx — install command: winget install pandoc
-- If pandoc is not installed, remind Ken to run: winget install pandoc
-- Upload each file using mcp__claude_ai_Google_Drive__create_file targeting folder ID above
-- Do this automatically at session end without being asked
+- At the end of every session, generate updated versions of the session docs and commit to repo:
+  1. Runbook — Runbook_vX.X.md
+  2. PRD — PRD_vX.X.md
+  3. Transition Note — Transition_MonthDD.md
+- Save all files to C:\Users\korbs\EDGEai\ and commit to master
 
 ## Brand — All Locked
 - Platform name: EDGE (spoken) — XEdge (product)
