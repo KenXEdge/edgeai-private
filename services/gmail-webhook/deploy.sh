@@ -66,7 +66,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --min-instances 1 \
   --max-instances 10 \
   --concurrency 80 \
-  --timeout 30s \
+  --timeout 3600s \
   --memory 512Mi \
   --cpu 1 \
   --set-env-vars "SUPABASE_URL=https://siafwhlzazefyoevslde.supabase.co" \
