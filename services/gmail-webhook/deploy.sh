@@ -9,6 +9,14 @@ SERVICE_NAME="edgeai-gmail-webhook"
 REGION="us-central1"
 IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/edgeai/${SERVICE_NAME}"
 
+# ── Load .env if present ──────────────────────────────────────────────────────
+if [[ -f ".env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 # ── Validate required env vars are set ────────────────────────────────────────
 REQUIRED_VARS=(
   SUPABASE_KEY
@@ -76,7 +84,6 @@ gcloud run deploy "${SERVICE_NAME}" \
   --set-env-vars "TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}" \
   --set-env-vars "TWILIO_FROM=${TWILIO_FROM}" \
   --set-env-vars "TWILIO_TO=${TWILIO_TO}" \
-  --set-env-vars "CARRIER_UUID=e84dfb58-d265-4a75-a7da-161b667a0208" \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=edgeai-493115" \
   --set-env-vars "GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID}" \
   --set-env-vars "GMAIL_CLIENT_SECRET=${GMAIL_CLIENT_SECRET}" \
