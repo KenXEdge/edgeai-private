@@ -5,13 +5,13 @@
 
 ## 1. Product Overview
 
-**Product Name:** XEdge (spoken: EDGE)
+**Platform Name:** EDGE (spoken) — XEdge (product)
 **Agent Name:** ACE — Agentic Carrier Employee
 **Company:** XTX LLC
 **Domain:** xtxtec.com
 **Taglines:** Carriers gain an edge. / First bid wins. / Be the ACE card.
 
-XEdge is a freight carrier automation SaaS that monitors a carrier's Gmail inbox, classifies broker emails using Claude AI, sends SMS alerts on hot leads, and tracks broker relationships — giving small carriers an automated competitive edge without hiring a dispatcher.
+EDGE is a freight carrier automation SaaS. ACE monitors a carrier's Gmail inbox, classifies broker emails using Claude AI, sends SMS alerts on hot leads, tracks broker relationships, and proactively briefs the carrier every morning — giving small carriers an automated competitive edge without hiring a dispatcher.
 
 ---
 
@@ -21,7 +21,7 @@ XEdge is a freight carrier automation SaaS that monitors a carrier's Gmail inbox
 
 **Problem:** Brokers send load offers via email all day. Carriers miss hot offers because they're driving, loading, or sleeping. By the time they reply, the load is gone. First bid wins in freight — but carriers are not monitoring email fast enough.
 
-**Solution:** ACE watches their Gmail 24/7, classifies every broker email, and texts them instantly when a load offer matches their lanes and rate floor.
+**Solution:** ACE watches their Gmail 24/7, classifies every broker email, and texts them instantly when a load offer matches their lanes and rate floor. Every morning ACE sends a brief — active focus zone and top broker activity — so the carrier starts the day ahead.
 
 ---
 
@@ -33,11 +33,11 @@ xtxtec.com (Vercel)
   /auth              — Login / Signup (React, Login.jsx)
   /verify            — Email confirmation gate (verify.html)
   /subscribe         — Tier selection → Stripe checkout
-  /onboard           — Carrier profile setup (4 steps)
-  /onboard/lanes     — Lane preferences
-  /onboard/rates     — Rate floors
-  /onboard/gmail     — Gmail OAuth connect
-  /dashboard         — Main carrier dashboard (React)
+  /onboard           — Carrier profile setup (step 1)
+  /onboard/lanes     — Lane preferences (step 2)
+  /onboard/rates     — Rate floors (step 3)
+  /onboard/gmail     — Gmail OAuth connect (step 4) — live
+  /dashboard         — Main carrier dashboard (/carrier retired)
   /api/stripe-webhook       — Stripe event handler
   /api/create-checkout-session — Stripe session creator
 
@@ -46,17 +46,17 @@ edgeai-gmail-webhook (Google Cloud Run — Python/Flask)
   /health            — Health check
   /confirm-win       — Carrier confirms a won load
   /renew-watches     — Weekly Gmail watch renewal
-  /extract-brokers   — Scans SENT mail → broker list
+  /extract-brokers   — Scans SENT mail → broker list (SSE stream)
   /import-brokers    — Manual broker import
-  /create-checkout-session — Stripe checkout (legacy backend route)
-  /stripe-webhook    — Stripe event handler (legacy backend route)
 
 Supabase (Postgres)
 Claude Haiku — Email classification + broker enrichment
-Telnyx — SMS alerts to carrier (pending — SMS_ENABLED=false)
+Telnyx — SMS alerts (SMS_ENABLED=false — pending setup)
 Stripe — Subscription billing (TEST mode)
 Gmail API — Per-carrier OAuth
 Google Pub/Sub — Gmail Watch push notifications
+Resend — Transactional email (noreply@xtxtransport.com, display: EdgeTech)
+n8n (Cloud) — ACE Morning Brief scheduler
 ```
 
 ---
@@ -65,12 +65,14 @@ Google Pub/Sub — Gmail Watch push notifications
 
 | Table | Purpose |
 |-------|---------|
-| carriers | One row per carrier. id (UUID), email, gmail_token, subscription_status, subscription_tier, stripe_customer_id, equipment_type, home_base_zip, max_radius |
-| brokers | Broker contacts per carrier. carrier_id, email, name, company, status (hot/warm/cold), last_reply_at |
-| responses | Every classified email. gmail_message_id, carrier_id, broker_id, classification, load_accepted |
+| carriers | One row per carrier. Full column list in Runbook. Includes active_focus_zip, active_focus_city, active_focus_state, focus_updated_at, outreach_time |
+| brokers | carrier_id, email, name, company, status (hot/warm/cold), last_reply_at |
+| responses | gmail_message_id, carrier_id, broker_id, classification, load_accepted |
 | load_wins | Confirmed won loads |
-| unknown_brokers_inbox | Emails from senders not in brokers table — pending review |
+| unknown_brokers_inbox | Emails from unknown senders — pending review |
 | gmail_sync | historyId tracking per email address |
+
+**RLS:** Disabled on carriers table — enforced at application layer.
 
 ---
 
@@ -78,23 +80,23 @@ Google Pub/Sub — Gmail Watch push notifications
 
 ```
 1. xtxtec.com landing → click Request Access CTA
-2. Inline OTP signup on home.html → signInWithOtp() → 8-digit code emailed
-3. User enters code → verifyOtp(type: 'signup') → session created
-4. navigate('/subscribe') → tier selection → Stripe checkout
+2. Inline OTP signup on home.html → signInWithOtp({ email }) → 8-digit code
+3. verifyOtp(type: 'signup') → session created → /subscribe?first=...&last=...
+4. /subscribe → tier selection → Stripe checkout
 5. Stripe webhook → subscription_status = active in carriers table
-6. navigate('/onboard') → equipment type, home base ZIP, MC#
-7. /onboard/lanes → preferred lanes
-8. /onboard/rates → rate floor (local + OTR)
-9. /onboard/gmail → Gmail OAuth connect → gmail_token saved
-10. /extract-brokers → scans SENT mail → Claude enriches → brokers table populated
-11. Gmail Watch started → ACE goes live
+6. /onboard → equipment type, home base ZIP, MC# (step 1)
+7. /onboard/lanes → preferred lanes + radius (step 2)
+8. /onboard/rates → rate floor local + OTR (step 3)
+9. /onboard/gmail → Gmail OAuth connect → gmail_token saved (step 4)
+10. /extract-brokers → scans SENT mail → Claude enriches → brokers table
+11. Gmail Watch started → ACE live
 ```
 
 ---
 
 ## 6. Email Classification
 
-Claude Haiku classifies every inbound broker email as one of:
+Claude Haiku classifies every inbound broker email:
 
 | Classification | Description |
 |----------------|-------------|
@@ -106,26 +108,106 @@ Claude Haiku classifies every inbound broker email as one of:
 
 **SMS fires on:** `load_offer` only (when SMS_ENABLED=true)
 
-**Deduplication:** `is_duplicate()` checks both `responses` and `unknown_brokers_inbox` before any Claude/SMS call. All Pub/Sub deliveries return HTTP 200 — non-200 causes infinite retry.
+**Routing:** Uses `active_focus_zip` when set on carrier row — falls back to `home_base_zip`. Resets at midnight.
 
-**Load board intercept:** Emails from DAT, Truckstop, Spot, NTG intercepted before broker lookup — routed to separate SMS path.
+**Deduplication:** `is_duplicate()` checks `responses` and `unknown_brokers_inbox` before any Claude/SMS call. All Pub/Sub deliveries return HTTP 200.
+
+**Load board intercept:** DAT, Truckstop, Spot, NTG intercepted before broker lookup — separate SMS path.
 
 ---
 
-## 7. Pricing Tiers
+## 7. ACE Morning Brief
 
-| Tier | Price | Stripe Price ID |
+Daily SMS sent to carrier at `outreach_time`. Triggered via n8n Cloud Scheduler.
+
+**Content:** Active focus zone + top broker activity for the day.
+
+### Input paths — setting active focus zone
+
+| Path | Mechanism |
+|------|-----------|
+| SMS | Carrier texts city, state, or ZIP → inbound SMS parser → updates active_focus_zip/city/state |
+| Dashboard | Focus zone input on dashboard.html → PATCH carriers table |
+
+### Active focus behavior
+
+| Rule | Detail |
+|------|--------|
+| Override | `active_focus_zip` overrides `home_base_zip` for classification routing |
+| Reset | Resets to `home_base_zip` at midnight if not updated |
+| Timestamp | `focus_updated_at` records last change |
+| Fallback | Classification uses `home_base_zip` when `active_focus_zip` is null |
+
+---
+
+## 8. ACE Scout
+
+Browser automation module for Sylectus load board. Supplements inbound email monitoring with proactive load board scraping.
+
+### Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| Session persistence | Logs in to Sylectus once, maintains session across runs |
+| Load deduplication | Tracks seen load IDs in Supabase — no reprocessing |
+| Broker email extraction | Scrapes contact emails from load postings |
+| Outreach via carrier Gmail | Uses carrier's connected OAuth token to send initial outreach to extracted brokers |
+
+### Constraints
+
+- Outreach must use carrier's own Gmail OAuth token — never platform address
+- Deduplication store must persist across runs
+- Session must refresh gracefully on timeout
+- Extracted brokers inserted to `brokers` table with status: 'cold'
+
+### Status
+
+Designed — not yet built. Queued for next major build cycle after Telnyx SMS and Morning Brief wiring.
+
+---
+
+## 9. Pricing Tiers
+
+| Tier | Price | What's Included |
 |------|-------|-----------------|
-| Base | $47/mo | price_1TN2Y5**** |
-| Custom | $97/mo | price_1TN2Yh**** |
-| Premium | $349 setup fee | price_1TN2dg**** |
+| Base | $47/mo | ACE email monitoring, SMS alerts on load_offer, broker tracking, Morning Brief, dashboard |
+| Base Plus | $97/mo | Base + two-way SMS loop (carrier can reply to ACE via SMS to update focus zone, confirm wins, query brokers) |
+| Dispatcher Pro | $297/mo | Base Plus + multi-carrier dashboard, dispatcher management view, carrier fleet oversight |
 
 CTA copy: **Request Access** (never "Start Free Trial")
 Pricing copy: **Month-to-month** (never "No credit card required")
 
+### Base tier — finalized feature set
+
+- Gmail inbox monitoring 24/7 via Pub/Sub
+- Claude Haiku classification — load_offer / positive / negative / question / unknown
+- SMS alert on load_offer (Telnyx)
+- ACE Morning Brief SMS at outreach_time
+- Active focus zone — set via dashboard
+- Broker relationship table — hot/warm/cold scoring
+- Load board email separation (DAT, Truckstop, Spot, NTG)
+- Carrier dashboard — brokers, responses, wins, focus zone
+- Broker extraction from SENT mail on onboarding
+
+### Base Plus — two-way SMS loop
+
+All Base features plus:
+- Carrier can text ACE to update active focus zone (city/state/ZIP)
+- Carrier can text ACE to confirm a won load
+- Carrier can text ACE to query top brokers for a zone
+- Inbound SMS parsed and routed to correct action
+
+### Dispatcher Pro — multi-carrier dashboard
+
+All Base Plus features plus:
+- Dispatcher management view — see all managed carriers in one dashboard
+- Per-carrier ACE status, broker counts, load win counts
+- Dispatcher can set focus zone for any managed carrier
+- Fleet-level analytics — response rates, win rates, broker relationships across carriers
+
 ---
 
-## 8. Locked System Values
+## 10. Locked System Values
 
 | Key | Value |
 |-----|-------|
@@ -139,34 +221,39 @@ Pricing copy: **Month-to-month** (never "No credit card required")
 | Claude model | claude-haiku-4-5-20251001 |
 | Stripe mode | TEST — do not flip to live |
 | SMS | DISABLED — SMS_ENABLED=false — Telnyx pending |
+| SMTP | Resend — noreply@xtxtransport.com — display: EdgeTech |
 
 ---
 
-## 9. Build Queue — April 25 2026
+## 11. Build Queue — April 25 2026
 
-### Priority 1 — Founder Account Activation (BLOCKER)
-- Stripe 100% off coupon OR direct Supabase: `UPDATE carriers SET subscription_status = 'active', subscription_tier = 'base' WHERE id = '<ken_uuid>';`
-- Do NOT charge Ken for his own account
+### Priority 1 — Telnyx SMS (BLOCKER)
+- Telnyx account setup — wire into main.py, remove Twilio
+- Flip SMS_ENABLED=true after confirmed working
 
-### Priority 2 — Test Carrier End-to-End
-- Fake carrier account, full flow top to bottom
-- Verify: UUID consistent, subscription activates, onboarding completes, Gmail OAuth connects, broker extraction runs, ACE fires SMS
-- Confirm each Supabase table gets correct rows
+### Priority 2 — Broker Extraction Reliability
+- Validate `/extract-brokers` against live Gmail SENT
+- SSE progress stream + error handling
 
-### Priority 3 — Delete Test Carrier Record
-- After flow confirmation: delete from carriers, brokers, gmail_sync, responses
+### Priority 3 — Stripe Webhook Email Match Fix (BUG)
+- OTP signup race condition — carriers row may not exist at webhook time
+- Fix: upsert on email or delay lookup
 
-### Priority 4 — Ken's Production Onboarding
-- Clean UUID, active subscription at $0
-- Real broker list loaded via Gmail OAuth extraction
-- ACE Base live
+### Priority 4 — Carriers Table Schema Audit
+- Confirm all new columns in production
+- Confirm RLS disabled
 
-### Priority 5 — Email Deliverability
-- Custom SMTP in Supabase Auth → noreply@xtxtec.com (not supabase.io)
-- Evaluate xtxtransport.com as established sender alias for platform emails
+### Priority 5 — Dashboard Live Data Wiring
+- Wire broker table, sidebar counts, focus zone input from live Supabase
 
-### Priority 6 — Infrastructure
-- Telnyx SMS replacement → flip SMS_ENABLED=true when live
+### Priority 6 — Founder Account Activation (BLOCKER)
+- Direct SQL: activate Ken's account at $0
+
+### Priority 7 — ACE Morning Brief Wiring
+- n8n trigger → Cloud Run or Supabase function
+- Inbound SMS parser end-to-end test
+
+### Priority 8 — Infrastructure
 - Privacy Policy page (required for Google OAuth verification)
 - Terms of Service page (required for Google OAuth verification)
 - Google OAuth verification submit
@@ -174,14 +261,16 @@ Pricing copy: **Month-to-month** (never "No credit card required")
 
 ---
 
-## 10. Standing Rules
+## 12. Standing Rules
 
-- `CARRIER_UUID` env var in Cloud Run must always match carrier's actual `id` in Supabase — single-carrier limitation; multi-carrier routing is next architecture step
 - Gmail Watch expires every 7 days — Cloud Scheduler calls `/renew-watches` weekly
 - All Pub/Sub deliveries must return HTTP 200 — non-200 causes infinite retry
 - git push to master auto-deploys to Vercel — always get Ken approval first
 - Node.js only on dev machine — Python NOT installed
-- n8n workflows ARCHIVED — do not unarchive
+- n8n: Morning Brief scheduler only — all other workflows ARCHIVED
+- `/carrier` route retired — use `/dashboard`
+- RLS disabled on carriers table — enforced at application layer
+- Stripe in TEST mode — do not flip until Ken instructs
 
 ---
 

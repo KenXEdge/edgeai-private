@@ -1,7 +1,15 @@
 # XEdge / EDGEai — SESSION HANDOFF NOTE
 ## April 25, 2026 | Read This First | Before Doing Anything Else
 
-Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separate commands)
+**Session start command:**
+```
+git pull
+```
+Then read:
+```
+docs/Runbook_v7.1.md  docs/PRD_v4.4.md  docs/PitchBook_v1.2.md  docs/Transition_latest.md
+```
+Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separate commands — PowerShell does not support `&&`)
 
 ---
 
@@ -12,10 +20,13 @@ Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separ
 | xtxtec.com | LIVE | Vercel — primary domain |
 | Cloud Run | STABLE | edgeai-gmail-webhook revision 00071-hj8 |
 | Supabase | LIVE | siafwhlzazefyoevslde.supabase.co |
-| Gmail OAuth | LIVE | Connected and confirmed working |
-| Stripe | TEST MODE | Webhook confirmed working — do not flip to live |
+| Gmail OAuth | LIVE | onboard-gmail.html — confirmed working |
+| Stripe billing | TEST MODE | Webhook confirmed working — do not flip to live |
+| OTP signup | LIVE | 8-digit code via Magic Link — Resend + xtxtransport.com |
+| /dashboard route | LIVE | /carrier fully retired |
 | SMS | DISABLED | SMS_ENABLED=false — Telnyx not yet set up |
-| Morning Brief | BUILT | n8n scheduler + inbound SMS parser + dashboard input path |
+| ACE Morning Brief | BUILT | n8n scheduler + SMS parser + dashboard input — wiring pending |
+| ACE Scout | DESIGNED | Not yet built — queued for next major build cycle |
 | Gmail Watch | PENDING | Depends on Ken production onboarding completion |
 | Google OAuth verification | PENDING | Needs Privacy Policy + Terms pages first |
 
@@ -23,108 +34,118 @@ Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separ
 
 ## 2. What Was Built This Session
 
-| # | Feature | Detail |
-|---|---------|--------|
-| 1 | EDGE brand corrections | Platform name EDGE (spoken) / XEdge (product) applied throughout all docs and UI |
-| 2 | ACE agent name locked | ACE = Agentic Carrier Employee — confirmed across all materials |
-| 3 | ACE Morning Brief | Daily SMS at carrier outreach_time via n8n — active focus zone + broker summary |
-| 4 | Supabase schema additions | active_focus_zip, active_focus_city, active_focus_state, focus_updated_at, outreach_time added to carriers table |
-| 5 | Inbound SMS parser | Carrier texts city/state/ZIP → parser extracts → updates active_focus_zip/city/state |
-| 6 | Dashboard focus input | Focus zone input on dashboard.html → PATCH carriers table |
-| 7 | Classification routing fix | Filter uses active_focus_zip when set; falls back to home_base_zip |
-| 8 | /carrier route retired | All traffic rerouted to /dashboard |
-| 9 | SMTP → Resend | xtxtransport.com sender domain — replaces default Supabase SMTP |
-| 10 | OTP 8-digit confirmed | signInWithOtp returns 8-digit code — working |
-| 11 | Stripe webhook confirmed | subscription_status activation end-to-end confirmed working |
-| 12 | Executive Binder updated | PRD v4.4, Runbook v7.0, PitchBook v1.1, Transition note committed to docs/ |
+| # | Feature / Fix | Detail |
+|---|---------------|--------|
+| 1 | OTP card selector fix | `#card-form-view` wrapper — OTP block renders after signInWithOtp() |
+| 2 | verifyOtp type fixed | type: 'email' → type: 'signup' |
+| 3 | OTP 8-digit | maxlength=8; all "6-digit" copy updated; token guard updated |
+| 4 | /carrier route retired | App.jsx route deleted; all navigate() calls → /dashboard; Layout.jsx nav updated |
+| 5 | EDGE brand corrections | Platform = EDGE (spoken) / XEdge (product); ACE = Agentic Carrier Employee |
+| 6 | SMTP → Resend | noreply@xtxtransport.com, display name EdgeTech, Magic Link template |
+| 7 | Gmail OAuth confirmed live | onboard-gmail.html OAuth flow tested on production |
+| 8 | Stripe webhook confirmed | subscription_status activation end-to-end confirmed working |
+| 9 | Supabase columns added | active_focus_zip, active_focus_city, active_focus_state, focus_updated_at, outreach_time |
+| 10 | ACE Morning Brief | n8n trigger, inbound SMS parser (city/state/ZIP), dashboard input, midnight reset |
+| 11 | ACE Scout designed | Sylectus browser automation — session, dedup, broker email extraction, Gmail outreach |
+| 12 | Tier corrections | Base $47 / Base Plus $97 / Dispatcher Pro $297 |
+| 13 | Base Plus SMS loop | Two-way SMS — carrier replies to ACE for focus zone, wins, broker queries |
+| 14 | Dispatcher Pro spec | Multi-carrier dashboard for dispatcher-managed fleets |
+| 15 | Executive Binder | Runbook v7.1, PRD v4.4, PitchBook v1.2, Transition note — committed to docs/ |
+| 16 | deploy.sh fixed | Auto-sources .env; CARRIER_UUID removed |
+| 17 | RLS confirmed | Disabled on carriers table — enforced at application layer |
 
 ---
 
-## 3. Priority Queue — Next Session
+## 3. Known Bug — Stripe Webhook Email Match
+
+**Symptom:** `subscription_status` may not flip to `active` on OTP signups.
+
+**Root cause:** On `checkout.session.completed`, `stripe-webhook.js` looks up the carrier by email. For OTP signups, the carriers row may not exist yet at the time the webhook fires — Supabase Auth creates the auth user, but the carriers insert may lag.
+
+**Impact:** Carrier completes Stripe checkout but ends up stuck at subscribe screen or fails subscription gate check.
+
+**Fix required next session:**
+- Option A: Upsert carrier row on email in `stripe-webhook.js` if not found
+- Option B: Confirm timing — when does carriers row get created relative to OTP signup completion
+- File: `dashboard/api/stripe-webhook.js`
+
+---
+
+## 4. Priority Queue — Next Session Top 5
 
 ### Priority 1 — Telnyx SMS (BLOCKER)
 - Set up Telnyx account
-- Wire Telnyx into main.py — replace all Twilio references
-- Test inbound + outbound SMS
-- Flip `SMS_ENABLED=true` only after confirmed working
-- Do NOT flip until tested end-to-end
+- Wire Telnyx into `services/gmail-webhook/main.py` — replace all Twilio references
+- Test inbound SMS (city/state/ZIP parsing for Morning Brief focus zone)
+- Test outbound SMS (load_offer alert)
+- Flip `SMS_ENABLED=true` only after both confirmed working end-to-end
 
 ### Priority 2 — Broker Extraction Reliability
 - Run `/extract-brokers` against Ken's live Gmail SENT folder
-- Validate SSE progress stream in onboard-gmail.html
-- Verify brokers table populates correctly with real data
-- Error handling and retry logic audit
+- Validate SSE progress stream in `onboard-gmail.html`
+- Error handling and retry logic in `main.py`
+- Confirm brokers table populated with real data before declaring complete
 
-### Priority 3 — Stripe Webhook Email Match Fix
-- In `dashboard/api/stripe-webhook.js`, verify carrier lookup on `checkout.session.completed` matches by email correctly
-- Test with a real checkout flow (test mode)
-- Confirm `subscription_status = active` set on correct row
+### Priority 3 — Stripe Webhook Fix (BUG — see above)
+- Fix email match race condition in `dashboard/api/stripe-webhook.js`
+- Test with a real OTP signup + Stripe test checkout
+- Confirm `subscription_status = active` on correct carriers row
 
 ### Priority 4 — Carriers Table Schema Audit
-- Confirm all new columns exist in production Supabase:
-  - active_focus_zip
-  - active_focus_city
-  - active_focus_state
-  - focus_updated_at
-  - outreach_time
-- Confirm RLS is disabled on carriers table
-- Add any missing columns via Supabase dashboard SQL
+- In Supabase dashboard, run:
+  ```sql
+  SELECT column_name FROM information_schema.columns
+  WHERE table_name = 'carriers' ORDER BY ordinal_position;
+  ```
+- Confirm presence of: active_focus_zip, active_focus_city, active_focus_state, focus_updated_at, outreach_time
+- Confirm RLS disabled: check via Supabase Auth > Policies
+- Add any missing columns with correct types
 
 ### Priority 5 — Dashboard Live Data Wiring
-- `dashboard.html` broker table — replace hardcoded rows with live Supabase query
-- Sidebar counts — live query from brokers and unknown_brokers_inbox
-- Focus zone input field — wire PATCH to carriers table
-- ACE status dot — wire from real carrier subscription_status
-
-### Priority 6 — Founder Account Activation (BLOCKER)
-- Direct Supabase SQL to activate Ken's account:
-  ```sql
-  UPDATE carriers SET subscription_status = 'active', subscription_tier = 'base'
-  WHERE id = '<carrier UUID = auth.users.id for that carrier>';
-  ```
-- Do NOT charge Ken — no Stripe, no coupon needed, direct SQL only
-- Verify row updated before proceeding
+- `dashboard/public/dashboard.html`
+  - Replace hardcoded broker `<tbody>` rows with live Supabase query (carrier_id = session.user.id)
+  - Sidebar badge counts from brokers + unknown_brokers_inbox live counts
+  - Focus zone input → PATCH carriers row active_focus_zip/city/state
+  - ACE status dot → from subscription_status
 
 ---
 
-## 4. Standing Rules — All Active
+## 5. Next Build Queue (After Top 5)
+
+- **ACE Morning Brief wiring** — n8n trigger → Cloud Run endpoint or Supabase function; test SMS end-to-end
+- **Founder Account Activation** — Direct SQL to activate Ken at $0; do NOT use Stripe
+- **ACE Scout build** — Sylectus session management, load dedup store, broker email extraction
+- **Privacy Policy + Terms pages** — Required for Google OAuth verification
+- **Google OAuth verification submit**
+- **Stripe flip to live mode** — Ken instructs when ready
+
+---
+
+## 6. Standing Rules — All Active
 
 - Node.js only — Python NOT installed on dev machine
 - No git push without Ken approval (exception: brand new standalone pages)
 - Never alter Ken's carriers row — carrier UUID = auth.users.id — never hardcode
 - `SMS_ENABLED=false` — Telnyx pending — do not flip
-- n8n: Morning Brief scheduler is active; all other n8n workflows ARCHIVED — do not unarchive
+- n8n: Morning Brief scheduler only — all other workflows ARCHIVED
 - Stripe TEST mode — do not flip to live until Ken instructs
 - `logo-edge-white.png` permanent in both dark and light mode — do not swap
-- PowerShell: two separate commands — `&&` operator not supported
+- PowerShell: two separate commands — `&&` operator not supported in PS 5.1
 - End of session: save updated docs to `C:\Users\korbs\EDGEai\` and commit to master
-- CARRIER_UUID removed from Cloud Run env vars — carrier identity comes from auth.users.id at runtime
+- CARRIER_UUID removed from Cloud Run env vars — carrier identity from auth.users.id at runtime
+- RLS disabled on carriers — enforced at application layer
 
 ---
 
-## 5. Infrastructure Notes
+## 7. Infrastructure Notes
 
 - Gmail Watch expires every 7 days — Cloud Scheduler calls `/renew-watches` weekly
 - All Pub/Sub deliveries must always return HTTP 200 — non-200 causes infinite retry loops
 - `trailingSlash: false` in vercel.json — required for Stripe and Pub/Sub POST endpoints
 - `routes` and `rewrites` cannot coexist in vercel.json — use only `rewrites` + `redirects`
-- deploy.sh now auto-sources `.env` before gcloud run deploy — secrets inject correctly
+- deploy.sh auto-sources `.env` — all secrets inject on deploy (fixed this session)
 - CARRIER_UUID removed from deploy.sh and Cloud Run env vars (April 29 2026)
-- RLS disabled on carriers table — confirmed
-
----
-
-## 6. Files Changed This Session
-
-| File | Change |
-|------|--------|
-| `services/gmail-webhook/main.py` | Inbound SMS parser, Morning Brief trigger, active_focus_zip routing |
-| `dashboard/public/dashboard.html` | Focus zone input field |
-| `dashboard/public/onboard-gmail.html` | /carrier → /dashboard redirect update |
-| `docs/Runbook_v7.0.md` | Full runbook — April 25 snapshot |
-| `docs/PRD_v4.3.md` | PRD v4.4 — Morning Brief feature, tier definitions, GTM |
-| `docs/PitchBook_v1.1.md` | PitchBook — EDGE brand, two-sided market, GTM, four-phase vision |
-| `docs/Transition_latest.md` | This file |
+- SMTP: Resend, noreply@xtxtransport.com, display name EdgeTech, Magic Link template
 
 ---
 
