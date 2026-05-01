@@ -6,22 +6,18 @@ classifies broker replies using Claude, and triggers carrier actions.
 
 import os
 import json
-import re
 import base64
 import logging
 import sys
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
 from email.utils import parseaddr
 
 import anthropic
-from flask import Flask, request, jsonify, redirect, Response, stream_with_context
+from flask import Flask, request, jsonify
 from supabase import create_client, Client
 from twilio.rest import Client as TwilioClient
 from google.oauth2.credentials import Credentials as OAuthCredentials
-from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 
 # ── Structured JSON logging for Cloud Run ─────────────────────────────────────
@@ -33,43 +29,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
-_ALLOWED_ORIGINS = {"https://xtxtec.com", "https://edgeai-dashboard.vercel.app"}
-
-def _cors_origin():
-    o = request.headers.get("Origin", "")
-    return o if o in _ALLOWED_ORIGINS else "https://xtxtec.com"
-
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = app.make_response("")
-        response.headers["Access-Control-Allow-Origin"] = _cors_origin()
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        response.status_code = 200
-        return response
-
-@app.after_request
-def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    return response
-
-@app.errorhandler(404)
-def not_found(e):
-    response = jsonify({"error": "not found"})
-    response.status_code = 404
-    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
-    return response
-
-@app.errorhandler(500)
-def server_error(e):
-    response = jsonify({"error": "internal server error"})
-    response.status_code = 500
-    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
-    return response
 
 # ── Lazy singletons (initialised once per container cold start) ────────────────
 _supabase: Client | None = None
@@ -118,30 +77,6 @@ def gmail_service():
     auth_req = google_requests.Request(session=requests_lib.Session())
     creds.refresh(auth_req)
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
-
-
-# ── Load board constants ───────────────────────────────────────────────────────
-
-LOAD_BOARD_SENDERS: dict[str, str] = {
-    "noreply@spotinc.com":         "Spot",
-    "loadmatches@ntgfreight.com":  "NTG",
-    "ftl-projects@prdlax.com":     "NTG",
-    "alerts@dat.com":              "DAT",
-    "notifications@truckstop.com": "Truckstop",
-}
-
-LOAD_BOARD_PARSE_PROMPT = (
-    "You are a freight load board email parser. Extract the following fields from the email body.\n"
-    "Return ONLY valid JSON. No markdown, no preamble, no explanation.\n\n"
-    "Fields:\n"
-    "- equipment_type: string (e.g. 'Dry Van', 'Reefer', 'Flatbed') or null\n"
-    "- origin: string (City ST format, e.g. 'Dallas TX') or null\n"
-    "- destination: string (City ST format, e.g. 'Oklahoma City OK') or null\n"
-    "- mileage: integer or null\n"
-    "- pickup_date: string (e.g. '4/27') or null\n"
-    "- shipment_number: string or null\n\n"
-    "Email body:\n{body}"
-)
 
 
 # ── Gmail helpers ──────────────────────────────────────────────────────────────
@@ -348,23 +283,20 @@ def is_duplicate(message_id: str) -> bool:
     return in_unknown
 
 
-def log_response(email_data: dict, classification: str, broker_id: str | None = None, broker_name: str | None = None) -> None:
+def log_response(email_data: dict, classification: str) -> None:
     try:
-        row = {
-            "gmail_message_id": email_data["message_id"],
-            "thread_id": email_data["thread_id"],
-            "broker_email": email_data["from_email"],
-            "subject": email_data["subject"],
-            "body": email_data["body"],
-            "classification": classification,
-            "carrier_id": os.environ["CARRIER_UUID"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        if broker_id is not None:
-            row["broker_id"] = broker_id
-        if broker_name is not None:
-            row["broker_name"] = broker_name
-        supabase_client().table("responses").insert(row).execute()
+        supabase_client().table("responses").insert(
+            {
+                "gmail_message_id": email_data["message_id"],
+                "thread_id": email_data["thread_id"],
+                "broker_email": email_data["from_email"],
+                "subject": email_data["subject"],
+                "body": email_data["body"],
+                "classification": classification,
+                "carrier_id": os.environ["CARRIER_UUID"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ).execute()
     except Exception as exc:
         if "23505" in str(exc) or "duplicate key" in str(exc):
             log.info('"log_response duplicate — already processed messageId=%s"',
@@ -459,30 +391,35 @@ Email body:
 {body}"""
 
 
-EXTRACT_PROMPT = (
-    "You are analyzing a freight broker email sent to a carrier.\n\n"
-    "Return a JSON object with exactly these fields:\n"
-    "{\"classification\": \"<label>\", "
-    "\"sender_name\": \"<name or null>\", "
-    "\"load_origin\": \"<city, state or null>\", "
-    "\"load_destination\": \"<city, state or null>\", "
-    "\"rate_offered\": \"<amount or null>\"}\n\n"
-    "Classification labels:\n"
-    "- load_offer   : offering a specific load, lane, or rate\n"
-    "- positive     : interested/positive but no specific load offered\n"
-    "- negative     : not interested, DNC, out of network\n"
-    "- question     : asking a clarifying question\n"
-    "- unknown      : cannot determine intent\n\n"
-    "Extraction rules:\n"
-    "- sender_name: full name from email signature, null if not present\n"
-    "- load_origin: pickup city/state e.g. Dallas TX, null if not mentioned\n"
-    "- load_destination: delivery city/state e.g. Chicago IL, null if not mentioned\n"
-    "- rate_offered: dollar rate e.g. $2.50/mile or $1500 flat, null if not mentioned\n\n"
-    "Return ONLY valid JSON, no other text.\n\n"
-    "Subject: {subject}\n"
-    "Body:\n"
-    "{body}"
-)
+EXTRACT_PROMPT = """You are analyzing a freight broker email sent to a carrier.
+
+Return a JSON object with exactly these fields:
+{{
+  "classification": "<label>",
+  "sender_name": "<name or null>",
+  "load_origin": "<city, state or null>",
+  "load_destination": "<city, state or null>",
+  "rate_offered": "<amount or null>"
+}}
+
+Classification labels:
+- load_offer   : offering a specific load, lane, or rate
+- positive     : interested/positive but no specific load offered
+- negative     : not interested, DNC, out of network
+- question     : asking a clarifying question
+- unknown      : cannot determine intent
+
+Extraction rules:
+- sender_name: full name from email signature, null if not present
+- load_origin: pickup city/state e.g. "Dallas, TX", null if not mentioned
+- load_destination: delivery city/state e.g. "Chicago, IL", null if not mentioned
+- rate_offered: dollar rate e.g. "$2.50/mile" or "$1,500 flat", null if not mentioned
+
+Return ONLY valid JSON, no other text.
+
+Subject: {subject}
+Body:
+{body}"""
 
 
 def classify_reply(email_data: dict) -> str:
@@ -524,23 +461,18 @@ def classify_and_extract(email_data: dict) -> dict:
         "rate_offered": None,
     }
     try:
-        subject = email_data["subject"]
-        body = email_data["body"]
-        prompt_text = (
-            "You are analyzing a freight broker email sent to a carrier.\n\n"
-            "Return ONLY valid JSON with these exact fields:\n"
-            "{\"classification\": \"\", \"sender_name\": null, "
-            "\"load_origin\": null, \"load_destination\": null, "
-            "\"rate_offered\": null}\n\n"
-            "classification must be exactly one of: load_offer, positive, "
-            "negative, question, unknown\n\n"
-            f"Subject: {subject}\n"
-            f"Body:\n{body[:3000]}"
-        )
         msg = anthropic_client().messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=200,
-            messages=[{"role": "user", "content": prompt_text}],
+            messages=[
+                {
+                    "role": "user",
+                    "content": EXTRACT_PROMPT.format(
+                        subject=email_data["subject"],
+                        body=email_data["body"],
+                    ),
+                }
+            ],
         )
         raw = msg.content[0].text.strip()
         extracted = json.loads(raw)
@@ -550,19 +482,14 @@ def classify_and_extract(email_data: dict) -> dict:
             extracted["classification"] = "unknown"
         return extracted
     except Exception as exc:
-        log.error('"classify_and_extract failed: %s"', str(exc))
-        if hasattr(exc, 'response'):
-            log.error('"classify_and_extract response body: %s"',
-                      exc.response.text if hasattr(exc.response, 'text') else str(exc.response))
+        log.error('"classify_and_extract failed: %s"', exc)
         return fallback
 
 
 # ── Twilio SMS ─────────────────────────────────────────────────────────────────
 
 def send_load_offer_sms(email_data: dict) -> None:
-    if os.environ.get("SMS_ENABLED", "true") == "false":
-        log.info('"SMS disabled — skipping load offer SMS"')
-        return
+    """Known broker load offer alert."""
     body = (
         f"LOAD OFFER from {email_data['from_email']}\n"
         f"Subject: {email_data['subject']}\n"
@@ -580,9 +507,7 @@ def send_load_offer_sms(email_data: dict) -> None:
 
 
 def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
-    if os.environ.get("SMS_ENABLED", "true") == "false":
-        log.info('"SMS disabled — skipping unknown broker SMS"')
-        return
+    """Unknown broker load offer alert with extracted load details."""
     origin = extracted.get("load_origin") or "Unknown"
     destination = extracted.get("load_destination") or "Unknown"
     rate = extracted.get("rate_offered") or "Not specified"
@@ -607,112 +532,6 @@ def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
         log.info('"SMS sent — unknown broker load offer from=%s"', email_data["from_email"])
     except Exception as exc:
         log.error('"send_unknown_broker_sms failed: %s"', exc)
-
-
-# ── Load board helpers ────────────────────────────────────────────────────────
-
-def is_load_board_email(from_email: str) -> bool:
-    """Return True if the sender is a known load board system address."""
-    return from_email.lower().strip() in LOAD_BOARD_SENDERS
-
-
-def parse_load_board_email(email_data: dict) -> dict:
-    """Call Claude to extract structured fields from a load board email.
-    Returns dict with keys: equipment_type, origin, destination, mileage,
-    pickup_date, shipment_number. All values may be None on parse failure.
-    """
-    fallback = {
-        "equipment_type": None,
-        "origin": None,
-        "destination": None,
-        "mileage": None,
-        "pickup_date": None,
-        "shipment_number": None,
-    }
-    try:
-        body = email_data["body"]
-        prompt_text = (
-            LOAD_BOARD_PARSE_PROMPT[: LOAD_BOARD_PARSE_PROMPT.rfind("Email body:")]
-            + f"Email body:\n{body[:3000]}"
-        )
-        msg = anthropic_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt_text}],
-        )
-        parsed = json.loads(msg.content[0].text.strip())
-        return parsed
-    except Exception as exc:
-        log.error('"parse_load_board_email failed: %s"', str(exc))
-        return fallback
-
-
-def get_carrier_profile() -> dict | None:
-    """Query the carriers table for the current carrier's profile.
-    Returns the first row (equipment_type, max_radius, home_base_zip) or None.
-    """
-    try:
-        resp = (
-            supabase_client()
-            .table("carriers")
-            .select("equipment_type, max_radius, home_base_zip")
-            .eq("id", os.environ["CARRIER_UUID"])
-            .limit(1)
-            .execute()
-        )
-        if resp.data:
-            return resp.data[0]
-    except Exception as exc:
-        log.error('"get_carrier_profile failed: %s"', exc)
-    return None
-
-
-def load_board_matches_carrier(parsed: dict, carrier: dict) -> bool:
-    """Return True if the load's equipment type matches the carrier's.
-    Case-insensitive substring check — e.g. carrier 'Dry Van' matches load 'dry van'.
-    Logs and returns False on mismatch.
-    """
-    carrier_equip = (carrier.get("equipment_type") or "").lower()
-    load_equip = (parsed.get("equipment_type") or "").lower()
-    if not carrier_equip or not load_equip:
-        return True  # no data to disqualify on — let it through
-    if carrier_equip in load_equip or load_equip in carrier_equip:
-        return True
-    log.info(
-        '"load_board_matches_carrier — mismatch carrier_equip=%s load_equip=%s"',
-        carrier_equip, load_equip,
-    )
-    return False
-
-
-def send_load_board_sms(email_data: dict, parsed: dict, board_name: str) -> None:
-    origin = parsed.get("origin") or "?"
-    destination = parsed.get("destination") or "?"
-    mileage = parsed.get("mileage")
-    equip = parsed.get("equipment_type") or "?"
-    pickup = parsed.get("pickup_date") or "?"
-    shipment = parsed.get("shipment_number") or "?"
-
-    body = (
-        f"{board_name.upper()} ALERT — "
-        f"{origin} to {destination} — "
-        f"{mileage} mi — "
-        f"{equip} — "
-        f"Pickup {pickup} — "
-        f"Shipment {shipment}"
-    )
-    try:
-        twilio_client().messages.create(
-            body=body,
-            from_=os.environ["TWILIO_FROM"],
-            to=os.environ["TWILIO_TO"],
-        )
-        log.info(
-            '"SMS sent — load board alert board=%s shipment=%s"',
-            board_name, shipment,
-        )
-    except Exception as exc:
-        log.error('"send_load_board_sms failed: %s"', exc)
 
 
 # ── Thread helpers ────────────────────────────────────────────────────────────
@@ -765,45 +584,6 @@ def process_message(message_id: str) -> None:
 
     log.info('"processing message %s from %s"', message_id, email_data["from_email"])
 
-    # Step 3a — load board intercept (before broker lookup)
-    if is_load_board_email(email_data["from_email"]):
-        board_name = LOAD_BOARD_SENDERS[email_data["from_email"].lower().strip()]
-        log.info('"load board email detected board=%s message=%s"', board_name, message_id)
-
-        parsed = parse_load_board_email(email_data)
-        if parsed is None:
-            log.error('"load board parse failed — skipping message=%s"', message_id)
-            mark_as_read(message_id)
-            return
-        carrier = get_carrier_profile()
-
-        if carrier and not load_board_matches_carrier(parsed, carrier):
-            log.info('"load board message skipped — equipment mismatch message=%s"', message_id)
-            mark_as_read(message_id)
-            return
-
-        send_load_board_sms(email_data, parsed, board_name)
-        mark_as_read(message_id)
-        return
-
-    # ── Pre-Claude noise filter — discard before API call ─────────────────────
-    _sender = email_data["from_email"]
-    _subject = email_data["subject"].lower()
-    _domain = _sender.split("@")[-1] if "@" in _sender else ""
-    _noise_senders = {"system@ucr.gov"}
-    _noise_domains = {"apple.com", "icloud.com"}
-    _noise_subjects = {
-        "invoice", "statement", "payment due", "remittance",
-        "pod", "proof of delivery", "signed bol", "bill of lading", "receipt",
-    }
-    if (
-        _sender in _noise_senders
-        or _domain in _noise_domains
-        or any(kw in _subject for kw in _noise_subjects)
-    ):
-        mark_as_read(message_id)
-        return
-
     # Step 3 — broker lookup determines which path to take
     broker = lookup_broker(email_data["from_email"])
 
@@ -816,7 +596,7 @@ def process_message(message_id: str) -> None:
 
         # Insert into responses FIRST — this is the dedup record.
         # Must succeed before SMS so that any retry finds it and stops.
-        log_response(email_data, classification, broker_id=broker.get("id"), broker_name=broker.get("name"))
+        log_response(email_data, classification)
 
         if classification == "load_offer":
             if not has_carrier_replied(email_data["thread_id"]):
@@ -1041,350 +821,241 @@ def renew_watches():
     return jsonify({"renewed": count_success, "errors": count_errors}), 200
 
 
-@app.route("/extract-brokers", methods=["GET"])
+@app.route("/extract-brokers", methods=["POST"])
 def extract_brokers():
     """
     Scan SENT emails for broker contacts not yet in the brokers table.
-    Streams progress as SSE. Sequential only — reliability over speed.
-    Query param: carrier_id=<uuid>
+    Accepts JSON body: {"carrier_id": "<uuid>", "days": <int>}.
+
+    Pipeline:
+      1. Page through SENT message IDs (messages.list, no body download)
+      2. Metadata fetch per message (To: + Subject: headers only — fast path)
+      3. Deduplicate recipient emails; batch-check against brokers table
+      4. Claude called ONCE per unique unknown email to enrich contact details
+    Never returns 5xx.
     """
-    carrier_id = request.args.get("carrier_id")
+    try:
+        data = request.get_json(silent=True) or {}
 
-    def generate():
+        carrier_id = data.get("carrier_id")
         if not carrier_id:
-            yield f'data: {json.dumps({"error": "carrier_id required"})}\n\n'
-            return
+            return jsonify({"error": "carrier_id required"}), 400
 
-        try:
-            # ── Load carrier ──────────────────────────────────────────────────────
-            try:
-                carrier_resp = (
-                    supabase_client()
-                    .table("carriers")
-                    .select("*")
-                    .eq("id", carrier_id)
-                    .limit(1)
-                    .execute()
-                )
-            except Exception as exc:
-                log.error('"extract_brokers — carrier lookup failed: %s"', exc)
-                yield f'data: {json.dumps({"error": "carrier lookup failed"})}\n\n'
-                return
+        carrier_resp = (
+            supabase_client()
+            .table("carriers")
+            .select("*")
+            .eq("id", carrier_id)
+            .limit(1)
+            .execute()
+        )
+        if not carrier_resp.data:
+            return jsonify({"error": "carrier not found"}), 404
+        carrier = carrier_resp.data[0]
 
-            if not carrier_resp.data:
-                yield f'data: {json.dumps({"error": "carrier not found"})}\n\n'
-                return
+        days = int(data.get("days", 7))
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y/%m/%d")
 
-            carrier = carrier_resp.data[0]
-            refresh_token = carrier.get("gmail_token")
-            if not refresh_token:
-                yield f'data: {json.dumps({"error": "carrier gmail_token not set"})}\n\n'
-                return
+        # ── Build per-carrier Gmail service ───────────────────────────────────
+        refresh_token = carrier.get("gmail_token") or os.environ["GMAIL_OAUTH_REFRESH_TOKEN"]
+        import google.auth.transport.requests as google_requests
+        import requests as requests_lib
+        carrier_creds = OAuthCredentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.environ["GMAIL_CLIENT_ID"],
+            client_secret=os.environ["GMAIL_CLIENT_SECRET"],
+            scopes=["https://www.googleapis.com/auth/gmail.modify"],
+        )
+        carrier_creds.refresh(google_requests.Request(session=requests_lib.Session()))
+        svc = build("gmail", "v1", credentials=carrier_creds, cache_discovery=False)
 
-            # ── Build Gmail service ───────────────────────────────────────────────
-            try:
-                import google.auth.transport.requests as google_requests
-                import requests as requests_lib
-                carrier_creds = OAuthCredentials(
-                    token=None,
-                    refresh_token=refresh_token,
-                    token_uri="https://oauth2.googleapis.com/token",
-                    client_id=os.environ["GMAIL_CLIENT_ID"],
-                    client_secret=os.environ["GMAIL_CLIENT_SECRET"],
-                    scopes=["https://www.googleapis.com/auth/gmail.modify"],
-                )
-                carrier_creds.refresh(google_requests.Request(session=requests_lib.Session()))
-                svc = build("gmail", "v1", credentials=carrier_creds, cache_discovery=False)
-            except Exception as exc:
-                log.error('"extract_brokers — gmail auth failed: %s"', exc)
-                yield f'data: {json.dumps({"error": "gmail auth failed"})}\n\n'
-                return
+        # ── Step 1: Page through SENT message IDs ─────────────────────────────
+        message_ids: list[str] = []
+        page_token = None
+        pages_fetched = 0
 
-            # ── Step 1: Collect SENT message IDs — last 180 days, cap 500 ────────
-            cutoff_date = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y/%m/%d")
-            message_ids: list[str] = []
-            page_token = None
-
-            while len(message_ids) < 500:
-                list_kwargs: dict = {
-                    "userId": "me",
-                    "labelIds": ["SENT"],
-                    "q": f"after:{cutoff_date}",
-                    "maxResults": 500,
-                }
-                if page_token:
-                    list_kwargs["pageToken"] = page_token
-                try:
-                    list_resp = svc.users().messages().list(**list_kwargs).execute()
-                except Exception as exc:
-                    log.error('"extract_brokers — step1 list failed: %s"', exc)
-                    break
-                message_ids.extend(m["id"] for m in list_resp.get("messages", []))
-                page_token = list_resp.get("nextPageToken")
-                if not page_token:
-                    break
-
-            message_ids = message_ids[:500]
-            log.info('"extract_brokers — step1 done messages=%d"', len(message_ids))
-
-            # ── Noise domains ─────────────────────────────────────────────────────
-            _NOISE_DOMAINS = {
-                "apple.com", "icloud.com", "google.com", "gmail.com",
-                "microsoft.com", "outlook.com", "hotmail.com",
-                "amazonaws.com", "twilio.com", "supabase.io", "stripe.com",
-                "anthropic.com", "github.com", "squarespace.com",
-                "highway.com", "truckstop.com", "dat.com",
-                "sylectus.com", "omnitracs.com", "paypal.com",
-                "ntgfreight.com", "e.truckstop.com", "spotinc.com",
-                "prdlax.com", "loadmatches.com", "notifications.com",
-                "macropoint.com", "fourkites.com", "project44.com",
-                "keeptruckin.com", "motive.com", "samsara.com",
-                "irs.gov", "dol.gov", "fmcsa.dot.gov",
-                "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
+        while True:
+            list_kwargs: dict = {
+                "userId": "me",
+                "labelIds": ["SENT"],
+                "q": f"after:{cutoff_date}",
+                "maxResults": 500,
             }
+            if page_token:
+                list_kwargs["pageToken"] = page_token
 
-            # ── Step 2: Metadata fetch — sequential ───────────────────────────────
-            email_names: dict[str, str] = {}
-            email_message_ids: dict[str, str] = {}
-
-            for msg_id in message_ids:
-                for attempt, delay in enumerate([0, 1, 2, 4]):
-                    if delay:
-                        time.sleep(delay)
-                    try:
-                        response = svc.users().messages().get(
-                            userId="me",
-                            id=msg_id,
-                            format="metadata",
-                            metadataHeaders=["To"],
-                        ).execute()
-                        try:
-                            to_val = ""
-                            for h in response.get("payload", {}).get("headers", []):
-                                if h.get("name", "").lower() == "to":
-                                    to_val = h.get("value", "")
-                                    break
-                            if not to_val:
-                                break
-                            to_name, to_email = parseaddr(to_val)
-                            to_email = to_email.lower().strip()
-                            if not to_email:
-                                break
-                            domain = to_email.split("@")[-1] if "@" in to_email else ""
-                            if domain in _NOISE_DOMAINS:
-                                break
-                            if to_email not in email_names and to_name:
-                                email_names[to_email] = to_name.strip()
-                            if to_email not in email_message_ids:
-                                email_message_ids[to_email] = msg_id
-                        except Exception as exc:
-                            log.error('"extract_brokers — meta parse error id=%s: %s"', msg_id, exc)
-                        break
-                    except HttpError as exc:
-                        if exc.resp.status == 429 and attempt < 3:
-                            log.warning('"extract_brokers — Gmail 429 meta id=%s attempt=%d retrying in %ds"', msg_id, attempt + 1, delay)
-                            continue
-                        log.error('"extract_brokers — meta fetch failed id=%s: %s"', msg_id, exc)
-                        break
-                    except Exception as exc:
-                        log.error('"extract_brokers — meta fetch failed id=%s: %s"', msg_id, exc)
-                        break
-
-            log.info('"extract_brokers — step2 done candidates=%d"', len(email_message_ids))
-
-            # ── Step 3: Exclude already-known brokers ─────────────────────────────
             try:
-                known_resp = (
-                    supabase_client()
-                    .table("brokers")
-                    .select("email")
-                    .eq("carrier_id", carrier_id)
-                    .execute()
-                )
-                known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
+                list_resp = svc.users().messages().list(**list_kwargs).execute()
             except Exception as exc:
-                log.error('"extract_brokers — step3 known lookup failed: %s"', exc)
-                known_set = set()
+                log.error('"extract_brokers — gmail list failed page=%d: %s"', pages_fetched + 1, exc)
+                break
 
-            unknown_emails = [e for e in email_message_ids if e not in known_set]
-            log.info('"extract_brokers — step3 done unknown=%d"', len(unknown_emails))
+            pages_fetched += 1
+            batch = list_resp.get("messages", [])
+            message_ids.extend(m["id"] for m in batch)
+            page_token = list_resp.get("nextPageToken")
+            log.info(
+                '"extract_brokers — pages_fetched=%d page_size=%d total_ids=%d"',
+                pages_fetched, len(batch), len(message_ids),
+            )
+            if not page_token:
+                break
 
-            # ── Signature extraction helpers ──────────────────────────────────────
-            def _decode_data(data: str) -> str:
-                try:
-                    return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
-                except Exception:
-                    return ""
+        log.info('"extract_brokers — step1 done pages=%d messages_scanned=%d"',
+                 pages_fetched, len(message_ids))
 
-            def _strip_html(html: str) -> str:
-                try:
-                    html = re.sub(r'<(script|style)[^>]*?>.*?</(script|style)>', '', html, flags=re.DOTALL | re.IGNORECASE)
-                    html = re.sub(r'<(br|p|div|tr|li|h[1-6])[^>]*?>', '\n', html, flags=re.IGNORECASE)
-                    html = re.sub(r'<[^>]+>', '', html)
-                    html = (html.replace('&nbsp;', ' ').replace('&amp;', '&')
-                                .replace('&lt;', '<').replace('&gt;', '>')
-                                .replace('&quot;', '"').replace('&#39;', "'"))
-                    return html
-                except Exception:
-                    return ""
+        # ── Step 2: Metadata fetch — batched 100 IDs per chunk ───────────────────
+        # email -> list of unique subjects seen across all messages sent to them
+        email_subjects: dict[str, list[str]] = {}
+        # email -> display name captured from To: header
+        email_names: dict[str, str] = {}
 
-            def _get_body(part) -> str:
-                try:
-                    mime = part.get("mimeType", "")
-                    data = part.get("body", {}).get("data", "")
-                    if mime == "text/plain":
-                        return _decode_data(data)
-                    if mime == "text/html":
-                        return _strip_html(_decode_data(data))
-                    parts = part.get("parts", [])
-                    if mime == "multipart/alternative":
-                        for subpart in parts:
-                            if subpart.get("mimeType") == "text/plain":
-                                text = _get_body(subpart)
-                                if text:
-                                    return text
-                        for subpart in parts:
-                            if subpart.get("mimeType") == "text/html":
-                                text = _get_body(subpart)
-                                if text:
-                                    return text
-                    collected = []
-                    for subpart in parts:
-                        text = _get_body(subpart)
-                        if text:
-                            collected.append(text)
-                    return "\n".join(collected)
-                except Exception:
-                    return ""
+        _NOISE_DOMAINS = {
+            "apple.com", "icloud.com", "google.com", "gmail.com",
+            "microsoft.com", "outlook.com", "hotmail.com",
+            "amazonaws.com", "twilio.com", "supabase.io", "stripe.com",
+            "anthropic.com", "github.com", "squarespace.com",
+            "highway.com", "truckstop.com", "dat.com",
+            "sylectus.com", "omnitracs.com", "paypal.com",
+            "ntgfreight.com", "e.truckstop.com", "spotinc.com",
+            "prdlax.com", "loadmatches.com", "notifications.com",
+            "macropoint.com", "fourkites.com", "project44.com",
+            "keeptruckin.com", "motive.com", "samsara.com",
+            "irs.gov", "dol.gov", "fmcsa.dot.gov",
+            "xtxtransport.com", "xedge-ai.com",
+        }
+        _CHUNK_SIZE = 100
 
-            def _fetch_signature(msg_id: str, email: str) -> str:
-                for attempt, delay in enumerate([0, 1, 2, 4]):
-                    if delay:
-                        time.sleep(delay)
-                    try:
-                        msg = svc.users().messages().get(
-                            userId="me", id=msg_id, format="full"
-                        ).execute()
-                        body = _get_body(msg.get("payload", {}))
-                        lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
-                        sig = "\n".join(lines[-15:])
-                        hints = []
-                        for h in msg.get("payload", {}).get("headers", []):
-                            if h.get("name", "").lower() in ("from", "reply-to"):
-                                v = h.get("value", "").strip()
-                                if v:
-                                    hints.append(v)
-                        if hints:
-                            hint_str = "Header hints: " + " | ".join(hints)
-                            sig = (sig + "\n" + hint_str) if sig else hint_str
-                        return sig
-                    except HttpError as exc:
-                        if exc.resp.status == 429 and attempt < 3:
-                            log.warning('"extract_brokers — Gmail 429 email=%s attempt=%d retrying in %ds"',
-                                        email, attempt + 1, delay)
-                            continue
-                        log.error('"extract_brokers — sig fetch http error email=%s: %s"', email, exc)
-                        return ""
-                    except Exception as exc:
-                        log.error('"extract_brokers — sig fetch failed email=%s: %s"', email, exc)
-                        return ""
-                return ""
+        def _handle_meta(request_id, response, exception):
+            if exception or not response:
+                log.error('"extract_brokers — metadata fetch failed id=%s: %s"', request_id, exception)
+                return
+            headers = response.get("payload", {}).get("headers", [])
+            to_val = subject_val = ""
+            for h in headers:
+                name_lower = h.get("name", "").lower()
+                if name_lower == "to":
+                    to_val = h.get("value", "")
+                elif name_lower == "subject":
+                    subject_val = h.get("value", "")
+            if not to_val:
+                return
+            to_name, to_email = parseaddr(to_val)
+            to_email = to_email.lower().strip()
+            if not to_email:
+                return
+            domain = to_email.split("@")[-1] if "@" in to_email else ""
+            if domain in _NOISE_DOMAINS:
+                return
+            if to_email not in email_names and to_name:
+                email_names[to_email] = to_name.strip()
+            if to_email not in email_subjects:
+                email_subjects[to_email] = []
+            if subject_val and subject_val not in email_subjects[to_email]:
+                email_subjects[to_email].append(subject_val)
 
-            # ── Steps 4+5: Sequential — fetch sig, classify+enrich via Claude ─────
-            _IMPORT_CLASSES = {"freight_broker", "freight_dispatcher"}
-            brokers: list[dict] = []
-            scan_count = 0
+        chunks = [message_ids[i:i + _CHUNK_SIZE] for i in range(0, len(message_ids), _CHUNK_SIZE)]
+        for chunk_idx, chunk in enumerate(chunks):
+            batch = svc.new_batch_http_request(callback=_handle_meta)
+            for msg_id in chunk:
+                batch.add(
+                    svc.users().messages().get(
+                        userId="me",
+                        id=msg_id,
+                        format="metadata",
+                        metadataHeaders=["To", "Subject"],
+                    ),
+                    request_id=msg_id,
+                )
+            try:
+                batch.execute()
+            except Exception as exc:
+                log.error('"extract_brokers — batch execute failed chunk=%d: %s"', chunk_idx + 1, exc)
+            log.info(
+                '"extract_brokers — step2 chunk=%d/%d msgs_processed=%d unique_emails=%d"',
+                chunk_idx + 1, len(chunks), min((chunk_idx + 1) * _CHUNK_SIZE, len(message_ids)), len(email_subjects),
+            )
 
-            for email in unknown_emails:
-                to_name = email_names.get(email, "")
-                msg_id = email_message_ids.get(email, "")
+        unique_emails = list(email_subjects.keys())
+        log.info('"extract_brokers — step2 done unique_emails=%d"', len(unique_emails))
 
-                signature = _fetch_signature(msg_id, email) if msg_id else ""
+        # ── Step 3: Batch-check which recipients are already in network ────────
+        known_resp = (
+            supabase_client()
+            .table("brokers")
+            .select("email")
+            .eq("carrier_id", carrier_id)
+            .execute()
+        )
+        known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
 
-                classification = "unknown"
-                enriched: dict = {}
-                try:
-                    prompt_text = (
-                        "Analyze this email contact and do two things in one response.\n\n"
-                        "1. Classify as one of:\n"
-                        "   - freight_broker: connects shippers with carriers. Indicators: company names with "
-                        "freight, logistics, transport, carrier, trucking, brokerage, dispatch, loads, shipping, cargo; "
-                        "titles like broker, agent, coordinator, logistics manager.\n"
-                        "   - freight_dispatcher: manages carrier loads directly.\n"
-                        "   - unknown: insufficient information to classify with confidence.\n\n"
-                        "2. Extract contact details from the signature block.\n\n"
-                        "Return a JSON object with exactly these fields:\n"
-                        "{\"classification\": \"freight_broker|freight_dispatcher|unknown\", "
-                        "\"name\": \"first last or null\", "
-                        "\"title\": \"job title or null\", "
-                        "\"company\": \"company name or null\", "
-                        "\"phone\": \"phone number or null\"}\n\n"
-                        "Return ONLY valid JSON, no other text.\n\n"
-                        f"Email: {email}\n"
-                        f"Name hint: {to_name or 'unknown'}\n"
-                        f"Signature:\n{signature or 'not available'}"
-                    )
-                    claude_msg = anthropic_client().messages.create(
-                        model="claude-haiku-4-5-20251001",
-                        max_tokens=200,
-                        messages=[{"role": "user", "content": prompt_text}],
-                    )
-                    enriched = json.loads(claude_msg.content[0].text.strip())
-                    classification = enriched.get("classification", "unknown")
-                except Exception as exc:
-                    log.error('"extract_brokers — claude failed email=%s: %s"', email, exc)
+        unknown_emails = [e for e in unique_emails if e not in known_set]
+        already_in_network = len(unique_emails) - len(unknown_emails)
+        log.info(
+            '"extract_brokers — step3 done already_in_network=%d unknown=%d"',
+            already_in_network, len(unknown_emails),
+        )
 
-                if classification in _IMPORT_CLASSES:
-                    broker_row = {
-                        "carrier_id": carrier_id,
-                        "email": email,
-                        "name": enriched.get("name") or to_name or None,
-                        "title": enriched.get("title"),
-                        "company": enriched.get("company"),
-                        "phone": enriched.get("phone"),
-                        "source": "gmail_scan",
-                    }
-                    brokers.append(broker_row)
-                    try:
-                        supabase_client().table("brokers").upsert(
-                            broker_row, on_conflict="carrier_id,email"
-                        ).execute()
-                    except Exception as exc:
-                        log.error('"extract_brokers — broker upsert failed email=%s: %s"', email, exc)
-                    yield f'data: {json.dumps({"found": len(brokers)})}\n\n'
-                else:
-                    try:
-                        supabase_client().table("unknown_brokers_inbox").upsert(
-                            {
-                                "carrier_id": carrier_id,
-                                "email": email,
-                                "name": enriched.get("name") or to_name or None,
-                                "classification": classification,
-                            },
-                            on_conflict="carrier_id,email",
-                        ).execute()
-                        scan_count += 1
-                    except Exception as exc:
-                        log.error('"extract_brokers — inbox upsert failed email=%s: %s"', email, exc)
-                    yield f'data: {json.dumps({"scanned": scan_count})}\n\n'
+        # ── Step 4: Claude enrichment — ONE call per unique unknown email ──────
+        brokers = []
+        enrich_count = 0
 
-            log.info('"extract_brokers — done brokers=%d scanned=%d messages=%d"',
-                     len(brokers), scan_count, len(message_ids))
-            yield f'data: {json.dumps({"done": True, "total": len(brokers), "scanned": len(message_ids)})}\n\n'
+        for email in unknown_emails:
+            subjects_str = "; ".join(email_subjects[email][:5]) or "none"
+            to_name = email_names.get(email)
+            prompt_text = (
+                "Given the broker's email address, display name (if known), "
+                "and subjects of emails sent to them, extract what you can.\n\n"
+                "Return a JSON object with exactly these fields:\n"
+                "{\"name\": \"first last or null\", "
+                "\"title\": \"job title or null\", "
+                "\"company\": \"company name or null\", "
+                "\"mobile\": \"mobile phone or null\", "
+                "\"direct\": \"direct phone or null\"}\n\n"
+                "Return ONLY valid JSON, no other text.\n\n"
+                f"Email: {email}\n"
+                f"Name hint: {to_name or ''}\n"
+                f"Subjects: {subjects_str}"
+            )
+            try:
+                claude_msg = anthropic_client().messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=200,
+                    messages=[{"role": "user", "content": prompt_text}],
+                )
+                enriched = json.loads(claude_msg.content[0].text.strip())
+                enrich_count += 1
+            except Exception as exc:
+                log.error('"extract_brokers — enrich failed email=%s: %s"', email, exc)
+                enriched = {}
 
-        except Exception as exc:
-            log.error('"extract_brokers — unhandled exception: %s"', exc, exc_info=True)
-            yield f'data: {json.dumps({"error": "internal error"})}\n\n'
+            brokers.append({
+                "email": email,
+                "name": enriched.get("name") or to_name or None,
+                "title": enriched.get("title"),
+                "company": enriched.get("company"),
+                "mobile": enriched.get("mobile"),
+                "direct": enriched.get("direct"),
+            })
 
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
+        log.info(
+            '"extract_brokers — step4 done claude_enrichments=%d final_broker_count=%d"',
+            enrich_count, len(brokers),
+        )
+
+        return jsonify({
+            "ok": True,
+            "brokers": brokers,
+            "total": len(brokers),
+            "messages_scanned": len(message_ids),
+            "already_in_network": already_in_network,
+        }), 200
+
+    except Exception as exc:
+        log.error('"extract_brokers — unhandled exception: %s"', exc, exc_info=True)
+        return jsonify({"ok": False, "error": "internal error", "brokers": []}), 200
 
 
 @app.route("/import-brokers", methods=["POST"])
@@ -1476,165 +1147,7 @@ def import_brokers():
             "total": total,
         }), 200
 
-# ── Gmail OAuth ──────────────────────────────────────────────────────────────
-from urllib.parse import urlencode
-import requests as _http
-
-_CLOUD_RUN_BASE = "https://edgeai-gmail-webhook-417422203146.us-central1.run.app"
-_OAUTH_REDIRECT = f"{_CLOUD_RUN_BASE}/oauth/gmail/callback"
-_GMAIL_SCOPE    = "https://www.googleapis.com/auth/gmail.modify"
-
-
-@app.route("/oauth/gmail/start", methods=["GET"])
-def oauth_gmail_start():
-    carrier_id = request.args.get("carrier_id")
-    if not carrier_id:
-        return jsonify({"error": "carrier_id required"}), 400
-    params = {
-        "client_id":     os.environ["GMAIL_CLIENT_ID"],
-        "redirect_uri":  _OAUTH_REDIRECT,
-        "response_type": "code",
-        "scope":         _GMAIL_SCOPE,
-        "access_type":   "offline",
-        "prompt":        "consent",
-        "state":         carrier_id,
-    }
-    return jsonify({"url": "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)})
-
-
-@app.route("/oauth/gmail/callback", methods=["GET"])
-def oauth_gmail_callback():
-    code       = request.args.get("code")
-    carrier_id = request.args.get("state")
-    error      = request.args.get("error")
-
-    if error or not code or not carrier_id:
-        log.error('"oauth_gmail_callback — denied or missing: error=%s"', error)
-        return redirect("https://xtxtec.com/onboard/gmail?connected=error")
-
-    token_resp    = _http.post("https://oauth2.googleapis.com/token", data={
-        "code":          code,
-        "client_id":     os.environ["GMAIL_CLIENT_ID"],
-        "client_secret": os.environ["GMAIL_CLIENT_SECRET"],
-        "redirect_uri":  _OAUTH_REDIRECT,
-        "grant_type":    "authorization_code",
-    })
-    tokens        = token_resp.json()
-    refresh_token = tokens.get("refresh_token")
-
-    if not refresh_token:
-        log.error('"oauth_gmail_callback — no refresh_token in response"')
-        return redirect("https://xtxtec.com/onboard/gmail?connected=error")
-
-    supabase_client().table("carriers").update({
-        "gmail_token": refresh_token,
-        "ace_status":  "pending",
-    }).eq("id", carrier_id).execute()
-
-    log.info('"oauth_gmail_callback — connected carrier_id=%s"', carrier_id)
-    return redirect("https://xtxtec.com/onboard/gmail?connected=true")
-
-
-# ── Stripe ───────────────────────────────────────────────────────────────────
-import stripe
-import os
-
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
-
-PRICE_IDS = {
-    "base":    "price_1TN2Y5PyMuFPyN5Gl2cTFgVj",
-    "custom":  "price_1TN2YhPyMuFPyN5GChyx5zvT",
-    "premium": "price_1TN2dgPyMuFPyN5Ghu1erL5c",
-}
-
-@app.route("/create-checkout-session", methods=["POST", "OPTIONS"])
-def create_checkout_session():
-    if request.method == "OPTIONS":
-        response = app.make_default_options_response()
-        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
-        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-        return response
-    try:
-        data = request.get_json()
-        tier = data.get("tier")
-        carrier_id = data.get("carrier_id")
-        email = data.get("email")
-        if tier not in PRICE_IDS:
-            return jsonify({"error": "Invalid tier"}), 400
-        price_id = PRICE_IDS[tier]
-        mode = "payment" if tier == "premium" else "subscription"
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode=mode,
-            customer_email=email,
-            line_items=[{"price": price_id, "quantity": 1}],
-            success_url="https://edgeai-dashboard.vercel.app/onboard?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="https://edgeai-dashboard.vercel.app/subscribe?cancelled=true",
-            metadata={"carrier_id": carrier_id, "tier": tier},
-        )
-        response = jsonify({"url": session.url})
-        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
-        return response
-    except Exception as e:
-        logging.error(f"[STRIPE] Checkout session error: {e}")
-        response = jsonify({"error": str(e)})
-        response.headers["Access-Control-Allow-Origin"] = "https://edgeai-dashboard.vercel.app"
-        return response, 500
-
-
-@app.route("/stripe-webhook", methods=["POST"])
-@app.route("/api/stripe-webhook", methods=["POST"])
-def stripe_webhook():
-    payload = request.get_data()
-    sig_header = request.headers.get("Stripe-Signature")
-    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
-
-    try:
-        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-    except stripe.error.SignatureVerificationError as e:
-        logging.error(f"[STRIPE] Webhook signature failed: {e}")
-        return jsonify({"error": "Invalid signature"}), 400
-
-    # Handle successful payment
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        carrier_id = session["metadata"]["carrier_id"] if "carrier_id" in session["metadata"] else None
-        tier = session["metadata"]["tier"] if "tier" in session["metadata"] else None
-
-        if carrier_id:
-            # Update carrier subscription in Supabase
-            sb = supabase_client()
-
-            if tier == "premium":
-                # Premium is setup fee only — don't change subscription tier
-                sb.table("carriers").update({
-                    "onboarding_complete": False,
-                    "subscription_status": "trial",
-                }).eq("id", carrier_id).execute()
-            else:
-                sb.table("carriers").update({
-                    "subscription_tier": tier,
-                    "subscription_status": "active",
-                    "subscription_start": "now()",
-                    "stripe_customer_id": session["customer"] if "customer" in session else None,
-                }).eq("id", carrier_id).execute()
-
-            logging.info(f"[STRIPE] Payment complete — carrier {carrier_id} — tier {tier}")
-
-    # Handle subscription cancellation
-    if event["type"] == "customer.subscription.deleted":
-        customer_id = event["data"]["object"]["customer"]
-        sb = supabase_client()
-        sb.table("carriers").update({
-            "subscription_status": "cancelled",
-        }).eq("stripe_customer_id", customer_id).execute()
-        logging.info(f"[STRIPE] Subscription cancelled — customer {customer_id}")
-
-    return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
-
-# sync revision 2026-04-17 22:15:26
