@@ -1276,8 +1276,20 @@ def extract_brokers():
                             userId="me", id=inbox_msg_id, format="full"
                         ).execute()
                         body = _get_body(msg.get("payload", {}))
-                        lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
-                        return "\n".join(lines[-20:])
+                        _quote_markers = (
+                            "-----Original Message-----",
+                            "On ",
+                            "> ",
+                            "________________________________",
+                        )
+                        body_lines = body.splitlines()
+                        cutoff = len(body_lines)
+                        for i, ln in enumerate(body_lines):
+                            if any(ln.strip().startswith(m) for m in _quote_markers):
+                                cutoff = i
+                                break
+                        lines = [ln.strip() for ln in body_lines[:cutoff] if ln.strip()]
+                        return "\n".join(lines[-15:])
                     except HttpError as exc:
                         if exc.resp.status == 429 and attempt < 3:
                             log.warning('"extract_brokers — Gmail 429 email=%s attempt=%d retrying in %ds"',
