@@ -31,41 +31,49 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-_ALLOWED_ORIGINS = {"https://xtxtec.com", "https://edgeai-dashboard.vercel.app"}
+# ── CORS ──────────────────────────────────────────────────────────────────────
+_ALLOWED_ORIGINS = [
+    "https://xtxtec.com",
+    "https://edgeai-dashboard.vercel.app",
+    "http://localhost:5173",
+]
 
-def _cors_origin():
-    o = request.headers.get("Origin", "")
-    return o if o in _ALLOWED_ORIGINS else "https://xtxtec.com"
-
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = app.make_response("")
-        response.headers["Access-Control-Allow-Origin"] = _cors_origin()
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        response.status_code = 200
-        return response
 
 @app.after_request
 def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    origin = request.headers.get("Origin", "")
+    if origin in _ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
     return response
+
+
+@app.route("/", defaults={"path": ""}, methods=["OPTIONS"])
+@app.route("/<path:path>", methods=["OPTIONS"])
+def handle_preflight(path):
+    origin = request.headers.get("Origin", "")
+    if origin in _ALLOWED_ORIGINS:
+        response = app.make_response(("", 204))
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        response.headers["Access-Control-Max-Age"] = "600"
+        return response
+    return app.make_response(("", 403))
+
 
 @app.errorhandler(404)
 def not_found(e):
     response = jsonify({"error": "not found"})
     response.status_code = 404
-    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
     return response
+
 
 @app.errorhandler(500)
 def server_error(e):
     response = jsonify({"error": "internal server error"})
     response.status_code = 500
-    response.headers["Access-Control-Allow-Origin"] = _cors_origin()
     return response
 
 # ── Lazy singletons (initialised once per container cold start) ────────────────
