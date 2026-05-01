@@ -1454,8 +1454,8 @@ def create_checkout_session():
             mode=mode,
             customer_email=email,
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url="https://edgeai-dashboard.vercel.app/onboard?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="https://edgeai-dashboard.vercel.app/subscribe?cancelled=true",
+            success_url="https://xtxtec.com/onboard?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url="https://xtxtec.com/subscribe?cancelled=true",
             metadata={"carrier_id": carrier_id, "tier": tier},
         )
         response = jsonify({"url": session.url})
