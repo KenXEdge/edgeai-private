@@ -1305,24 +1305,25 @@ def extract_brokers():
                 enriched: dict = {}
                 try:
                     prompt_text = (
-                        "Analyze this email contact and do two things in one response.\n\n"
-                        "1. Classify as one of:\n"
-                        "   - freight_broker: connects shippers with carriers. Indicators: company names with "
-                        "freight, logistics, transport, carrier, trucking, brokerage, dispatch, loads, shipping, cargo; "
-                        "titles like broker, agent, coordinator, logistics manager.\n"
-                        "   - freight_dispatcher: manages carrier loads directly.\n"
-                        "   - unknown: insufficient information to classify with confidence.\n\n"
-                        "2. Extract contact details from the signature block.\n\n"
-                        "Return a JSON object with exactly these fields:\n"
+                        "You are classifying an email contact from a freight carrier's sent mail.\n"
+                        "IMPORTANT: Be liberal. If the domain or name suggests ANY freight, logistics, "
+                        "transportation, shipping, or supply chain connection — classify as freight_broker.\n"
+                        "Only use unknown if there is truly NO freight connection whatsoever.\n\n"
+                        "Classify as:\n"
+                        "- freight_broker: ANY company in freight, logistics, transportation, shipping, "
+                        "trucking, brokerage, dispatch, loads, cargo, supply chain, 3PL, TMS, factoring.\n"
+                        "- freight_dispatcher: independent dispatcher managing carrier loads directly.\n"
+                        "- unknown: NO connection to freight or transportation whatsoever.\n\n"
+                        "Return ONLY valid JSON with exactly these fields:\n"
                         "{\"classification\": \"freight_broker|freight_dispatcher|unknown\", "
                         "\"name\": \"first last or null\", "
                         "\"title\": \"job title or null\", "
                         "\"company\": \"company name or null\", "
                         "\"phone\": \"phone number or null\"}\n\n"
-                        "Return ONLY valid JSON, no other text.\n\n"
-                        f"Email: {email}\n"
-                        f"Name hint: {to_name or 'unknown'}\n"
-                        f"Signature:\n{signature or 'not available'}"
+                        f"Email address: {email}\n"
+                        f"Email domain: {email.split('@')[-1] if '@' in email else 'unknown'}\n"
+                        f"Name from sent mail: {to_name or 'unknown'}\n"
+                        f"Signature text:\n{signature or 'not available'}"
                     )
                     claude_msg = anthropic_client().messages.create(
                         model="claude-haiku-4-5-20251001",
@@ -1638,3 +1639,4 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=port)
 
 # sync revision 2026-04-17 22:15:26
+
