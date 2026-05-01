@@ -386,43 +386,38 @@ async function handleContinue() {
   }
 
   btn.disabled = true;
-  btn.innerHTML = 'Scanning sent mail…';
+  btn.innerHTML = 'Scanning inbox…';
+  setStatus('Scanning your inbox for broker contacts…', 'info');
 
-  try {
-    setStatus('Scanning your sent mail for broker contacts…', 'info');
+  const es = new EventSource(CLOUD_RUN + '/extract-brokers?carrier_id=' + _session.user.id);
 
-    const extractRes = await fetch(CLOUD_RUN + '/extract-brokers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ carrier_id: _session.user.id, days: 90 }),
-    });
-    if (!extractRes.ok) throw new Error('Broker scan failed (HTTP ' + extractRes.status + ')');
-    const extractData = await extractRes.json();
-    if (!extractData.ok) throw new Error(extractData.error || 'Broker scan returned an error');
+  es.onmessage = function(event) {
+    let data;
+    try { data = JSON.parse(event.data); } catch(e) { return; }
+    if (data.error) {
+      es.close();
+      setStatus('Error: ' + data.error, 'error');
+      btn.disabled = false;
+      btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      return;
+    }
+    if (data.found !== undefined) {
+      setStatus('Found ' + data.found + ' brokers so far…', 'info');
+    }
+    if (data.done) {
+      es.close();
+      setStatus('✓ ' + data.total + ' brokers imported — ACE is ready. Taking you to your dashboard…', 'success');
+      btn.innerHTML = 'Going to Dashboard…';
+      setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
+    }
+  };
 
-    const brokers = extractData.brokers || [];
-    const total = brokers.length;
-
-    btn.innerHTML = 'Importing ' + total + ' brokers…';
-    setStatus('Found ' + total + ' brokers — importing to your network…', 'info');
-
-    const importRes = await fetch(CLOUD_RUN + '/import-brokers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ carrier_id: _session.user.id, brokers }),
-    });
-    if (!importRes.ok) throw new Error('Broker import failed (HTTP ' + importRes.status + ')');
-
-    setStatus('✓ ' + total + ' brokers imported — ACE is ready. Taking you to your dashboard…', 'success');
-    btn.innerHTML = 'Going to Dashboard…';
-    setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
-
-  } catch (err) {
-    console.error('[onboard-gmail] broker import failed:', err);
-    setStatus('Error: ' + err.message + ' — please try again.', 'error');
+  es.onerror = function() {
+    es.close();
+    setStatus('Connection error — please try again.', 'error');
     btn.disabled = false;
     btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  }
+  };
 }
 
 document.addEventListener('DOMContentLoaded', function() {
