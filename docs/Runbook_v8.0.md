@@ -66,7 +66,7 @@ EDGEai is a freight carrier automation SaaS. It:
 | Repo | KenXEdge/edgeai-private |
 | Branch | master |
 | Cloud Run service | edgeai-gmail-webhook |
-| Active revision | 00106-fzh |
+| Active revision | 00107-hk2 |
 | Git restore baseline | 2c4a409 |
 | GCP project | edgeai-493115 |
 | Pub/Sub topic | projects/edgeai-493115/topics/edgeai-gmail |
@@ -98,7 +98,7 @@ xtxtec.com           — Marketing / landing + dashboard (HTML/JS + React, Vite,
   /api/stripe-webhook — Stripe webhook handler
   /api/create-checkout-session — Stripe session creator
 
-edgeai-gmail-webhook — Cloud Run (Python/Flask) — revision 00106-fzh
+edgeai-gmail-webhook — Cloud Run (Python/Flask) — revision 00107-hk2
   /webhook           — Pub/Sub push receiver
   /health            — Health check
   /confirm-win       — Carrier confirms a won load
