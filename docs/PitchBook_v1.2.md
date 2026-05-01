@@ -1,5 +1,5 @@
 # XEdge — PitchBook
-**Version:** 1.2 | **Date:** April 25, 2026 | **Company:** XTX LLC | **Founder:** Ken Korbel
+**Version:** 1.2 | **Date:** May 1, 2026 | **Company:** XTX LLC | **Founder:** Ken Korbel
 
 ---
 
@@ -35,9 +35,11 @@ The freight market has a two-sided gap: carriers need real-time response without
 
 **ACE** connects to a carrier's Gmail via OAuth. It watches for broker emails around the clock, classifies each one using Claude AI, and texts the carrier the moment a load offer arrives. Setup takes under 10 minutes. No hardware. No dispatcher. No long-term contract.
 
-**ACE Morning Brief** — every morning at the carrier's configured time, ACE sends a daily SMS with the carrier's active focus zone and top broker activity. The carrier can text back a city, state, or ZIP to shift ACE's routing focus for the day. ACE adapts instantly.
+**ACE Morning Brief** — every morning at the carrier's configured time, ACE sends a daily SMS with the carrier's active focus zone and top broker activity. The carrier can text back a city, state, or ZIP to shift ACE's routing focus for the day. ACE adapts instantly. No app. No dashboard login required. Just a text.
 
-**ACE Scout** (next build) — ACE extends into Sylectus load boards, scraping load postings, extracting broker emails, and initiating outreach through the carrier's own Gmail — building the broker network automatically.
+The Morning Brief is where the relationship starts — ACE and the carrier, talking every day, building a working rhythm. That daily touchpoint is the moat. No load board app has it. No dispatcher tool has it. It is the difference between a tool and a teammate.
+
+**ACE Scout** (next build) — ACE extends into Sylectus load boards, scraping load postings, extracting broker emails, and initiating outreach through the carrier's own Gmail — building the broker network automatically. The Scout is where ACE stops being reactive and starts being proactive: finding loads, finding brokers, initiating contact on the carrier's behalf.
 
 The long-term vision: ACE doesn't just alert. ACE responds. ACE negotiates rate. ACE books the load. The carrier drives.
 
@@ -93,7 +95,23 @@ ACE Scout (next build):
 
 ---
 
-## 5. Market
+## 5. Load Board Intelligence
+
+ACE monitors and separates load board alerts from broker relationship emails. Each source has a distinct email path and SMS alert format.
+
+| Load Board | Sender Domain | Signal Type | ACE Action |
+|------------|--------------|-------------|------------|
+| DAT | alerts@dat.com | Load match alert | Parse → SMS if equipment match |
+| Truckstop | notifications@truckstop.com | Load match alert | Parse → SMS if equipment match |
+| Spot (NTG) | noreply@spotinc.com / loadmatches@ntgfreight.com | Load offer | Parse → SMS if equipment match |
+| Sylectus | ACE Scout (scrape) | Load postings | Extract broker email → outreach |
+| ArcBest / TQL | Inbound broker email | Direct load offer | Classified by Claude → load_offer path |
+
+Load board emails are intercepted before the broker lookup path — they bypass Claude classification and go directly to a structured parse → equipment match → SMS pipeline.
+
+---
+
+## 6. Market
 
 **Target:** Owner-operators and small fleets (1–5 trucks) in the United States
 
@@ -107,7 +125,7 @@ ACE Scout (next build):
 
 ---
 
-## 6. Go-To-Market
+## 7. Go-To-Market
 
 ### GTM Channels
 
@@ -118,7 +136,7 @@ Every registered motor carrier in the US is in the FMCSA database with email, MC
 Owner-operator and small fleet Facebook groups have 50K–500K members each. These carriers talk about missing loads, broker relationships, and dispatcher costs daily. EDGE fits the conversation exactly.
 
 **Dispatcher cluster acquisition**
-Independent freight dispatchers manage 5–20 carrier relationships each. One dispatcher converted to EDGE brings their entire carrier roster. Target dispatcher forums, Facebook groups, and load board communities. Dispatcher Pro tier aligns incentives — the dispatcher gets their own dashboard.
+Independent freight dispatchers manage 5–20 carrier relationships each. One dispatcher converted to EDGE brings their entire carrier roster. Target dispatcher forums, Facebook groups, and load board communities. The Dispatcher Pro tier aligns incentives — the dispatcher gets their own multi-carrier dashboard, ACE watches every inbox they manage, and they stop juggling 10 separate email tabs manually. Dispatcher cluster acquisition is a force multiplier: one sale = up to 20 carrier seats.
 
 ### Four-Phase Vision
 
@@ -131,7 +149,7 @@ Independent freight dispatchers manage 5–20 carrier relationships each. One di
 
 ---
 
-## 7. Pricing
+## 8. Pricing
 
 | Tier | Price | Positioning |
 |------|-------|-------------|
@@ -145,7 +163,7 @@ A carrier who wins one extra load per month at $1,500 average revenue covers Bas
 
 ---
 
-## 8. Competitive Analysis
+## 9. Competitive Analysis
 
 | Factor | EDGE / ACE | Traditional Dispatcher | Load Board Apps | Augment |
 |--------|-----------|----------------------|-----------------|---------|
@@ -173,7 +191,7 @@ Augment operates in the dispatcher workflow management layer. EDGE operates at t
 
 ---
 
-## 9. Traction
+## 10. Traction
 
 - Platform live at xtxtec.com — production on Vercel + Google Cloud Run
 - Stripe billing integrated (TEST mode — ready to flip live)
@@ -185,10 +203,11 @@ Augment operates in the dispatcher workflow management layer. EDGE operates at t
 - ACE Scout designed — Sylectus automation module queued for next build cycle
 - Founder (Ken) onboarding as first production carrier at $0 cost
 - Supabase schema fully operational — carriers, brokers, responses, load_wins, gmail_sync
+- Load board intelligence live — DAT, Truckstop, Spot, NTG on separate parse + SMS path
 
 ---
 
-## 10. Team
+## 11. Team
 
 **Ken Korbel — Founder**
 
@@ -200,7 +219,7 @@ Company: XTX LLC (Wyoming). Platform: EDGE. Agent: ACE.
 
 ---
 
-## 11. Ask
+## 12. Ask
 
 EDGE is pre-revenue but production-ready. Seeking:
 
@@ -215,7 +234,7 @@ EDGE is pre-revenue but production-ready. Seeking:
 
 ---
 
-## 12. Vision
+## 13. Vision
 
 ACE is the first AI employee every small carrier can afford.
 
@@ -229,4 +248,4 @@ The network is where EDGE becomes infrastructure — broker relationship data ag
 
 ---
 
-*XEdge PitchBook v1.2 | XTX LLC | April 25 2026 | ken@xtxtec.com | xtxtec.com*
+*XEdge PitchBook v1.2 | XTX LLC | May 1 2026 | ken@xtxtec.com | xtxtec.com*
