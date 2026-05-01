@@ -1257,27 +1257,26 @@ def extract_brokers():
                 except Exception:
                     return ""
 
-            def _fetch_signature(msg_id: str, email: str) -> str:
+            def _fetch_signature(email: str) -> str:
                 for attempt, delay in enumerate([0, 1, 2, 4]):
                     if delay:
                         time.sleep(delay)
                     try:
+                        result = svc.users().messages().list(
+                            userId="me",
+                            q=f"from:{email} in:inbox",
+                            maxResults=1,
+                        ).execute()
+                        messages = result.get("messages", [])
+                        if not messages:
+                            return ""
+                        inbox_msg_id = messages[0]["id"]
                         msg = svc.users().messages().get(
-                            userId="me", id=msg_id, format="full"
+                            userId="me", id=inbox_msg_id, format="full"
                         ).execute()
                         body = _get_body(msg.get("payload", {}))
                         lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
-                        sig = "\n".join(lines[-15:])
-                        hints = []
-                        for h in msg.get("payload", {}).get("headers", []):
-                            if h.get("name", "").lower() in ("from", "reply-to"):
-                                v = h.get("value", "").strip()
-                                if v:
-                                    hints.append(v)
-                        if hints:
-                            hint_str = "Header hints: " + " | ".join(hints)
-                            sig = (sig + "\n" + hint_str) if sig else hint_str
-                        return sig
+                        return "\n".join(lines[-20:])
                     except HttpError as exc:
                         if exc.resp.status == 429 and attempt < 3:
                             log.warning('"extract_brokers — Gmail 429 email=%s attempt=%d retrying in %ds"',
@@ -1299,7 +1298,7 @@ def extract_brokers():
                 to_name = email_names.get(email, "")
                 msg_id = email_message_ids.get(email, "")
 
-                signature = _fetch_signature(msg_id, email) if msg_id else ""
+                signature = _fetch_signature(email)
 
                 classification = "unknown"
                 enriched: dict = {}
