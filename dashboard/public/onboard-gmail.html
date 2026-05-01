@@ -387,34 +387,42 @@ async function handleContinue() {
 
   btn.disabled = true;
   btn.innerHTML = 'Scanning sent mail…';
-  setStatus('Scanning your sent mail for broker contacts…', 'info');
 
-  const es = new EventSource(CLOUD_RUN + '/extract-brokers?carrier_id=' + _session.user.id);
+  try {
+    setStatus('Scanning your sent mail for broker contacts…', 'info');
 
-  es.onmessage = function(e) {
-    let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
-    if (msg.found !== undefined) {
-      setStatus('Scanning your sent mail… ' + msg.found + ' brokers found', 'info');
-    } else if (msg.done) {
-      es.close();
-      setStatus('✓ ' + msg.total + ' brokers imported — going to dashboard…', 'success');
-      btn.innerHTML = 'Going to Dashboard…';
-      setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
-    } else if (msg.error) {
-      es.close();
-      setStatus('Error: ' + msg.error + ' — please try again.', 'error');
-      btn.disabled = false;
-      btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    }
-  };
+    const extractRes = await fetch(CLOUD_RUN + '/extract-brokers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ carrier_id: _session.user.id, days: 90 }),
+    });
+    if (!extractRes.ok) throw new Error('Broker scan failed (HTTP ' + extractRes.status + ')');
+    const extractData = await extractRes.json();
+    if (!extractData.ok) throw new Error(extractData.error || 'Broker scan returned an error');
 
-  es.onerror = function() {
-    es.close();
-    setStatus('Connection error — please try again.', 'error');
+    const brokers = extractData.brokers || [];
+    const total = brokers.length;
+
+    btn.innerHTML = 'Importing ' + total + ' brokers…';
+    setStatus('Found ' + total + ' brokers — importing to your network…', 'info');
+
+    const importRes = await fetch(CLOUD_RUN + '/import-brokers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ carrier_id: _session.user.id, brokers }),
+    });
+    if (!importRes.ok) throw new Error('Broker import failed (HTTP ' + importRes.status + ')');
+
+    setStatus('✓ ' + total + ' brokers imported — ACE is ready. Taking you to your dashboard…', 'success');
+    btn.innerHTML = 'Going to Dashboard…';
+    setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
+
+  } catch (err) {
+    console.error('[onboard-gmail] broker import failed:', err);
+    setStatus('Error: ' + err.message + ' — please try again.', 'error');
     btn.disabled = false;
     btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  };
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
