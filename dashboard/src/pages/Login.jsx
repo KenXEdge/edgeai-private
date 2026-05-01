@@ -87,7 +87,7 @@ export default function Login() {
     setError(null)
     setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://edgeai-dashboard.vercel.app/reset-password'
+      redirectTo: 'https://xtxtec.com/reset-password'
     })
     setLoading(false)
     if (error) { setError(error.message); return }
@@ -98,7 +98,7 @@ export default function Login() {
   async function handleGoogle() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: 'https://edgeai-dashboard.vercel.app/carrier' }
+      options: { redirectTo: 'https://xtxtec.com/dashboard' }
     })
     if (error) setError(error.message)
   }
