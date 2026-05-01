@@ -1299,6 +1299,7 @@ def extract_brokers():
                 msg_id = email_message_ids.get(email, "")
 
                 signature = _fetch_signature(email)
+                log.info('"extract_brokers — debug email=%s sig_len=%d sig=%s"', email, len(signature), repr(signature[:100]))
 
                 classification = "unknown"
                 enriched: dict = {}
