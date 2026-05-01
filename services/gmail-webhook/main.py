@@ -1264,7 +1264,8 @@ def extract_brokers():
                     try:
                         result = svc.users().messages().list(
                             userId="me",
-                            q=f"from:{email} in:inbox",
+                            q=f"from:{email}",
+                            labelIds=["INBOX"],
                             maxResults=1,
                         ).execute()
                         messages = result.get("messages", [])
