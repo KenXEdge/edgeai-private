@@ -283,7 +283,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-const CLOUD_RUN = 'https://edgeai-gmail-webhook-417422203146.us-central1.run.app';
+const CLOUD_RUN = 'https://edgeai-gmail-webhook-jh6fc2627a-uc.a.run.app';
 let _sb = null, _session = null;
 (async function authGate() {
   document.body.style.visibility = 'hidden';
@@ -330,7 +330,8 @@ function toggleTheme() {
   if (!isLight) { labelDark.style.color='#E8A020'; labelLight.style.color=''; }
   else { labelLight.style.color='#a07010'; labelDark.style.color=''; }
   localStorage.setItem('edgeTheme', isLight ? 'light' : 'dark');
-
+  var logoImg = document.getElementById('logo-img');
+  if (logoImg) logoImg.src = isLight ? '/assets/X_yellow_dash_tranp.png' : '/assets/edge_refined_roadline1.png';
 }
 (function(){
   var t = localStorage.getItem('edgeTheme');
@@ -343,7 +344,8 @@ function toggleTheme() {
     if (track) track.classList.add('light-on');
     if (labelDark) { labelDark.classList.remove('active'); labelDark.style.color = ''; }
     if (labelLight) { labelLight.classList.add('active'); labelLight.style.color = '#a07010'; }
-
+    var logoImg = document.getElementById('logo-img');
+    if (logoImg) logoImg.src = '/assets/X_yellow_dash_tranp.png';
   }
 })();
 
@@ -436,4 +438,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>
-
