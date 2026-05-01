@@ -846,11 +846,6 @@ def process_message(message_id: str, carrier_id: str) -> None:
         classification = extracted.get("classification", "unknown")
         log.info('"unknown broker classified %s as %s"', message_id, classification)
 
-        if classification in ("negative", "unknown"):
-            log.info('"unknown broker discarded — classification=%s sender=%s"',
-                     classification, email_data["from_email"])
-            return
-
         log_unknown_broker_inbox(email_data, extracted, carrier_id)
 
         if classification == "load_offer":
