@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       mode: tier === 'premium' ? 'payment' : 'subscription',
       customer_email: email,
       line_items: [{ price: PRICE_IDS[tier], quantity: 1 }],
-      success_url: 'https://xtxtec.com/subscribe?session_id={CHECKOUT_SESSION_ID}',
+      success_url: 'https://xtxtec.com/onboard?session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://xtxtec.com/subscribe?cancelled=true',
       metadata: { carrier_id, tier },
     })
