@@ -304,14 +304,14 @@ def upsert_history_id(email: str, history_id: str) -> None:
     ).execute()
 
 
-def lookup_broker(from_email: str) -> dict | None:
+def lookup_broker(from_email: str, carrier_id: str) -> dict | None:
     """Return broker row if the sender is a known broker for this carrier."""
     resp = (
         supabase_client()
         .table("brokers")
         .select("*")
         .eq("email", from_email)
-        .eq("carrier_id", os.environ["CARRIER_UUID"])
+        .eq("carrier_id", carrier_id)
         .limit(1)
         .execute()
     )
@@ -345,7 +345,7 @@ def is_duplicate(message_id: str) -> bool:
     return in_unknown
 
 
-def log_response(email_data: dict, classification: str, broker_id: str | None = None, broker_name: str | None = None) -> None:
+def log_response(email_data: dict, classification: str, carrier_id: str, broker_id: str | None = None, broker_name: str | None = None) -> None:
     try:
         row = {
             "gmail_message_id": email_data["message_id"],
@@ -354,7 +354,7 @@ def log_response(email_data: dict, classification: str, broker_id: str | None = 
             "subject": email_data["subject"],
             "body": email_data["body"],
             "classification": classification,
-            "carrier_id": os.environ["CARRIER_UUID"],
+            "carrier_id": carrier_id,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         if broker_id is not None:
@@ -370,14 +370,14 @@ def log_response(email_data: dict, classification: str, broker_id: str | None = 
         raise
 
 
-def log_load_win(email_data: dict) -> None:
+def log_load_win(email_data: dict, carrier_id: str) -> None:
     supabase_client().table("load_wins").insert(
         {
             "broker_email": email_data["from_email"],
             "subject": email_data["subject"],
             "body": email_data["body"],
             "gmail_message_id": email_data["message_id"],
-            "carrier_id": os.environ["CARRIER_UUID"],
+            "carrier_id": carrier_id,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
     ).execute()
@@ -414,12 +414,12 @@ def _parse_rate_numeric(rate_str: str | None) -> float | None:
     return None
 
 
-def log_unknown_broker_inbox(email_data: dict, extracted: dict) -> None:
+def log_unknown_broker_inbox(email_data: dict, extracted: dict, carrier_id: str) -> None:
     """Insert an unrecognised sender into unknown_brokers_inbox for carrier review."""
     try:
         supabase_client().table("unknown_brokers_inbox").insert(
             {
-                "carrier_id": os.environ["CARRIER_UUID"],
+                "carrier_id": carrier_id,
                 "gmail_message_id": email_data["message_id"],
                 "sender_email": email_data["from_email"],
                 "sender_name": extracted.get("sender_name"),
@@ -436,6 +436,25 @@ def log_unknown_broker_inbox(email_data: dict, extracted: dict) -> None:
                  email_data["from_email"], extracted.get("classification"))
     except Exception as exc:
         log.error('"log_unknown_broker_inbox failed: %s"', exc)
+
+
+def get_carrier_id_for_email(email_address: str) -> str | None:
+    """Look up carrier UUID from carriers table by email address."""
+    try:
+        resp = (
+            supabase_client()
+            .table("carriers")
+            .select("id")
+            .eq("email", email_address)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return resp.data[0]["id"]
+        return None
+    except Exception as exc:
+        log.error('"get_carrier_id_for_email failed email=%s: %s"', email_address, exc)
+        return None
 
 
 # ── Claude classification ──────────────────────────────────────────────────────
@@ -644,7 +663,7 @@ def parse_load_board_email(email_data: dict) -> dict:
         return fallback
 
 
-def get_carrier_profile() -> dict | None:
+def get_carrier_profile(carrier_id: str) -> dict | None:
     """Query the carriers table for the current carrier's profile.
     Returns the first row (equipment_type, max_radius, home_base_zip) or None.
     """
@@ -653,7 +672,7 @@ def get_carrier_profile() -> dict | None:
             supabase_client()
             .table("carriers")
             .select("equipment_type, max_radius, home_base_zip")
-            .eq("id", os.environ["CARRIER_UUID"])
+            .eq("id", carrier_id)
             .limit(1)
             .execute()
         )
@@ -745,7 +764,7 @@ def has_carrier_replied(thread_id: str) -> bool:
 
 # ── Core processing pipeline ───────────────────────────────────────────────────
 
-def process_message(message_id: str) -> None:
+def process_message(message_id: str, carrier_id: str) -> None:
     """Full pipeline for one Gmail message."""
 
     # Step 1 — deduplication FIRST, before any API calls or processing
@@ -772,7 +791,7 @@ def process_message(message_id: str) -> None:
             log.error('"load board parse failed — skipping message=%s"', message_id)
             mark_as_read(message_id)
             return
-        carrier = get_carrier_profile()
+        carrier = get_carrier_profile(carrier_id)
 
         if carrier and not load_board_matches_carrier(parsed, carrier):
             log.info('"load board message skipped — equipment mismatch message=%s"', message_id)
@@ -802,7 +821,7 @@ def process_message(message_id: str) -> None:
         return
 
     # Step 3 — broker lookup determines which path to take
-    broker = lookup_broker(email_data["from_email"])
+    broker = lookup_broker(email_data["from_email"], carrier_id)
 
     if broker:
         # ── Known broker path ────────────────────────────────────────────────
@@ -813,7 +832,7 @@ def process_message(message_id: str) -> None:
 
         # Insert into responses FIRST — this is the dedup record.
         # Must succeed before SMS so that any retry finds it and stops.
-        log_response(email_data, classification, broker_id=broker.get("id"), broker_name=broker.get("name"))
+        log_response(email_data, classification, carrier_id, broker_id=broker.get("id"), broker_name=broker.get("name"))
 
         if classification == "load_offer":
             if not has_carrier_replied(email_data["thread_id"]):
@@ -838,7 +857,7 @@ def process_message(message_id: str) -> None:
                      classification, email_data["from_email"])
             return
 
-        log_unknown_broker_inbox(email_data, extracted)
+        log_unknown_broker_inbox(email_data, extracted, carrier_id)
 
         if classification == "load_offer":
             send_unknown_broker_sms(email_data, extracted)
@@ -891,6 +910,11 @@ def webhook():
 
         print(f"[WEBHOOK] pubsub notification received — emailAddress={email_address} newHistoryId={new_history_id}", flush=True)
 
+        carrier_id = get_carrier_id_for_email(email_address)
+        if not carrier_id:
+            log.warning('"[WEBHOOK] no carrier found for email=%s — skipping"', email_address)
+            return jsonify({"ok": True}), 200
+
         # ── historyId tracking ────────────────────────────────────────────────
         stored_history_id = get_stored_history_id(email_address)
         print(f"[WEBHOOK] gmail_sync lookup result — email={email_address} storedHistoryId={stored_history_id!r}", flush=True)
@@ -916,7 +940,7 @@ def webhook():
         for idx, msg in enumerate(new_messages):
             print(f"[WEBHOOK] dispatching message[{idx}] id={msg.get('id')}", flush=True)
             try:
-                process_message(msg["id"])
+                process_message(msg["id"], carrier_id)
             except Exception as exc:
                 log.error('"unhandled error processing %s: %s"', msg.get("id"), exc)
                 print(f"[WEBHOOK] ERROR processing message {msg.get('id')}: {exc}", flush=True)
@@ -957,7 +981,6 @@ def confirm_win():
             .table("responses")
             .select("*")
             .eq("gmail_message_id", message_id)
-            .eq("carrier_id", os.environ["CARRIER_UUID"])
             .limit(1)
             .execute()
         )
@@ -979,7 +1002,7 @@ def confirm_win():
             "subject": row["subject"],
             "body": row["body"],
             "message_id": row["gmail_message_id"],
-        })
+        }, row["carrier_id"])
 
         return jsonify({"ok": True, "win_logged": True}), 200
 
