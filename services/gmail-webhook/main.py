@@ -9,6 +9,7 @@ import json
 import base64
 import logging
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
@@ -1050,26 +1051,43 @@ def renew_watches():
     return jsonify({"renewed": count_success, "errors": count_errors}), 200
 
 
-@app.route("/extract-brokers", methods=["POST"])
-def extract_brokers():
-    """
-    Scan SENT emails for broker contacts not yet in the brokers table.
-    Accepts JSON body: {"carrier_id": "<uuid>", "days": <int>}.
+_NOISE_DOMAINS_INBOX = {
+    "apple.com", "icloud.com", "google.com", "gmail.com",
+    "microsoft.com", "outlook.com", "hotmail.com",
+    "amazonaws.com", "twilio.com", "supabase.io", "stripe.com",
+    "anthropic.com", "github.com", "squarespace.com",
+    "highway.com", "truckstop.com", "dat.com",
+    "sylectus.com", "omnitracs.com", "paypal.com",
+    "ntgfreight.com", "e.truckstop.com", "spotinc.com",
+    "prdlax.com", "loadmatches.com", "notifications.com",
+    "macropoint.com", "fourkites.com", "project44.com",
+    "keeptruckin.com", "motive.com", "samsara.com",
+    "irs.gov", "dol.gov", "fmcsa.dot.gov",
+    "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
+}
 
-    Pipeline:
-      1. Page through SENT message IDs (messages.list, no body download)
-      2. Metadata fetch per message (To: + Subject: headers only — fast path)
-      3. Deduplicate recipient emails; batch-check against brokers table
-      4. Claude called ONCE per unique unknown email to enrich contact details
-    Never returns 5xx.
-    """
+_ENRICH_PROMPT = (
+    "You are enriching a freight broker contact record from an email.\n\n"
+    "Return ONLY a valid JSON object with exactly these fields:\n"
+    "{{\n"
+    '  "name": "First Last or null",\n'
+    '  "company": "Brokerage name or null",\n'
+    '  "phone": "mobile phone only — null if not found or only landline",\n'
+    '  "status": "hot | warm | cold — hot=recent active load offer, cold=old/generic",\n'
+    '  "priority": "high | medium | low — based on load volume signals in the email",\n'
+    '  "notes": "1-sentence summary of relationship or load type or null",\n'
+    '  "last_load_origin": "City ST format or null",\n'
+    '  "last_load_destination": "City ST format or null"\n'
+    "}}\n\n"
+    "Sender name hint: {name}\n"
+    "Email body:\n{body}"
+)
+
+
+def _scan_inbox_and_enrich(carrier_id: str) -> None:
+    """Background thread: scan INBOX 180 days, Claude-enrich unique senders, write to brokers."""
+    log.info('"[extract-brokers] scan started carrier_id=%s"', carrier_id)
     try:
-        data = request.get_json(silent=True) or {}
-
-        carrier_id = data.get("carrier_id")
-        if not carrier_id:
-            return jsonify({"error": "carrier_id required"}), 400
-
         carrier_resp = (
             supabase_client()
             .table("carriers")
@@ -1079,16 +1097,15 @@ def extract_brokers():
             .execute()
         )
         if not carrier_resp.data:
-            return jsonify({"error": "carrier not found"}), 404
+            log.error('"[extract-brokers] carrier not found carrier_id=%s"', carrier_id)
+            return
         carrier = carrier_resp.data[0]
 
-        days = int(data.get("days", 7))
-        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y/%m/%d")
-
-        # ── Build per-carrier Gmail service ───────────────────────────────────
         refresh_token = carrier.get("gmail_token")
         if not refresh_token:
-            return jsonify({"error": "carrier gmail_token not set"}), 400
+            log.error('"[extract-brokers] no gmail_token carrier_id=%s"', carrier_id)
+            return
+
         import google.auth.transport.requests as google_requests
         import requests as requests_lib
         carrier_creds = OAuthCredentials(
@@ -1102,122 +1119,79 @@ def extract_brokers():
         carrier_creds.refresh(google_requests.Request(session=requests_lib.Session()))
         svc = build("gmail", "v1", credentials=carrier_creds, cache_discovery=False)
 
-        # ── Step 1: Page through SENT message IDs ─────────────────────────────
+        # ── Step 1: Page through INBOX message IDs — 180 days ─────────────────
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y/%m/%d")
         message_ids: list[str] = []
         page_token = None
-        pages_fetched = 0
-
         while True:
             list_kwargs: dict = {
                 "userId": "me",
-                "labelIds": ["SENT"],
-                "q": f"after:{cutoff_date}",
+                "labelIds": ["INBOX"],
+                "q": f"after:{cutoff}",
                 "maxResults": 500,
             }
             if page_token:
                 list_kwargs["pageToken"] = page_token
-
             try:
-                list_resp = svc.users().messages().list(**list_kwargs).execute()
+                resp = svc.users().messages().list(**list_kwargs).execute()
             except Exception as exc:
-                log.error('"extract_brokers — gmail list failed page=%d: %s"', pages_fetched + 1, exc)
+                log.error('"[extract-brokers] gmail list failed: %s"', exc)
                 break
-
-            pages_fetched += 1
-            batch = list_resp.get("messages", [])
+            batch = resp.get("messages", [])
             message_ids.extend(m["id"] for m in batch)
-            page_token = list_resp.get("nextPageToken")
-            log.info(
-                '"extract_brokers — pages_fetched=%d page_size=%d total_ids=%d"',
-                pages_fetched, len(batch), len(message_ids),
-            )
-            if not page_token or len(message_ids) >= 500:
+            page_token = resp.get("nextPageToken")
+            if not page_token or len(message_ids) >= 2000:
                 break
+        message_ids = message_ids[:2000]
+        log.info('"[extract-brokers] inbox scan total_ids=%d"', len(message_ids))
 
-        message_ids = message_ids[:500]
-        log.info('"extract_brokers — step1 done pages=%d messages_scanned=%d"',
-                 pages_fetched, len(message_ids))
-
-        # ── Step 2: Metadata fetch — batched 100 IDs per chunk ───────────────────
-        # email -> list of unique subjects seen across all messages sent to them
-        email_subjects: dict[str, list[str]] = {}
-        # email -> display name captured from To: header
+        # ── Step 2: Batch metadata — collect unique FROM senders ──────────────
         email_names: dict[str, str] = {}
-        # email -> most recent message ID sent to that address (first seen = newest)
         email_message_ids: dict[str, str] = {}
-
-        _NOISE_DOMAINS = {
-            "apple.com", "icloud.com", "google.com", "gmail.com",
-            "microsoft.com", "outlook.com", "hotmail.com",
-            "amazonaws.com", "twilio.com", "supabase.io", "stripe.com",
-            "anthropic.com", "github.com", "squarespace.com",
-            "highway.com", "truckstop.com", "dat.com",
-            "sylectus.com", "omnitracs.com", "paypal.com",
-            "ntgfreight.com", "e.truckstop.com", "spotinc.com",
-            "prdlax.com", "loadmatches.com", "notifications.com",
-            "macropoint.com", "fourkites.com", "project44.com",
-            "keeptruckin.com", "motive.com", "samsara.com",
-            "irs.gov", "dol.gov", "fmcsa.dot.gov",
-            "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
-        }
-        _CHUNK_SIZE = 100
+        _CHUNK = 100
 
         def _handle_meta(request_id, response, exception):
             if exception or not response:
-                log.error('"extract_brokers — metadata fetch failed id=%s: %s"', request_id, exception)
                 return
             headers = response.get("payload", {}).get("headers", [])
-            to_val = subject_val = ""
+            from_val = ""
             for h in headers:
-                name_lower = h.get("name", "").lower()
-                if name_lower == "to":
-                    to_val = h.get("value", "")
-                elif name_lower == "subject":
-                    subject_val = h.get("value", "")
-            if not to_val:
+                if h.get("name", "").lower() == "from":
+                    from_val = h.get("value", "")
+                    break
+            if not from_val:
                 return
-            to_name, to_email = parseaddr(to_val)
-            to_email = to_email.lower().strip()
-            if not to_email:
+            from_name, from_email = parseaddr(from_val)
+            from_email = from_email.lower().strip()
+            if not from_email or "@" not in from_email:
                 return
-            domain = to_email.split("@")[-1] if "@" in to_email else ""
-            if domain in _NOISE_DOMAINS:
+            domain = from_email.split("@")[-1]
+            if domain in _NOISE_DOMAINS_INBOX:
                 return
-            if to_email not in email_names and to_name:
-                email_names[to_email] = to_name.strip()
-            if to_email not in email_message_ids:
-                email_message_ids[to_email] = request_id
-            if to_email not in email_subjects:
-                email_subjects[to_email] = []
-            if subject_val and subject_val not in email_subjects[to_email]:
-                email_subjects[to_email].append(subject_val)
+            if from_email not in email_names and from_name:
+                email_names[from_email] = from_name.strip()
+            if from_email not in email_message_ids:
+                email_message_ids[from_email] = request_id
 
-        chunks = [message_ids[i:i + _CHUNK_SIZE] for i in range(0, len(message_ids), _CHUNK_SIZE)]
+        chunks = [message_ids[i:i + _CHUNK] for i in range(0, len(message_ids), _CHUNK)]
         for chunk_idx, chunk in enumerate(chunks):
-            batch = svc.new_batch_http_request(callback=_handle_meta)
+            batch_req = svc.new_batch_http_request(callback=_handle_meta)
             for msg_id in chunk:
-                batch.add(
+                batch_req.add(
                     svc.users().messages().get(
-                        userId="me",
-                        id=msg_id,
-                        format="metadata",
-                        metadataHeaders=["To", "Subject"],
+                        userId="me", id=msg_id, format="metadata",
+                        metadataHeaders=["From"],
                     ),
                     request_id=msg_id,
                 )
             try:
-                batch.execute()
+                batch_req.execute()
             except Exception as exc:
-                log.error('"extract_brokers — batch execute failed chunk=%d: %s"', chunk_idx + 1, exc)
-            log.info(
-                '"extract_brokers — step2 chunk=%d/%d msgs_processed=%d unique_emails=%d"',
-                chunk_idx + 1, len(chunks), min((chunk_idx + 1) * _CHUNK_SIZE, len(message_ids)), len(email_subjects),
-            )
+                log.error('"[extract-brokers] batch meta failed chunk=%d: %s"', chunk_idx + 1, exc)
+        unique_emails = list(email_message_ids.keys())
+        log.info('"[extract-brokers] unique senders=%d"', len(unique_emails))
 
-        unique_emails = list(email_subjects.keys())
-        log.info('"extract_brokers — step2 done unique_emails=%d"', len(unique_emails))
-
-        # ── Step 3: Batch-check which recipients are already in network ────────
+        # ── Step 3: Deduplicate against existing brokers ──────────────────────
         known_resp = (
             supabase_client()
             .table("brokers")
@@ -1226,15 +1200,10 @@ def extract_brokers():
             .execute()
         )
         known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
+        new_emails = [e for e in unique_emails if e not in known_set]
+        log.info('"[extract-brokers] new=%d already_known=%d"', len(new_emails), len(known_set))
 
-        unknown_emails = [e for e in unique_emails if e not in known_set]
-        already_in_network = len(unique_emails) - len(unknown_emails)
-        log.info(
-            '"extract_brokers — step3 done already_in_network=%d unknown=%d"',
-            already_in_network, len(unknown_emails),
-        )
-
-        # ── Step 2.5: Fetch signature blocks for unknown brokers ──────────────
+        # ── Step 4: Fetch body for each new sender ────────────────────────────
         def _extract_body_text(msg):
             def _get_text(part):
                 if part.get("mimeType") == "text/plain":
@@ -1248,7 +1217,7 @@ def extract_brokers():
                 return ""
             return _get_text(msg.get("payload", {}))
 
-        def _fetch_sig(email):
+        def _fetch_body(email):
             msg_id = email_message_ids.get(email)
             if not msg_id:
                 return email, ""
@@ -1256,79 +1225,74 @@ def extract_brokers():
                 msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
                 body = _extract_body_text(msg)
                 lines = [l.strip() for l in body.splitlines() if l.strip()]
-                return email, "\n".join(lines[-10:])
+                return email, "\n".join(lines[:40])
             except Exception as exc:
-                log.error('"extract_brokers — sig fetch failed email=%s: %s"', email, exc)
+                log.error('"[extract-brokers] body fetch failed email=%s: %s"', email, exc)
                 return email, ""
 
-        email_signatures: dict[str, str] = {}
+        email_bodies: dict[str, str] = {}
         with ThreadPoolExecutor(max_workers=10) as pool:
-            futures = {pool.submit(_fetch_sig, email): email for email in unknown_emails}
+            futures = {pool.submit(_fetch_body, e): e for e in new_emails}
             for future in as_completed(futures):
-                email, sig = future.result()
-                email_signatures[email] = sig
-        log.info('"extract_brokers — step2.5 done signatures_fetched=%d"', sum(1 for s in email_signatures.values() if s))
+                email, body = future.result()
+                email_bodies[email] = body
 
-        # ── Step 4: Claude enrichment — parallel, up to 10 concurrent calls ────
-        brokers = []
-        enrich_count = 0
-
-        def _enrich(email):
-            to_name = email_names.get(email)
-            signature = email_signatures.get(email, "")
-            prompt_text = (
-                "Extract contact details from the email signature block below.\n\n"
-                "Return a JSON object with exactly these fields:\n"
-                "{\"name\": \"first last or null\", "
-                "\"title\": \"job title or null\", "
-                "\"company\": \"company name or null\", "
-                "\"email\": \"direct email or null\", "
-                "\"phone\": \"phone number or null\"}\n\n"
-                "Return ONLY valid JSON, no other text.\n\n"
-                f"Signature:\n{signature or 'not available'}"
-            )
+        # ── Step 5: Claude Haiku enrichment + direct write to brokers ─────────
+        def _enrich_and_insert(email):
+            body = email_bodies.get(email, "")
+            name_hint = email_names.get(email, "")
+            prompt = _ENRICH_PROMPT.format(name=name_hint or "unknown", body=body or "not available")
             try:
                 claude_msg = anthropic_client().messages.create(
                     model="claude-haiku-4-5-20251001",
-                    max_tokens=200,
-                    messages=[{"role": "user", "content": prompt_text}],
+                    max_tokens=300,
+                    messages=[{"role": "user", "content": prompt}],
                 )
                 enriched = json.loads(claude_msg.content[0].text.strip())
             except Exception as exc:
-                log.error('"extract_brokers — enrich failed email=%s: %s"', email, exc)
+                log.error('"[extract-brokers] enrich failed email=%s: %s"', email, exc)
                 enriched = {}
-            return email, to_name, enriched
-
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            futures = {pool.submit(_enrich, email): email for email in unknown_emails}
-            for future in as_completed(futures):
-                email, to_name, enriched = future.result()
-                if enriched:
-                    enrich_count += 1
-                brokers.append({
+            try:
+                supabase_client().table("brokers").insert({
+                    "carrier_id": carrier_id,
                     "email": email,
-                    "name": enriched.get("name") or to_name or None,
-                    "title": enriched.get("title"),
+                    "name": enriched.get("name") or name_hint or None,
                     "company": enriched.get("company"),
                     "phone": enriched.get("phone"),
-                })
+                    "status": enriched.get("status") or "warm",
+                    "priority": enriched.get("priority") or "medium",
+                    "notes": enriched.get("notes"),
+                    "last_load_origin": enriched.get("last_load_origin"),
+                    "last_load_destination": enriched.get("last_load_destination"),
+                    "days_cadence": 3,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }).execute()
+                return True
+            except Exception as exc:
+                log.error('"[extract-brokers] insert failed email=%s: %s"', email, exc)
+                return False
 
-        log.info(
-            '"extract_brokers — step4 done claude_enrichments=%d final_broker_count=%d"',
-            enrich_count, len(brokers),
-        )
+        imported = 0
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_enrich_and_insert, e): e for e in new_emails}
+            for future in as_completed(futures):
+                if future.result():
+                    imported += 1
 
-        return jsonify({
-            "ok": True,
-            "brokers": brokers,
-            "total": len(brokers),
-            "messages_scanned": len(message_ids),
-            "already_in_network": already_in_network,
-        }), 200
+        log.info('"[extract-brokers] done imported=%d carrier_id=%s"', imported, carrier_id)
 
     except Exception as exc:
-        log.error('"extract_brokers — unhandled exception: %s"', exc, exc_info=True)
-        return jsonify({"ok": False, "error": "internal error", "brokers": []}), 200
+        log.error('"[extract-brokers] scan failed carrier_id=%s: %s"', carrier_id, exc, exc_info=True)
+
+
+@app.route("/extract-brokers", methods=["POST"])
+def extract_brokers():
+    data = request.get_json(silent=True) or {}
+    carrier_id = data.get("carrier_id")
+    if not carrier_id:
+        return jsonify({"error": "carrier_id required"}), 400
+    threading.Thread(target=_scan_inbox_and_enrich, args=(carrier_id,), daemon=True).start()
+    return jsonify({"status": "started", "carrier_id": carrier_id}), 200
 
 
 @app.route("/import-brokers", methods=["POST"])
