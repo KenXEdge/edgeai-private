@@ -1281,8 +1281,8 @@ def _scan_inbox_and_enrich(carrier_id: str) -> None:
 
         log.info('"[extract-brokers] done imported=%d carrier_id=%s"', imported, carrier_id)
 
-    except Exception as exc:
-        log.error('"[extract-brokers] scan failed carrier_id=%s: %s"', carrier_id, exc, exc_info=True)
+    except Exception as e:
+        log.exception('[extract-brokers] background thread crashed: %s', e)
 
 
 @app.route("/extract-brokers", methods=["POST"])
