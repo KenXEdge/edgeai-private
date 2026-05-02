@@ -1,5 +1,5 @@
 # XEdge / EDGEai — SESSION HANDOFF NOTE
-## April 25, 2026 | Read This First | Before Doing Anything Else
+## May 2, 2026 | Read This First | Before Doing Anything Else
 
 **Session start command:**
 ```
@@ -7,18 +7,36 @@ git pull
 ```
 Then read:
 ```
-docs/Runbook_v7.1.md  docs/PRD_v4.4.md  docs/PitchBook_v1.2.md  docs/Transition_latest.md
+docs/Runbook_v7.1.md  docs/PRD_v4.4.md  docs/PitchBook_v1.2.md  docs/Transition_050226_v1.md
 ```
 Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separate commands — PowerShell does not support `&&`)
 
 ---
 
-## 1. System Status — April 25 2026
+## NEXT SESSION MANDATE — STABILITY BEFORE SCALE
+
+- No new features until Base tier works end-to-end for one real carrier
+- Pre-deploy checklist required before any commit (OTP signup, Stripe activation, onboard 1-4, Gmail OAuth, broker extraction, email classification, SMS)
+- One problem at a time — verify before moving forward
+- Every fix documented in Runbook before next change
+
+---
+
+## CURSOR EVALUATION — Next Session
+
+- Open full codebase in Cursor for full project audit before touching anything
+- Use as code review tool first — identify issues in main.py and onboard flow
+- Evaluate as replacement for Claude Code if it proves more reliable
+- Same Claude models under the hood — no loss of AI capability
+
+---
+
+## 1. System Status — May 2 2026
 
 | Component | Status | Detail |
 |-----------|--------|--------|
 | xtxtec.com | LIVE | Vercel — primary domain |
-| Cloud Run | STABLE | edgeai-gmail-webhook revision 00071-hj8 |
+| Cloud Run | STABLE | edgeai-gmail-webhook revision 00112-d7j |
 | Supabase | LIVE | siafwhlzazefyoevslde.supabase.co |
 | Gmail OAuth | LIVE | onboard-gmail.html — confirmed working |
 | Stripe billing | TEST MODE | Webhook confirmed working — do not flip to live |
@@ -134,6 +152,7 @@ Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separ
 - End of session: save updated docs to `C:\Users\korbs\EDGEai\` and commit to master
 - CARRIER_UUID removed from Cloud Run env vars — carrier identity from auth.users.id at runtime
 - RLS disabled on carriers — enforced at application layer
+- Transition notes naming convention: `Transition_MMDDYY_v1.md`, increment to v2.md etc for same-day iterations
 
 ---
 
@@ -146,7 +165,11 @@ Claude Code entry: `cd C:\Users\korbs\EDGEai\dashboard` then `claude` (two separ
 - deploy.sh auto-sources `.env` — all secrets inject on deploy (fixed this session)
 - CARRIER_UUID removed from deploy.sh and Cloud Run env vars (April 29 2026)
 - SMTP: Resend, noreply@xtxtransport.com, display name EdgeTech, Magic Link template
+- **Active revision:** 00112-d7j
+- **Stable fallback:** 00107-hk2
+- **Pre-extraction fallback:** 00109-8hv
+- **Git fallback:** `git checkout 2c4a409 -- services/gmail-webhook/main.py`
 
 ---
 
-*XEdge Transition Note | April 25 2026 | XTX LLC*
+*XEdge Transition Note | May 2 2026 | XTX LLC*
