@@ -389,35 +389,51 @@ async function handleContinue() {
   btn.innerHTML = 'Scanning inbox…';
   setStatus('Scanning your inbox for broker contacts…', 'info');
 
-  const es = new EventSource(CLOUD_RUN + '/extract-brokers?carrier_id=' + _session.user.id);
+  const carrierId = _session.user.id;
+  let pollInterval = null;
+  let lastCount = -1;
+  let stableRounds = 0;
 
-  es.onmessage = function(event) {
-    let data;
-    try { data = JSON.parse(event.data); } catch(e) { return; }
-    if (data.error) {
-      es.close();
-      setStatus('Error: ' + data.error, 'error');
-      btn.disabled = false;
-      btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      return;
-    }
-    if (data.found !== undefined) {
-      setStatus('Found ' + data.found + ' brokers so far…', 'info');
-    }
-    if (data.done) {
-      es.close();
-      setStatus('✓ ' + data.total + ' brokers imported — ACE is ready. Taking you to your dashboard…', 'success');
-      btn.innerHTML = 'Going to Dashboard…';
-      setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
-    }
-  };
-
-  es.onerror = function() {
-    es.close();
-    setStatus('Connection error — please try again.', 'error');
+  function stopPolling(finalCount) {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    setStatus('✓ ' + finalCount + ' brokers found — ACE is ready. Continue to your dashboard.', 'success');
     btn.disabled = false;
-    btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  };
+    btn.innerHTML = 'Continue to Dashboard <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    btn.onclick = function() { window.location.href = '/dashboard'; };
+  }
+
+  function startPolling() {
+    pollInterval = setInterval(async function() {
+      try {
+        const { count } = await _sb
+          .from('brokers')
+          .select('*', { count: 'exact', head: true })
+          .eq('carrier_id', carrierId);
+        const n = count || 0;
+        setStatus('Finding brokers… ' + n + ' found so far', 'info');
+        if (n === lastCount) {
+          stableRounds++;
+          if (stableRounds >= 3) stopPolling(n);
+        } else {
+          lastCount = n;
+          stableRounds = 0;
+        }
+      } catch (err) {
+        clearInterval(pollInterval);
+        setStatus('Connection error — please try again.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+    }, 1000);
+  }
+
+  fetch(CLOUD_RUN + '/extract-brokers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ carrier_id: carrierId }),
+  }).catch(err => console.error('[extract-brokers] POST failed:', err));
+
+  startPolling();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
