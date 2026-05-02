@@ -50,7 +50,11 @@ export default async function handler(req, res) {
         }
         const { error } = await supabase
           .from('carriers')
-          .update({ subscription_status: 'active' })
+          .update({
+            subscription_status: 'active',
+            subscription_tier: session.metadata.tier,
+            stripe_customer_id: session.customer,
+          })
           .eq('id', carrierId)
         if (error) console.error('[stripe-webhook] activate failed:', error.message)
         else console.log('[stripe-webhook] activated carrier:', carrierId)
