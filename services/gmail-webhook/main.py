@@ -1364,6 +1364,26 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 return ""
             return _get_text(msg.get("payload", {}))
 
+        def _strip_reply_quotes(text: str) -> str:
+            """Remove quoted reply chains — only cut on unambiguous separators."""
+            import re
+            # Only split on patterns that definitively mark a quoted block,
+            # NOT on bare "From:" which commonly appears in signatures/addresses.
+            pattern = re.compile(
+                r'\n(?:'
+                r'-{3,}\s*(?:Original Message|Forwarded Message)\s*-{3,}'  # --- Original Message ---
+                r'|On\s.{10,80}?wrote:\s*$'      # On Mon Jan 1, Joe Smith wrote:  (end of line)
+                r'|_{10,}'                        # ___________ (long underscores only)
+                r')',
+                re.IGNORECASE | re.MULTILINE,
+            )
+            match = pattern.search(text)
+            if match:
+                text = text[:match.start()]
+            # Strip lines that are pure inline quotes (start with >)
+            lines = [l for l in text.splitlines() if not l.strip().startswith(">")]
+            return "\n".join(lines).strip()
+
         imported = 0
         enhanced = 0
 
@@ -1401,6 +1421,8 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                         userId="me", id=inbox_msgs[0]["id"], format="full"
                     ).execute()
                     body = _extract_body_text(inbox_msg)
+                    # Strip quoted reply chain so we only read the broker's own content
+                    body = _strip_reply_quotes(body)
                     lines = [l.strip() for l in body.splitlines() if l.strip()]
                     signature = "\n".join(lines[-20:])
 
@@ -1425,25 +1447,25 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
             to_name = email_names.get(email, "")
             _anth = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
             prompt_text = (
-                "Extract contact details from the email signature and lane context below.\n\n"
+                "Extract freight broker contact details from the email content below.\n\n"
                 "Return a JSON object with exactly these fields:\n"
-                "{\"name\": \"first last or null\", "
+                "{\"name\": \"broker first last or null\", "
                 "\"title\": \"job title max 25 chars or null\", "
                 "\"company\": \"brokerage or company name or null\", "
                 "\"phone\": \"mobile number only or null\", "
                 "\"origin\": \"pickup city ST or null\", "
                 "\"destination\": \"delivery city ST or null\"}\n\n"
-                "Phone rules — ONLY return a number explicitly labeled Mobile, Cell, or M. "
-                "Return null if the only numbers present are labeled Office, Afterhours, "
-                "After Hours, Direct, Desk, Ext, or are 800/toll-free numbers. "
-                "Never return an office number or afterhours number.\n\n"
-                "Title rule: max 25 characters — truncate if longer.\n\n"
-                "Origin/destination: extract from the lane context (sent email) if present — "
-                "format as city abbreviation e.g. 'Chicago IL'. Return null if not found.\n\n"
-                "Return ONLY valid JSON, no other text.\n\n"
-                f"Sender name hint: {to_name or 'unknown'}\n"
-                f"Signature (broker reply):\n{signature or 'not available'}\n\n"
-                f"Lane context (sent email to broker):\n{sent_context or 'not available'}"
+                "Rules:\n"
+                "- name/title/company/phone: extract from the broker's signature block\n"
+                "- origin/destination: extract the freight lane (pickup → delivery city/state) "
+                "from either the broker signature or the lane context — format 'City ST'\n"
+                "- Phone: ONLY return a number labeled Mobile, Cell, or M. "
+                "Return null for Office, Afterhours, Direct, Desk, Ext, or 800 numbers.\n"
+                "- Title: max 25 characters — truncate if longer\n"
+                "- Return ONLY valid JSON, no other text\n\n"
+                f"Broker name hint (from To: header): {to_name or 'unknown'}\n\n"
+                f"Broker signature (from their reply):\n{signature or 'not available'}\n\n"
+                f"Lane context (outbound bid email):\n{sent_context or 'not available'}"
             )
             try:
                 claude_msg = _anth.messages.create(
@@ -1454,6 +1476,12 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 raw_text = claude_msg.content[0].text.strip() if claude_msg.content else ""
                 log.info('[extract-brokers] claude raw email=%s stop=%s text=%r',
                          email, claude_msg.stop_reason, raw_text[:300])
+                # Strip markdown code fences if Claude wraps the JSON block
+                if raw_text.startswith("```"):
+                    raw_text = raw_text.split("```", 2)[1]          # drop opening fence
+                    if raw_text.startswith("json"):
+                        raw_text = raw_text[4:]                      # drop "json" label
+                    raw_text = raw_text.rsplit("```", 1)[0].strip()  # drop closing fence
                 enriched = json.loads(raw_text)
             except Exception as exc:
                 log.error('[extract-brokers] enrich failed email=%s: %s', email, exc)
@@ -1464,10 +1492,12 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
             is_new = email not in known_map
             try:
                 if is_new:
+                    # Name priority: broker's reply signature > To: display name from SENT header
+                    broker_name = enriched.get("name") or to_name or None
                     supabase_client().table("brokers").insert({
                         "carrier_id": carrier_id,
                         "email": email,
-                        "name": enriched.get("name") or to_name or None,
+                        "name": broker_name,
                         "title": (enriched.get("title") or "")[:25] or None,
                         "company": enriched.get("company"),
                         "phone": enriched.get("phone"),
