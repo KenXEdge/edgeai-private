@@ -1116,6 +1116,27 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         if not refresh_token:
             log.error('[extract-brokers] no gmail_token carrier_id=%s', carrier_id)
             return
+        # Carrier identity — used to filter own info out of broker enrichment.
+        # Primary: pulled from carriers table (populated after onboarding).
+        # Fallback: derive company tokens from carrier email domain so the filter
+        # works even before onboarding data is filled in.
+        carrier_name    = (carrier.get("owner_name") or carrier.get("name") or "").strip()
+        carrier_phone   = (carrier.get("phone") or "").strip()
+        carrier_company = (carrier.get("company_name") or carrier.get("name") or "").strip().lower()
+        if not carrier_company:
+            # Derive unique identifier from email domain.
+            # Strip common freight/legal suffixes to isolate the carrier's brand token.
+            # e.g. contact@xtxtransport.com → "xtxtransport" → strip "transport" → "xtx"
+            import re as _re
+            _domain = (carrier.get("email") or "").split("@")[-1].split(".")[0].lower()
+            _carrier_suffix_re = re.compile(
+                r'(transport(ation)?|trucking?|freight|logistics|express|llc|inc|corp|co|group|services?)$',
+                re.IGNORECASE,
+            )
+            _unique = _carrier_suffix_re.sub("", _domain).strip()
+            carrier_company = _unique if len(_unique) >= 2 else _domain
+        log.info('[extract-brokers] carrier identity name=%r company=%r phone=****%s',
+                 carrier_name, carrier_company, carrier_phone[-4:] if carrier_phone else "")
 
         import google.auth.transport.requests as google_requests
         import requests as requests_lib
@@ -1208,6 +1229,7 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         email_names: dict[str, str] = {}
         email_message_ids: dict[str, str] = {}
         email_sent_dates: dict[str, str] = {}  # most recent SENT timestamp per recipient
+        email_touch_counts: dict[str, int] = {}  # total SENT messages to this broker
         personal_domain_contacts: dict[str, str] = {}  # email -> display name (for unknown review)
 
         def _is_hard_noise(email: str) -> bool:
@@ -1279,6 +1301,8 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 email_subjects[to_email] = []
             if subject_val and subject_val not in email_subjects[to_email]:
                 email_subjects[to_email].append(subject_val)
+            # Count every SENT message to this broker — touch count indicator
+            email_touch_counts[to_email] = email_touch_counts.get(to_email, 0) + 1
 
         chunks = [message_ids[i:i + 100] for i in range(0, len(message_ids), 100)]
         for chunk_idx, chunk in enumerate(chunks):
@@ -1331,7 +1355,7 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         known_resp = (
             supabase_client()
             .table("brokers")
-            .select("email,phone,company,title")
+            .select("email,phone,company,title,last_load_origin,last_load_destination,touch_count")
             .eq("carrier_id", carrier_id)
             .execute()
         )
@@ -1487,13 +1511,43 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 log.error('[extract-brokers] enrich failed email=%s: %s', email, exc)
                 enriched = {}
 
-            # ── 4c: Write to SB immediately ───────────────────────────────────────
+            # ── 4c: Carrier identity filter — null fields that are Ken's own info ──
+            # When a broker never replied, Claude reads the SENT body and may extract
+            # the carrier's own signature. Detect and clear those fields before writing.
+            _carr_name_lower = (carrier_name or "").lower()
+            _carr_phone_digits = "".join(c for c in (carrier_phone or "") if c.isdigit())
+            def _is_carrier_field(val: str | None, field: str) -> bool:
+                if not val:
+                    return False
+                v = val.lower().strip()
+                if field == "name":
+                    # Match if extracted name overlaps with carrier's name tokens
+                    carr_tokens = set(_carr_name_lower.split())
+                    return bool(carr_tokens & set(v.split()))
+                if field == "phone":
+                    digits = "".join(c for c in v if c.isdigit())
+                    return bool(_carr_phone_digits and digits.endswith(_carr_phone_digits[-7:]))
+                if field == "company":
+                    # Match if extracted company contains the carrier's unique brand token
+                    # carrier_company is already stripped to its unique core (e.g. "xtx")
+                    return bool(carrier_company and len(carrier_company) >= 2 and carrier_company in v)
+                return False
+
+            if _is_carrier_field(enriched.get("name"), "name"):
+                enriched["name"] = None
+            if _is_carrier_field(enriched.get("phone"), "phone"):
+                enriched["phone"] = None
+            if _is_carrier_field(enriched.get("company"), "company"):
+                enriched["company"] = None
+
+            # ── 4d: Write to SB immediately ───────────────────────────────────────
             last_contacted = email_sent_dates.get(email)
             is_new = email not in known_map
             try:
                 if is_new:
                     # Name priority: broker's reply signature > To: display name from SENT header
                     broker_name = enriched.get("name") or to_name or None
+                    touch = email_touch_counts.get(email, 0)
                     supabase_client().table("brokers").insert({
                         "carrier_id": carrier_id,
                         "email": email,
@@ -1504,12 +1558,13 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                         "last_contacted": last_contacted,
                         "last_load_origin": enriched.get("origin"),
                         "last_load_destination": enriched.get("destination"),
+                        "touch_count": touch,
                         "status": "warm",
                         "priority": "medium",
                         "days_cadence": 3,
                     }).execute()
                     imported += 1
-                    log.info('[extract-brokers] inserted email=%s', email)
+                    log.info('[extract-brokers] inserted email=%s touches=%d', email, touch)
                 else:
                     existing = known_map[email]
                     patch = {}
@@ -1525,6 +1580,8 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                         patch["last_load_destination"] = enriched["destination"]
                     if last_contacted:
                         patch["last_contacted"] = last_contacted
+                    # Always refresh touch count — reflects current SENT history
+                    patch["touch_count"] = email_touch_counts.get(email, 0)
                     if patch:
                         supabase_client().table("brokers").update(patch).eq(
                             "carrier_id", carrier_id).eq("email", email).execute()
