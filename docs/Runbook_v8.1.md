@@ -449,4 +449,156 @@ Browser automation module for Sylectus load board. Runs as a scheduled or on-dem
 
 ---
 
+## SUPABASE SCHEMA REFERENCE
+
+> Living section — update as columns are added. This is the source of truth for table design intent.
+
+---
+
+### `carriers` — Carrier profile & ACE configuration
+Primary input for all Haiku outreach prompts. Populated at onboarding.
+
+| Column | Type | Purpose |
+|---|---|---|
+| id | uuid | PK = auth.users.id |
+| owner_name | text | First name used in outreach ("Ken here") |
+| company_name | text | Carrier company name |
+| email / phone | text | Contact info |
+| truck_type | text | Equipment type ("26' box truck") |
+| truck_length | int | Truck length in feet |
+| equipment_type | text | Cargo type capability |
+| has_lift_gate / has_pallet_jack / has_air_ride | bool | Equipment capabilities |
+| max_load_weight | int | Max weight capacity (lbs) |
+| home_base_city / home_base_state / home_base_zip | text | Where carrier is based ("back to OKC") |
+| preferred_lanes | text | Preferred routes/corridors |
+| message_tone | text | casual / professional — controls Haiku outreach voice |
+| rate_floor / min_rate_local / min_rate_otr | numeric/int | Rate minimums |
+| otr_willing | bool | Willing to run OTR |
+| coverage_radius / max_radius | int | Miles from home base |
+| outreach_time | text | Preferred time to send outreach |
+| active_days | text | Days available |
+| ace_status / ace_level | text/int | ACE agent state |
+| subscription_status / subscription_tier | text | Billing state |
+| gmail_token | text | OAuth refresh token for Gmail API |
+| onboarding_complete | bool | All profile fields wired from onboarding page |
+
+**Note:** `onboarding_complete = false` means Haiku outreach prompts will be incomplete. Wiring onboarding page answers → carriers row is a critical path item.
+
+---
+
+### `brokers` — Contact directory (one row per broker per carrier)
+Source of truth for who to reach out to. Populated by `/extract-brokers` (SENT scan) and CSV import.
+
+| Column | Type | Purpose |
+|---|---|---|
+| id | uuid | PK |
+| carrier_id | uuid | FK → carriers |
+| email | text | Broker email — unique per carrier |
+| name | text | Broker first/last name |
+| company | text | Brokerage name |
+| phone | text | Direct or mobile phone |
+| status | text | hot / warm / cold |
+| priority | text | high / medium / low |
+| days_cadence | int | Days between outreach attempts |
+| last_contacted | timestamptz | Most recent SENT email to this broker — Haiku converts to natural language ("last Wednesday") |
+| last_responded | timestamptz | Last time broker replied |
+| response_count / load_count | int | Aggregate engagement stats |
+| preferred | bool | Carrier-flagged as preferred |
+| alert_requested | bool | Carrier wants SMS alert on any reply |
+
+**Dedup rule:** on re-extract or CSV import, existing records are never duplicated — null fields (phone, company) are enhanced if new data is available.
+
+---
+
+### `outreach_log` — Every ACE outreach send event
+One row per outreach email sent to a broker. Source of truth for cadence and timing.
+
+| Column | Type | Purpose |
+|---|---|---|
+| id | uuid | PK |
+| carrier_id / broker_id | uuid | FKs |
+| channel | text | email / sms |
+| subject | text | Email subject line |
+| message_body | text | Full outreach content sent |
+| sent_at | timestamptz | When ACE actually sent — Haiku reads this for "I reached out last Wednesday" |
+| status | text | sent / bounced / failed |
+| opened | bool | Email opened |
+| responded | bool | Broker replied |
+| responded_at | timestamptz | When broker replied |
+| response_type | text | positive / negative / neutral |
+| load_offered | bool | Broker offered a load |
+| bid_amount | int | Rate offered |
+| next_followup_at | timestamptz | Scheduled next outreach touch |
+
+---
+
+### `responses` — Broker reply events + SMS carrier notification loop
+One row per inbound broker reply. Hub for the SMS → carrier → auto-reply cycle.
+
+| Column | Type | Purpose |
+|---|---|---|
+| id | uuid | PK |
+| carrier_id / broker_id | uuid | FKs |
+| outreach_id | uuid | FK → outreach_log row that triggered this reply |
+| thread_id | text | Gmail thread ID |
+| gmail_message_id | text | Gmail message ID |
+| subject / body / raw_email | text | Broker reply content |
+| classification | text | load_offer / positive / negative / neutral |
+| load_origin / load_destination | text | Parsed from broker reply |
+| load_distance | int | Miles |
+| equipment_needed | text | What the broker needs |
+| pickup_time | text | Pickup window |
+| rate_offered | int | Rate in broker reply |
+| carrier_notified | bool | SMS was sent to carrier |
+| **sms_token** | text UNIQUE | One-time token embedded in SMS hot links — used to identify which response the carrier is acting on |
+| sms_sent_at | timestamptz | When SMS notification fired to carrier |
+| carrier_response | text | BOOK / PASS / CALL — carrier's SMS tap |
+| carrier_responded_at | timestamptz | When carrier tapped the SMS link |
+| load_accepted | bool | Load was booked |
+| followup_sent_at | timestamptz | When ACE auto-sent triggered reply to broker |
+| followup_body | text | What ACE said to broker after carrier responded |
+
+**SMS loop flow:**
+```
+broker replies positive
+  → responses row created, sms_token generated
+  → SMS to carrier: "[BOOK] [PASS] [CALL]" links embed sms_token
+  → carrier taps → platform resolves sms_token → sets carrier_response
+  → ACE fires triggered email to broker → followup_sent_at set
+  → if BOOK → load_wins row created
+```
+
+---
+
+### `load_wins` — Confirmed booked loads
+| Column | Type | Purpose |
+|---|---|---|
+| carrier_id / broker_id | uuid | FKs |
+| broker_email / broker_name / broker_company / broker_phone | text | Denormalized at time of booking |
+| load_origin / load_destination | text | Lane |
+| rate_confirmed | numeric | Final agreed rate |
+| load_reference | text | Broker's load/reference number |
+| subject / body / gmail_message_id | text | Source email |
+
+---
+
+### `trucks` — Fleet (multi-truck carriers)
+Used when `multi_truck_mode = true` on carriers row.
+
+| Column | Type | Purpose |
+|---|---|---|
+| carrier_id | uuid | FK |
+| unit_number | text | Truck identifier |
+| equipment_type | text | Truck type |
+| liftgate / max_weight | bool/int | Capabilities |
+| home_base_zip | text | Where this unit operates from |
+| status | text | available / on_load / maintenance |
+
+---
+
+### `unknown_brokers_inbox` — Unrecognized inbound senders
+Staging area for Gmail senders not yet in the brokers table. Carrier reviews and promotes to brokers manually or via dashboard action.
+
+---
+
 *EDGEai Runbook v8.1 | XTX LLC | May 1 2026*

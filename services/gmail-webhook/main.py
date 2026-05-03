@@ -1188,6 +1188,7 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         email_subjects: dict[str, list[str]] = {}
         email_names: dict[str, str] = {}
         email_message_ids: dict[str, str] = {}
+        email_sent_dates: dict[str, str] = {}  # most recent SENT timestamp per recipient
 
         def _is_noise(email: str) -> bool:
             if "@" not in email:
@@ -1221,10 +1222,17 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 return
             if _is_noise(to_email):
                 return
+            # Track most recent SENT date — internalDate is ms since epoch
+            internal_ms = response.get("internalDate")
+            if internal_ms:
+                ts = datetime.fromtimestamp(int(internal_ms) / 1000, tz=timezone.utc).isoformat()
+                if to_email not in email_sent_dates or ts > email_sent_dates[to_email]:
+                    email_sent_dates[to_email] = ts
+                    email_message_ids[to_email] = request_id  # use most-recent message for sig
+            elif to_email not in email_message_ids:
+                email_message_ids[to_email] = request_id
             if to_email not in email_names and to_name:
                 email_names[to_email] = to_name.strip()
-            if to_email not in email_message_ids:
-                email_message_ids[to_email] = request_id
             if to_email not in email_subjects:
                 email_subjects[to_email] = []
             if subject_val and subject_val not in email_subjects[to_email]:
@@ -1247,17 +1255,25 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 log.error('[extract-brokers] batch meta failed chunk=%d: %s', chunk_idx + 1, exc)
         log.info('[extract-brokers] unique recipients=%d', len(email_subjects))
 
-        # ── Step 3: Deduplicate against existing brokers ──────────────────────
+        # ── Step 3: Deduplicate — new vs. enhanceable (existing with null fields) ─
         known_resp = (
             supabase_client()
             .table("brokers")
-            .select("email")
+            .select("email,phone,company")
             .eq("carrier_id", carrier_id)
             .execute()
         )
-        known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
-        unknown_emails = [e for e in email_subjects if e not in known_set]
-        log.info('[extract-brokers] new=%d already_known=%d', len(unknown_emails), len(known_set))
+        known_map: dict[str, dict] = {row["email"].lower(): row for row in (known_resp.data or [])}
+        new_emails = [e for e in email_subjects if e not in known_map]
+        # Enhanceable = existing record missing phone or company
+        enhance_emails = [
+            e for e in email_subjects if e in known_map and
+            not all([known_map[e].get("phone"), known_map[e].get("company")])
+        ]
+        process_emails = new_emails + enhance_emails
+        log.info('[extract-brokers] new=%d enhance=%d skip=%d',
+                 len(new_emails), len(enhance_emails),
+                 len(email_subjects) - len(new_emails) - len(enhance_emails))
 
         # ── Step 4: Fetch signature block (last 10 lines of SENT email) ───────
         def _extract_body_text(msg):
@@ -1288,27 +1304,28 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
 
         email_signatures: dict[str, str] = {}
         with ThreadPoolExecutor(max_workers=5) as pool:
-            futures = {pool.submit(_fetch_sig, e): e for e in unknown_emails}
+            futures = {pool.submit(_fetch_sig, e): e for e in process_emails}
             for future in as_completed(futures):
                 email, sig = future.result()
                 email_signatures[email] = sig
         log.info('[extract-brokers] signatures fetched=%d', sum(1 for s in email_signatures.values() if s))
 
-        # ── Step 5: Claude enrich + direct insert ─────────────────────────────
+        # ── Step 5: Claude enrich + insert (new) or enhance (existing nulls) ────
         imported = 0
+        enhanced = 0
 
-        def _enrich_and_insert(email):
+        def _enrich_and_write(email):
+            nonlocal imported, enhanced
             to_name = email_names.get(email, "")
             signature = email_signatures.get(email, "")
             prompt_text = (
                 "Extract contact details from the email signature block below.\n\n"
                 "Return a JSON object with exactly these fields:\n"
                 "{\"name\": \"first last or null\", "
-                "\"title\": \"job title or null\", "
-                "\"company\": \"company name or null\", "
-                "\"email\": \"direct email or null\", "
+                "\"company\": \"brokerage or company name or null\", "
                 "\"phone\": \"phone number or null\"}\n\n"
                 "Return ONLY valid JSON, no other text.\n\n"
+                f"Sender name hint: {to_name or 'unknown'}\n"
                 f"Signature:\n{signature or 'not available'}"
             )
             try:
@@ -1321,30 +1338,49 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
             except Exception as exc:
                 log.error('[extract-brokers] enrich failed email=%s: %s', email, exc)
                 enriched = {}
+
+            last_contacted = email_sent_dates.get(email)
+            is_new = email not in known_map
+
             try:
-                supabase_client().table("brokers").insert({
-                    "carrier_id": carrier_id,
-                    "email": email,
-                    "name": enriched.get("name") or to_name or None,
-                    "company": enriched.get("company"),
-                    "phone": enriched.get("phone"),
-                    "status": "warm",
-                    "priority": "medium",
-                    "days_cadence": 3,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }).execute()
+                if is_new:
+                    supabase_client().table("brokers").insert({
+                        "carrier_id": carrier_id,
+                        "email": email,
+                        "name": enriched.get("name") or to_name or None,
+                        "company": enriched.get("company"),
+                        "phone": enriched.get("phone"),
+                        "last_contacted": last_contacted,
+                        "status": "warm",
+                        "priority": "medium",
+                        "days_cadence": 3,
+                    }).execute()
+                    imported += 1
+                else:
+                    # Only update fields that are currently null
+                    existing = known_map[email]
+                    patch = {}
+                    if not existing.get("phone") and enriched.get("phone"):
+                        patch["phone"] = enriched["phone"]
+                    if not existing.get("company") and enriched.get("company"):
+                        patch["company"] = enriched["company"]
+                    if last_contacted:
+                        patch["last_contacted"] = last_contacted
+                    if patch:
+                        supabase_client().table("brokers").update(patch).eq(
+                            "carrier_id", carrier_id).eq("email", email).execute()
+                        enhanced += 1
                 return True
             except Exception as exc:
-                log.error('[extract-brokers] insert failed email=%s: %s', email, exc)
+                log.error('[extract-brokers] write failed email=%s: %s', email, exc)
                 return False
 
         with ThreadPoolExecutor(max_workers=5) as pool:
-            futures = {pool.submit(_enrich_and_insert, e): e for e in unknown_emails}
+            futures = {pool.submit(_enrich_and_write, e): e for e in process_emails}
             for future in as_completed(futures):
-                if future.result():
-                    imported += 1
+                future.result()
 
-        log.info('[extract-brokers] done imported=%d carrier_id=%s', imported, carrier_id)
+        log.info('[extract-brokers] done imported=%d enhanced=%d carrier_id=%s', imported, enhanced, carrier_id)
 
     except Exception as e:
         log.exception('[extract-brokers] background thread crashed: %s', e)
@@ -1387,16 +1423,15 @@ def import_brokers():
 
         total = len(broker_list)
 
-        # Pre-fetch existing emails for this carrier to detect duplicates without
-        # relying on DB constraint errors in the hot path.
+        # Pre-fetch existing records so we can enhance nulls rather than skip
         existing_resp = (
             supabase_client()
             .table("brokers")
-            .select("email")
+            .select("email,phone,company")
             .eq("carrier_id", carrier_id)
             .execute()
         )
-        existing_set: set[str] = {row["email"].lower() for row in (existing_resp.data or [])}
+        existing_map: dict[str, dict] = {row["email"].lower(): row for row in (existing_resp.data or [])}
 
         for broker in broker_list:
             email = (broker.get("email") or "").lower().strip()
@@ -1405,26 +1440,37 @@ def import_brokers():
                 errors += 1
                 continue
 
-            if email in existing_set:
-                duplicates += 1
-                continue
-
             try:
-                supabase_client().table("brokers").insert({
-                    "carrier_id": carrier_id,
-                    "email": email,
-                    "name": broker.get("name"),
-                    "company": broker.get("company"),
-                    "phone": broker.get("mobile") or broker.get("direct"),
-                    "status": "warm",
-                    "priority": "medium",
-                    "days_cadence": 3,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }).execute()
-                existing_set.add(email)
-                imported += 1
+                if email not in existing_map:
+                    supabase_client().table("brokers").insert({
+                        "carrier_id": carrier_id,
+                        "email": email,
+                        "name": broker.get("name"),
+                        "company": broker.get("company"),
+                        "phone": broker.get("mobile") or broker.get("direct") or broker.get("phone"),
+                        "status": "warm",
+                        "priority": "medium",
+                        "days_cadence": 3,
+                    }).execute()
+                    existing_map[email] = {}
+                    imported += 1
+                else:
+                    # Enhance nulls only — never overwrite existing data
+                    existing = existing_map[email]
+                    patch = {}
+                    incoming_phone = broker.get("mobile") or broker.get("direct") or broker.get("phone")
+                    if not existing.get("phone") and incoming_phone:
+                        patch["phone"] = incoming_phone
+                    if not existing.get("company") and broker.get("company"):
+                        patch["company"] = broker["company"]
+                    if patch:
+                        supabase_client().table("brokers").update(patch).eq(
+                            "carrier_id", carrier_id).eq("email", email).execute()
+                        imported += 1
+                    else:
+                        duplicates += 1
             except Exception as exc:
-                log.error('"import_brokers — insert failed email=%s: %s"', email, exc)
+                log.error('"import_brokers — write failed email=%s: %s"', email, exc)
                 errors += 1
 
         log.info(
