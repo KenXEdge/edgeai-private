@@ -13,10 +13,10 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from email import message_from_bytes
-from email.utils import parseaddr
+from email.utils import parseaddr, parsedate_to_datetime
 
 import anthropic
-from flask import Flask, request, jsonify, redirect
+from flask import Flask, request, jsonify, redirect, Response, stream_with_context
 from supabase import create_client, Client
 from twilio.rest import Client as TwilioClient
 from google.oauth2.credentials import Credentials as OAuthCredentials
@@ -805,12 +805,22 @@ def process_message(message_id: str, carrier_id: str) -> None:
 
     # ── Pre-Claude noise filter — discard before API call ─────────────────────
     _sender = email_data["from_email"]
+    _local = _sender.split("@")[0] if "@" in _sender else ""
     _domain = _sender.split("@")[-1] if "@" in _sender else ""
-    _noise_senders = {"system@ucr.gov"}
-    _noise_domains = {"apple.com", "icloud.com"}
+    _inbox_hard_noise_domains = {
+        "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
+        "stripe.com", "paypal.com", "amazonaws.com", "github.com",
+        "squarespace.com", "twilio.com", "supabase.io", "anthropic.com",
+        "irs.gov", "dol.gov", "fmcsa.dot.gov", "dot.gov",
+    }
+    _inbox_noreply_prefixes = {
+        "noreply", "no-reply", "donotreply", "do-not-reply",
+        "notifications", "automated", "mailer", "bounce",
+    }
     if (
-        _sender in _noise_senders
-        or _domain in _noise_domains
+        _local in _inbox_noreply_prefixes
+        or _domain in _inbox_hard_noise_domains
+        or any(_domain == d or _domain.endswith("." + d) for d in _inbox_hard_noise_domains)
     ):
         mark_as_read(message_id)
         return
@@ -1084,10 +1094,11 @@ _ENRICH_PROMPT = (
 )
 
 
-def _scan_inbox_and_enrich(carrier_id: str) -> None:
-    """Background thread: scan INBOX 180 days, Claude-enrich unique senders, write to brokers."""
-    log.info('"[extract-brokers] scan started carrier_id=%s"', carrier_id)
+def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
+    """Background thread: scan SENT 180 days, extract broker contacts, Claude-enrich, write to brokers."""
+    log.info('[extract-brokers] scan started carrier_id=%s days=%d', carrier_id, days)
     try:
+        # ── Carrier + Gmail setup ─────────────────────────────────────────────
         carrier_resp = (
             supabase_client()
             .table("carriers")
@@ -1097,13 +1108,13 @@ def _scan_inbox_and_enrich(carrier_id: str) -> None:
             .execute()
         )
         if not carrier_resp.data:
-            log.error('"[extract-brokers] carrier not found carrier_id=%s"', carrier_id)
+            log.error('[extract-brokers] carrier not found carrier_id=%s', carrier_id)
             return
         carrier = carrier_resp.data[0]
 
         refresh_token = carrier.get("gmail_token")
         if not refresh_token:
-            log.error('"[extract-brokers] no gmail_token carrier_id=%s"', carrier_id)
+            log.error('[extract-brokers] no gmail_token carrier_id=%s', carrier_id)
             return
 
         import google.auth.transport.requests as google_requests
@@ -1119,14 +1130,15 @@ def _scan_inbox_and_enrich(carrier_id: str) -> None:
         carrier_creds.refresh(google_requests.Request(session=requests_lib.Session()))
         svc = build("gmail", "v1", credentials=carrier_creds, cache_discovery=False)
 
-        # ── Step 1: Page through INBOX message IDs — 180 days ─────────────────
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y/%m/%d")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y/%m/%d")
+
+        # ── Step 1: Page through SENT message IDs ────────────────────────────
         message_ids: list[str] = []
         page_token = None
         while True:
             list_kwargs: dict = {
                 "userId": "me",
-                "labelIds": ["INBOX"],
+                "labelIds": ["SENT"],
                 "q": f"after:{cutoff}",
                 "maxResults": 500,
             }
@@ -1135,75 +1147,210 @@ def _scan_inbox_and_enrich(carrier_id: str) -> None:
             try:
                 resp = svc.users().messages().list(**list_kwargs).execute()
             except Exception as exc:
-                log.error('"[extract-brokers] gmail list failed: %s"', exc)
+                log.error('[extract-brokers] gmail list failed: %s', exc)
                 break
-            batch = resp.get("messages", [])
-            message_ids.extend(m["id"] for m in batch)
+            message_ids.extend(m["id"] for m in resp.get("messages", []))
             page_token = resp.get("nextPageToken")
-            if not page_token or len(message_ids) >= 2000:
+            if not page_token or len(message_ids) >= 500:
                 break
-        message_ids = message_ids[:2000]
-        log.info('"[extract-brokers] inbox scan total_ids=%d"', len(message_ids))
+        message_ids = message_ids[:500]
+        log.info('[extract-brokers] sent scan total_ids=%d', len(message_ids))
 
-        # ── Step 2: Batch metadata — collect unique FROM senders ──────────────
+        # ── Step 2: Batch metadata — TO: + Subject: headers ──────────────────
+        # Hard drop: definitely not a broker, no review value
+        _HARD_NOISE_DOMAINS = {
+            # EDGEai own domains
+            "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
+            # Cloud / dev infrastructure
+            "amazonaws.com", "oraclecloud.com", "github.com",
+            # Payment / billing
+            "stripe.com", "paypal.com", "zellepay.com",
+            "triumphpay.com", "expressfreightfinance.com",
+            # SaaS / platforms
+            "squarespace.com", "twilio.com", "supabase.io",
+            "anthropic.com", "webinarjam.net",
+            # TMS / visibility / ELD platforms
+            "sylectus.com", "omnitracs.com", "macropoint.com",
+            "fourkites.com", "project44.com", "keeptruckin.com",
+            "motive.com", "samsara.com", "truckertools.com",
+            # Load boards / brokerage platforms — NOT blocked; real broker contacts work here
+            # e.g. tql.com, ntgfreight.com, spotinc.com, dat.com, truckstop.com, priority1.com
+            # Insurance / compliance
+            "trkinsure.com", "registrymonitoring.com", "lgiinc.com",
+            # Marketing / notifications
+            "notifications.com", "linkt.io",
+            # Automotive / unrelated commerce
+            "carmax.com",
+            # Government
+            "irs.gov", "dol.gov", "fmcsa.dot.gov", "dot.gov",
+            # Misc junk
+            "g2mint.com", "e.truckstop.com",
+        }
+        # Personal domains: route to unknown_brokers_inbox for carrier review
+        _PERSONAL_DOMAINS = {
+            "gmail.com", "googlemail.com", "google.com",
+            "yahoo.com", "yahoo.co.uk",
+            "outlook.com", "hotmail.com", "live.com", "msn.com",
+            "icloud.com", "apple.com",
+            "aol.com", "protonmail.com", "proton.me",
+            "microsoft.com",
+        }
+        # No-reply automated senders — hard drop. "info" removed: info@brokerfirm.com is valid.
+        _NOREPLY_PREFIXES = {
+            "noreply", "no-reply", "donotreply", "do-not-reply",
+            "notifications", "automated", "mailer", "bounce",
+            "newsletter", "updates",
+        }
+        # Role prefixes that may carry load opportunities — route to unknown_brokers_inbox for review
+        _REVIEW_PREFIXES = {"dispatch", "dispatcher"}
+
+        email_subjects: dict[str, list[str]] = {}
         email_names: dict[str, str] = {}
         email_message_ids: dict[str, str] = {}
-        _CHUNK = 100
+        email_sent_dates: dict[str, str] = {}  # most recent SENT timestamp per recipient
+        personal_domain_contacts: dict[str, str] = {}  # email -> display name (for unknown review)
+
+        def _is_hard_noise(email: str) -> bool:
+            if "@" not in email:
+                return True
+            local, domain = email.rsplit("@", 1)
+            if local in _NOREPLY_PREFIXES:
+                return True
+            for noise in _HARD_NOISE_DOMAINS:
+                if domain == noise or domain.endswith("." + noise):
+                    return True
+            return False
+
+        def _is_personal_domain(email: str) -> bool:
+            if "@" not in email:
+                return False
+            _, domain = email.rsplit("@", 1)
+            return domain in _PERSONAL_DOMAINS
 
         def _handle_meta(request_id, response, exception):
             if exception or not response:
                 return
             headers = response.get("payload", {}).get("headers", [])
-            from_val = ""
+            to_val = subject_val = date_val = ""
             for h in headers:
-                if h.get("name", "").lower() == "from":
-                    from_val = h.get("value", "")
-                    break
-            if not from_val:
+                n = h.get("name", "").lower()
+                if n == "to":
+                    to_val = h.get("value", "")
+                elif n == "subject":
+                    subject_val = h.get("value", "")
+                elif n == "date":
+                    date_val = h.get("value", "")
+            if not to_val:
                 return
-            from_name, from_email = parseaddr(from_val)
-            from_email = from_email.lower().strip()
-            if not from_email or "@" not in from_email:
+            to_name, to_email = parseaddr(to_val)
+            to_email = to_email.lower().strip()
+            if not to_email or "@" not in to_email:
                 return
-            domain = from_email.split("@")[-1]
-            if domain in _NOISE_DOMAINS_INBOX:
+            if _is_hard_noise(to_email):
                 return
-            if from_email not in email_names and from_name:
-                email_names[from_email] = from_name.strip()
-            if from_email not in email_message_ids:
-                email_message_ids[from_email] = request_id
+            _to_local = to_email.split("@")[0]
+            _to_domain = to_email.split("@")[1]
+            if _is_personal_domain(to_email) or _to_local in _REVIEW_PREFIXES or "dispatch" in _to_domain:
+                if to_email not in personal_domain_contacts:
+                    personal_domain_contacts[to_email] = to_name.strip() if to_name else ""
+                return
+            # Parse sent date — Date header is most reliable in batch responses
+            sent_ts = None
+            if date_val:
+                try:
+                    sent_ts = parsedate_to_datetime(date_val).astimezone(timezone.utc).isoformat()
+                except Exception:
+                    pass
+            if not sent_ts:
+                internal_ms = response.get("internalDate")
+                if internal_ms:
+                    try:
+                        sent_ts = datetime.fromtimestamp(int(internal_ms) / 1000, tz=timezone.utc).isoformat()
+                    except Exception:
+                        pass
+            if sent_ts:
+                if to_email not in email_sent_dates or sent_ts > email_sent_dates[to_email]:
+                    email_sent_dates[to_email] = sent_ts
+            if to_email not in email_message_ids:
+                email_message_ids[to_email] = request_id
+            if to_email not in email_names and to_name:
+                email_names[to_email] = to_name.strip()
+            if to_email not in email_subjects:
+                email_subjects[to_email] = []
+            if subject_val and subject_val not in email_subjects[to_email]:
+                email_subjects[to_email].append(subject_val)
 
-        chunks = [message_ids[i:i + _CHUNK] for i in range(0, len(message_ids), _CHUNK)]
+        chunks = [message_ids[i:i + 100] for i in range(0, len(message_ids), 100)]
         for chunk_idx, chunk in enumerate(chunks):
             batch_req = svc.new_batch_http_request(callback=_handle_meta)
             for msg_id in chunk:
                 batch_req.add(
                     svc.users().messages().get(
                         userId="me", id=msg_id, format="metadata",
-                        metadataHeaders=["From"],
+                        metadataHeaders=["To", "Subject", "Date"],
                     ),
                     request_id=msg_id,
                 )
             try:
                 batch_req.execute()
             except Exception as exc:
-                log.error('"[extract-brokers] batch meta failed chunk=%d: %s"', chunk_idx + 1, exc)
-        unique_emails = list(email_message_ids.keys())
-        log.info('"[extract-brokers] unique senders=%d"', len(unique_emails))
+                log.error('[extract-brokers] batch meta failed chunk=%d: %s', chunk_idx + 1, exc)
+        log.info('[extract-brokers] unique recipients=%d personal_domain_contacts=%d',
+                 len(email_subjects), len(personal_domain_contacts))
 
-        # ── Step 3: Deduplicate against existing brokers ──────────────────────
+        # ── Step 2b: Route personal-domain sent contacts to unknown_brokers_inbox ─
+        if personal_domain_contacts:
+            existing_unknown_resp = (
+                supabase_client()
+                .table("unknown_brokers_inbox")
+                .select("sender_email")
+                .eq("carrier_id", carrier_id)
+                .execute()
+            )
+            known_unknown = {row["sender_email"].lower() for row in (existing_unknown_resp.data or [])}
+            for p_email, p_name in personal_domain_contacts.items():
+                if p_email in known_unknown:
+                    continue
+                try:
+                    supabase_client().table("unknown_brokers_inbox").insert({
+                        "carrier_id": carrier_id,
+                        "gmail_message_id": email_message_ids.get(p_email) or f"sent-scan-{p_email}",
+                        "sender_email": p_email,
+                        "sender_name": p_name or None,
+                        "raw_email": "[Found in SENT — personal domain — review to add as broker]",
+                        "classification": "unknown",
+                        "status": "pending_review",
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }).execute()
+                except Exception as exc:
+                    log.error('[extract-brokers] unknown_inbox insert failed email=%s: %s', p_email, exc)
+            log.info('[extract-brokers] personal domain contacts routed to unknown_brokers_inbox count=%d',
+                     len(personal_domain_contacts))
+
+        # ── Step 3: Deduplicate — new vs. enhanceable (existing with null fields) ─
         known_resp = (
             supabase_client()
             .table("brokers")
-            .select("email")
+            .select("email,phone,company,title")
             .eq("carrier_id", carrier_id)
             .execute()
         )
-        known_set: set[str] = {row["email"].lower() for row in (known_resp.data or [])}
-        new_emails = [e for e in unique_emails if e not in known_set]
-        log.info('"[extract-brokers] new=%d already_known=%d"', len(new_emails), len(known_set))
+        known_map: dict[str, dict] = {row["email"].lower(): row for row in (known_resp.data or [])}
+        new_emails = [e for e in email_subjects if e not in known_map]
+        # Enhanceable = existing record missing phone, company, or title
+        enhance_emails = [
+            e for e in email_subjects if e in known_map and
+            not all([known_map[e].get("phone"), known_map[e].get("company"), known_map[e].get("title")])
+        ]
+        process_emails = new_emails + enhance_emails
+        log.info('[extract-brokers] new=%d enhance=%d skip=%d',
+                 len(new_emails), len(enhance_emails),
+                 len(email_subjects) - len(new_emails) - len(enhance_emails))
 
-        # ── Step 4: Fetch body for each new sender ────────────────────────────
+        # ── Steps 4+5: Per-broker pipeline — fetch sig → enrich → write (streaming) ─
+        # Each broker goes start-to-finish in one thread. Records land in SB as they
+        # complete. A crash mid-run loses only the in-flight batch, not everything.
+
         def _extract_body_text(msg):
             def _get_text(part):
                 if part.get("mimeType") == "text/plain":
@@ -1217,69 +1364,153 @@ def _scan_inbox_and_enrich(carrier_id: str) -> None:
                 return ""
             return _get_text(msg.get("payload", {}))
 
-        def _fetch_body(email):
-            msg_id = email_message_ids.get(email)
-            if not msg_id:
-                return email, ""
-            try:
-                msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
-                body = _extract_body_text(msg)
-                lines = [l.strip() for l in body.splitlines() if l.strip()]
-                return email, "\n".join(lines[:40])
-            except Exception as exc:
-                log.error('"[extract-brokers] body fetch failed email=%s: %s"', email, exc)
-                return email, ""
+        imported = 0
+        enhanced = 0
 
-        email_bodies: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            futures = {pool.submit(_fetch_body, e): e for e in new_emails}
-            for future in as_completed(futures):
-                email, body = future.result()
-                email_bodies[email] = body
+        def _process_broker(email):
+            nonlocal imported, enhanced
+            import google.auth.transport.requests as _greq
+            import requests as _rlib
 
-        # ── Step 5: Claude Haiku enrichment + direct write to brokers ─────────
-        def _enrich_and_insert(email):
-            body = email_bodies.get(email, "")
-            name_hint = email_names.get(email, "")
-            prompt = _ENRICH_PROMPT.format(name=name_hint or "unknown", body=body or "not available")
+            # ── 4a: Build thread-local Gmail service (httplib2 not thread-safe) ──
+            # Also build a thread-local Anthropic client — avoids any shared-state
+            # issues with httpx connection pools across concurrent threads.
+            signature = ""
+            sent_context = ""
             try:
-                claude_msg = anthropic_client().messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=300,
-                    messages=[{"role": "user", "content": prompt}],
+                _creds = OAuthCredentials(
+                    token=None,
+                    refresh_token=refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=os.environ["GMAIL_CLIENT_ID"],
+                    client_secret=os.environ["GMAIL_CLIENT_SECRET"],
+                    scopes=["https://www.googleapis.com/auth/gmail.modify"],
                 )
-                enriched = json.loads(claude_msg.content[0].text.strip())
+                _creds.refresh(_greq.Request(session=_rlib.Session()))
+                _svc = build("gmail", "v1", credentials=_creds, cache_discovery=False)
+
+                # Fetch broker's reply from INBOX — last 20 non-blank lines = signature
+                inbox_resp = _svc.users().messages().list(
+                    userId="me",
+                    q=f'from:"{email}"',
+                    maxResults=1,
+                ).execute()
+                inbox_msgs = inbox_resp.get("messages", [])
+                if inbox_msgs:
+                    inbox_msg = _svc.users().messages().get(
+                        userId="me", id=inbox_msgs[0]["id"], format="full"
+                    ).execute()
+                    body = _extract_body_text(inbox_msg)
+                    lines = [l.strip() for l in body.splitlines() if l.strip()]
+                    signature = "\n".join(lines[-20:])
+
+                # Fetch the carrier's own SENT email to this broker — first 30 non-blank
+                # lines give Claude lane/load context (origin, destination, rate, etc.)
+                sent_msg_id = email_message_ids.get(email)
+                if sent_msg_id:
+                    try:
+                        sent_msg = _svc.users().messages().get(
+                            userId="me", id=sent_msg_id, format="full"
+                        ).execute()
+                        sent_body = _extract_body_text(sent_msg)
+                        sent_lines = [l.strip() for l in sent_body.splitlines() if l.strip()]
+                        sent_context = "\n".join(sent_lines[:30])
+                    except Exception as exc:
+                        log.warning('[extract-brokers] sent body fetch failed email=%s: %s', email, exc)
+
             except Exception as exc:
-                log.error('"[extract-brokers] enrich failed email=%s: %s"', email, exc)
-                enriched = {}
+                log.error('[extract-brokers] sig fetch failed email=%s: %s', email, exc)
+
+            # ── 4b: Claude enrich (thread-local client) ───────────────────────────
+            to_name = email_names.get(email, "")
+            _anth = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+            prompt_text = (
+                "Extract contact details from the email signature and lane context below.\n\n"
+                "Return a JSON object with exactly these fields:\n"
+                "{\"name\": \"first last or null\", "
+                "\"title\": \"job title max 25 chars or null\", "
+                "\"company\": \"brokerage or company name or null\", "
+                "\"phone\": \"mobile number only or null\", "
+                "\"origin\": \"pickup city ST or null\", "
+                "\"destination\": \"delivery city ST or null\"}\n\n"
+                "Phone rules — ONLY return a number explicitly labeled Mobile, Cell, or M. "
+                "Return null if the only numbers present are labeled Office, Afterhours, "
+                "After Hours, Direct, Desk, Ext, or are 800/toll-free numbers. "
+                "Never return an office number or afterhours number.\n\n"
+                "Title rule: max 25 characters — truncate if longer.\n\n"
+                "Origin/destination: extract from the lane context (sent email) if present — "
+                "format as city abbreviation e.g. 'Chicago IL'. Return null if not found.\n\n"
+                "Return ONLY valid JSON, no other text.\n\n"
+                f"Sender name hint: {to_name or 'unknown'}\n"
+                f"Signature (broker reply):\n{signature or 'not available'}\n\n"
+                f"Lane context (sent email to broker):\n{sent_context or 'not available'}"
+            )
             try:
-                supabase_client().table("brokers").insert({
-                    "carrier_id": carrier_id,
-                    "email": email,
-                    "name": enriched.get("name") or name_hint or None,
-                    "company": enriched.get("company"),
-                    "phone": enriched.get("phone"),
-                    "status": enriched.get("status") or "warm",
-                    "priority": enriched.get("priority") or "medium",
-                    "notes": enriched.get("notes"),
-                    "last_load_origin": enriched.get("last_load_origin"),
-                    "last_load_destination": enriched.get("last_load_destination"),
-                    "days_cadence": 3,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }).execute()
+                claude_msg = _anth.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=250,
+                    messages=[{"role": "user", "content": prompt_text}],
+                )
+                raw_text = claude_msg.content[0].text.strip() if claude_msg.content else ""
+                log.info('[extract-brokers] claude raw email=%s stop=%s text=%r',
+                         email, claude_msg.stop_reason, raw_text[:300])
+                enriched = json.loads(raw_text)
+            except Exception as exc:
+                log.error('[extract-brokers] enrich failed email=%s: %s', email, exc)
+                enriched = {}
+
+            # ── 4c: Write to SB immediately ───────────────────────────────────────
+            last_contacted = email_sent_dates.get(email)
+            is_new = email not in known_map
+            try:
+                if is_new:
+                    supabase_client().table("brokers").insert({
+                        "carrier_id": carrier_id,
+                        "email": email,
+                        "name": enriched.get("name") or to_name or None,
+                        "title": (enriched.get("title") or "")[:25] or None,
+                        "company": enriched.get("company"),
+                        "phone": enriched.get("phone"),
+                        "last_contacted": last_contacted,
+                        "last_load_origin": enriched.get("origin"),
+                        "last_load_destination": enriched.get("destination"),
+                        "status": "warm",
+                        "priority": "medium",
+                        "days_cadence": 3,
+                    }).execute()
+                    imported += 1
+                    log.info('[extract-brokers] inserted email=%s', email)
+                else:
+                    existing = known_map[email]
+                    patch = {}
+                    if not existing.get("phone") and enriched.get("phone"):
+                        patch["phone"] = enriched["phone"]
+                    if not existing.get("company") and enriched.get("company"):
+                        patch["company"] = enriched["company"]
+                    if not existing.get("title") and enriched.get("title"):
+                        patch["title"] = (enriched["title"])[:25]
+                    if not existing.get("last_load_origin") and enriched.get("origin"):
+                        patch["last_load_origin"] = enriched["origin"]
+                    if not existing.get("last_load_destination") and enriched.get("destination"):
+                        patch["last_load_destination"] = enriched["destination"]
+                    if last_contacted:
+                        patch["last_contacted"] = last_contacted
+                    if patch:
+                        supabase_client().table("brokers").update(patch).eq(
+                            "carrier_id", carrier_id).eq("email", email).execute()
+                        enhanced += 1
+                        log.info('[extract-brokers] enhanced email=%s fields=%s', email, list(patch.keys()))
                 return True
             except Exception as exc:
-                log.error('"[extract-brokers] insert failed email=%s: %s"', email, exc)
+                log.error('[extract-brokers] write failed email=%s: %s', email, exc)
                 return False
 
-        imported = 0
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            futures = {pool.submit(_enrich_and_insert, e): e for e in new_emails}
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            futures = {pool.submit(_process_broker, e): e for e in process_emails}
             for future in as_completed(futures):
-                if future.result():
-                    imported += 1
+                future.result()
 
-        log.info('"[extract-brokers] done imported=%d carrier_id=%s"', imported, carrier_id)
+        log.info('[extract-brokers] done imported=%d enhanced=%d carrier_id=%s', imported, enhanced, carrier_id)
 
     except Exception as e:
         log.exception('[extract-brokers] background thread crashed: %s', e)
@@ -1291,8 +1522,23 @@ def extract_brokers():
     carrier_id = data.get("carrier_id")
     if not carrier_id:
         return jsonify({"error": "carrier_id required"}), 400
-    threading.Thread(target=_scan_inbox_and_enrich, args=(carrier_id,), daemon=True).start()
-    return jsonify({"status": "started", "carrier_id": carrier_id}), 200
+    days = int(data.get("days", 180))
+
+    def run():
+        # Yield immediately so client gets status:started without waiting
+        yield json.dumps({"status": "started", "carrier_id": carrier_id}) + "\n"
+        try:
+            _scan_sent_and_enrich(carrier_id, days)
+            yield json.dumps({"status": "done", "carrier_id": carrier_id}) + "\n"
+        except Exception as exc:
+            log.error('"extract-brokers stream error: %s"', exc, exc_info=True)
+            yield json.dumps({"status": "error", "error": str(exc)}) + "\n"
+
+    return Response(
+        stream_with_context(run()),
+        mimetype="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no"},
+    )
 
 
 @app.route("/import-brokers", methods=["POST"])
@@ -1321,16 +1567,15 @@ def import_brokers():
 
         total = len(broker_list)
 
-        # Pre-fetch existing emails for this carrier to detect duplicates without
-        # relying on DB constraint errors in the hot path.
+        # Pre-fetch existing records so we can enhance nulls rather than skip
         existing_resp = (
             supabase_client()
             .table("brokers")
-            .select("email")
+            .select("email,phone,company")
             .eq("carrier_id", carrier_id)
             .execute()
         )
-        existing_set: set[str] = {row["email"].lower() for row in (existing_resp.data or [])}
+        existing_map: dict[str, dict] = {row["email"].lower(): row for row in (existing_resp.data or [])}
 
         for broker in broker_list:
             email = (broker.get("email") or "").lower().strip()
@@ -1339,26 +1584,37 @@ def import_brokers():
                 errors += 1
                 continue
 
-            if email in existing_set:
-                duplicates += 1
-                continue
-
             try:
-                supabase_client().table("brokers").insert({
-                    "carrier_id": carrier_id,
-                    "email": email,
-                    "name": broker.get("name"),
-                    "company": broker.get("company"),
-                    "phone": broker.get("mobile") or broker.get("direct"),
-                    "status": "warm",
-                    "priority": "medium",
-                    "days_cadence": 3,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }).execute()
-                existing_set.add(email)
-                imported += 1
+                if email not in existing_map:
+                    supabase_client().table("brokers").insert({
+                        "carrier_id": carrier_id,
+                        "email": email,
+                        "name": broker.get("name"),
+                        "company": broker.get("company"),
+                        "phone": broker.get("mobile") or broker.get("direct") or broker.get("phone"),
+                        "status": "warm",
+                        "priority": "medium",
+                        "days_cadence": 3,
+                    }).execute()
+                    existing_map[email] = {}
+                    imported += 1
+                else:
+                    # Enhance nulls only — never overwrite existing data
+                    existing = existing_map[email]
+                    patch = {}
+                    incoming_phone = broker.get("mobile") or broker.get("direct") or broker.get("phone")
+                    if not existing.get("phone") and incoming_phone:
+                        patch["phone"] = incoming_phone
+                    if not existing.get("company") and broker.get("company"):
+                        patch["company"] = broker["company"]
+                    if patch:
+                        supabase_client().table("brokers").update(patch).eq(
+                            "carrier_id", carrier_id).eq("email", email).execute()
+                        imported += 1
+                    else:
+                        duplicates += 1
             except Exception as exc:
-                log.error('"import_brokers — insert failed email=%s: %s"', email, exc)
+                log.error('"import_brokers — write failed email=%s: %s"', email, exc)
                 errors += 1
 
         log.info(
