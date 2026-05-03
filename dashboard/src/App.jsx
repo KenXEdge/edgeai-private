@@ -61,6 +61,13 @@ export default function App() {
         <Route path="/subscribe" element={<Subscribe />} />
 
 <Route path="/" element={<MarketingPage />} />
+        <Route path="/dashboard" element={
+          <RequireAuth>
+            <Layout>
+              <CarrierHome />
+            </Layout>
+          </RequireAuth>
+        } />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
