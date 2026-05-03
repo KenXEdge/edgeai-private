@@ -49,26 +49,6 @@ export default function Login() {
     setMode(newMode)
   }
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-        const { data: carrier } = await supabase
-          .from('carriers')
-          .select('subscription_status, onboarding_complete')
-          .eq('id', session.user.id)
-          .single()
-        if (!carrier || carrier.subscription_status !== 'active') {
-          navigate('/subscribe')
-        } else if (!carrier.onboarding_complete) {
-          navigate('/onboard')
-        } else {
-          navigate('/dashboard')
-        }
-      }
-    })
-    return () => subscription.unsubscribe()
-  }, [])
-
   async function handleSignIn(e) {
     e.preventDefault()
     setError(null)
@@ -76,7 +56,7 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (error) setError(error.message)
-    // onAuthStateChange handles redirect after sign-in
+    else navigate('/dashboard')
   }
 
   async function handleSignUp(e) {
@@ -118,7 +98,7 @@ export default function Login() {
   async function handleGoogle() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: 'https://xtxtec.com/auth' }
+      options: { redirectTo: 'https://xtxtec.com/dashboard' }
     })
     if (error) setError(error.message)
   }
