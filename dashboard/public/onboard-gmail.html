@@ -386,54 +386,68 @@ async function handleContinue() {
   }
 
   btn.disabled = true;
-  btn.innerHTML = 'Scanning inbox…';
-  setStatus('Scanning your inbox for broker contacts…', 'info');
+  btn.innerHTML = 'ACE is working…';
 
-  const carrierId = _session.user.id;
-  let pollInterval = null;
-  let lastCount = -1;
-  let stableRounds = 0;
+  const PATIENCE_MSGS = [
+    'Broker Extraction in Progress…',
+    'Please be Patient — this takes a few minutes',
+    'ACE is already working for you',
+    'Hang in there, ACE has it handled',
+    'Building your broker network…',
+    'Reading your sent history — almost there',
+    'ACE never stops working for you',
+  ];
+  const IDLE_DONE_MS  = 45000;  // 45s with no new brokers = extraction complete
+  const MAX_WAIT_MS   = 600000; // 10 min hard cap
 
-  function stopPolling(finalCount) {
-    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-    setStatus('✓ ' + finalCount + ' brokers found — ACE is ready. Continue to your dashboard.', 'success');
-    btn.disabled = false;
-    btn.innerHTML = 'Continue to Dashboard <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    btn.onclick = function() { window.location.href = '/dashboard'; };
-  }
+  try {
+    const extractRes = await fetch(CLOUD_RUN + '/extract-brokers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ carrier_id: _session.user.id, days: 180 }),
+    });
+    if (!extractRes.ok) throw new Error('Extraction failed (HTTP ' + extractRes.status + ')');
 
-  function startPolling() {
-    pollInterval = setInterval(async function() {
-      try {
+    // Background thread is now running — poll Supabase broker count every 2s
+    const total = await new Promise((resolve) => {
+      let msgIdx    = 0;
+      let lastCount = 0;
+      let lastChange = Date.now();
+      const start    = Date.now();
+
+      setStatus(PATIENCE_MSGS[0] + ' — 0 brokers found so far', 'info');
+
+      const iv = setInterval(async () => {
+        msgIdx = (msgIdx + 1) % PATIENCE_MSGS.length;
+
         const { count } = await _sb
           .from('brokers')
           .select('*', { count: 'exact', head: true })
-          .eq('carrier_id', carrierId);
-        const n = count || 0;
-        setStatus('Finding brokers… ' + n + ' found so far', 'info');
-        if (n === lastCount) {
-          stableRounds++;
-          if (stableRounds >= 3) stopPolling(n);
-        } else {
-          lastCount = n;
-          stableRounds = 0;
-        }
-      } catch (err) {
-        clearInterval(pollInterval);
-        setStatus('Connection error — please try again.', 'error');
-        btn.disabled = false;
-        btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      }
-    }, 1000);
+          .eq('carrier_id', _session.user.id);
+
+        const now = Date.now();
+        if (count !== lastCount) { lastCount = count; lastChange = now; }
+
+        const countLabel = count > 0 ? ' — ' + count + ' brokers found so far' : '';
+        setStatus(PATIENCE_MSGS[msgIdx] + countLabel, 'info');
+        btn.innerHTML = 'ACE is working' + (count > 0 ? ' — ' + count + ' brokers' : '…');
+
+        const idle    = (now - lastChange) > IDLE_DONE_MS && count > 0;
+        const timeout = (now - start) > MAX_WAIT_MS;
+        if (idle || timeout) { clearInterval(iv); resolve(count); }
+      }, 2000);
+    });
+
+    setStatus('✓ ' + total + ' brokers imported to your network — ACE is ready!', 'success');
+    btn.innerHTML = 'Going to Dashboard…';
+    setTimeout(() => { window.location.href = '/dashboard'; }, 2500);
+
+  } catch (err) {
+    console.error('[onboard-gmail] extraction failed:', err);
+    setStatus('Error: ' + err.message + ' — please try again.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
-
-  fetch(CLOUD_RUN + '/extract-brokers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ carrier_id: carrierId }),
-  }).catch(err => console.error('[extract-brokers] POST failed:', err));
-
-  startPolling();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
