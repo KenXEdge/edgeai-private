@@ -1598,7 +1598,7 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 log.error('[extract-brokers] write failed email=%s: %s', email, exc)
                 return False
 
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=2) as pool:
             futures = {pool.submit(_process_broker, e): e for e in process_emails}
             for future in as_completed(futures):
                 future.result()
