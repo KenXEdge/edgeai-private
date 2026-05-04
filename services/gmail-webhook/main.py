@@ -1124,18 +1124,23 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         carrier_name    = (carrier.get("owner_name") or carrier.get("name") or "").strip()
         carrier_phone   = (carrier.get("phone") or "").strip()
         carrier_company = (carrier.get("company_name") or carrier.get("name") or "").strip().lower()
+        _carrier_suffix_re = re.compile(
+            r'(transport(ation)?|trucking?|freight|logistics|express|llc|inc|corp|co|group|services?)$',
+            re.IGNORECASE,
+        )
         if not carrier_company:
             # Derive unique identifier from email domain.
             # Strip common freight/legal suffixes to isolate the carrier's brand token.
             # e.g. contact@xtxtransport.com → "xtxtransport" → strip "transport" → "xtx"
-            import re as _re
             _domain = (carrier.get("email") or "").split("@")[-1].split(".")[0].lower()
-            _carrier_suffix_re = re.compile(
-                r'(transport(ation)?|trucking?|freight|logistics|express|llc|inc|corp|co|group|services?)$',
-                re.IGNORECASE,
-            )
             _unique = _carrier_suffix_re.sub("", _domain).strip()
             carrier_company = _unique if len(_unique) >= 2 else _domain
+        else:
+            # Strip suffixes from company_name to isolate brand token for matching.
+            # e.g. "XTX LLC" → "xtx", "XTX Transport LLC" → "xtx"
+            _unique = _carrier_suffix_re.sub("", carrier_company).strip()
+            if len(_unique) >= 2:
+                carrier_company = _unique
         log.info('[extract-brokers] carrier identity name=%r company=%r phone=****%s',
                  carrier_name, carrier_company, carrier_phone[-4:] if carrier_phone else "")
 
