@@ -6,6 +6,7 @@ classifies broker replies using Claude, and triggers carrier actions.
 
 import os
 import json
+import re
 import base64
 import logging
 import sys
