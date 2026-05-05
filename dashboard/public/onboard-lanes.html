@@ -293,14 +293,10 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
       </div>
       <div class="progress-step">
         <div class="step-dot pending">3</div>
-        <div class="step-label">Rates</div>
-      </div>
-      <div class="progress-step">
-        <div class="step-dot pending">4</div>
         <div class="step-label">Gmail</div>
       </div>
       <div class="progress-step">
-        <div class="step-dot pending">5</div>
+        <div class="step-dot pending">4</div>
         <div class="step-label">Review</div>
       </div>
     </div>
@@ -314,7 +310,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <div class="page">
 
   <div class="page-header">
-    <div class="page-eyebrow">Step 2 of 5</div>
+    <div class="page-eyebrow">Step 2 of 4</div>
     <div class="page-title">Service Lanes</div>
     <div class="page-sub">Tell ACE where you operate so it only sends loads that fit your territory.</div>
   </div>
@@ -498,9 +494,9 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <div class="bottom-bar">
   <div class="bottom-inner">
     <div class="bottom-step-info">
-      <div class="bottom-step-label">Step 2 of 5</div>
+      <div class="bottom-step-label">Step 2 of 4</div>
       <div class="bottom-step-name">Service Lanes</div>
-      <div class="bottom-step-next">Next: Rates →</div>
+      <div class="bottom-step-next">Next: Gmail →</div>
     </div>
     <div class="bottom-actions">
       <button class="btn-back" onclick="window.location.href='/onboard'">← Back</button>
@@ -720,7 +716,7 @@ async function handleContinue() {
     console.error('[onboard-lanes] exception:', err.message);
   }
 
-  window.location.href = '/onboard/rates';
+  window.location.href = '/onboard/gmail';
 }
 </script>
 </body>

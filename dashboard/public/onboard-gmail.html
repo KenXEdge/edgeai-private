@@ -168,22 +168,18 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     <div class="progress-steps">
       <div class="progress-step done">
         <div class="step-dot done">✓</div>
-        <div class="step-label">Truck</div>
+        <div class="step-label">Profile</div>
       </div>
       <div class="progress-step done">
         <div class="step-dot done">✓</div>
         <div class="step-label">Lanes</div>
       </div>
-      <div class="progress-step done">
-        <div class="step-dot done">✓</div>
-        <div class="step-label">Rates</div>
-      </div>
       <div class="progress-step">
-        <div class="step-dot active">4</div>
+        <div class="step-dot active">3</div>
         <div class="step-label active">Gmail</div>
       </div>
       <div class="progress-step">
-        <div class="step-dot pending">5</div>
+        <div class="step-dot pending">4</div>
         <div class="step-label">Review</div>
       </div>
     </div>
@@ -197,7 +193,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <div class="page">
 
   <div class="page-header">
-    <div class="page-eyebrow">Step 4 of 5</div>
+    <div class="page-eyebrow">Step 3 of 4</div>
     <div class="page-title">Connect Gmail</div>
     <div class="page-sub">ACE sends outreach and reads broker replies through your Gmail — no separate inbox needed.</div>
   </div>
@@ -261,18 +257,24 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
   <div id="extract-status" style="display:none"></div>
 
+  <div id="broker-counter" style="display:none;text-align:center;margin:0.5rem 0 1rem;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;">Brokers Found</div>
+    <div id="broker-count-num" style="font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:800;color:var(--gold);line-height:1;transition:transform 0.15s,color 0.15s;">0</div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:4px;letter-spacing:1px;">and counting…</div>
+  </div>
+
 </div><!-- /page -->
 
 <!-- BOTTOM BAR -->
 <div class="bottom-bar">
   <div class="bottom-inner">
     <div class="bottom-step-info">
-      <div class="bottom-step-label">Step 4 of 5</div>
+      <div class="bottom-step-label">Step 3 of 4</div>
       <div class="bottom-step-name">Connect Gmail</div>
       <div class="bottom-step-next">Next: Review →</div>
     </div>
     <div class="bottom-actions">
-      <button class="btn-back" onclick="window.location.href='/onboard/rates'">← Back</button>
+      <button class="btn-back" onclick="window.location.href='/onboard/lanes'">← Back</button>
       <button class="btn-continue" id="btn-continue" onclick="handleContinue()">
         Save &amp; Continue
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -375,7 +377,7 @@ async function handleContinue() {
   const statusEl = document.getElementById('extract-status');
 
   function setStatus(msg, type) {
-    const base = 'display:block;margin:1rem 0;padding:12px 16px;border-radius:2px;font-size:13px;font-weight:600;text-align:center;';
+    const base = 'display:block;margin:1rem 0;padding:12px 16px;border-radius:2px;font-size:13px;font-weight:600;text-align:center;transition:opacity 0.5s;opacity:1;';
     const styles = {
       info:    'background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.2);color:#E8A020',
       success: 'background:rgba(50,200,100,0.1);border:1px solid rgba(50,200,100,0.3);color:#32c864',
@@ -390,12 +392,18 @@ async function handleContinue() {
 
   const PATIENCE_MSGS = [
     'Broker Extraction in Progress…',
-    'Please be Patient — this takes a few minutes',
-    'ACE is already working for you',
-    'Hang in there, ACE has it handled',
-    'Building your broker network…',
-    'Reading your sent history — almost there',
-    'ACE never stops working for you',
+    'ACE is working on it — this takes a few minutes',
+    'So just who is ACE — you may be asking?',
+    'ACE — Agentic Carrier Employee',
+    'EDGE is the platform ACE lives in — Built for Carriers, by Carriers who care about our community!',
+    'Hang in there — ACE has it handled',
+    'Thank you for helping us help you! Support for the EDGE platform is growing fast — you\'re part of it — we\'re just getting started!',
+    'So, why EDGE? Well — 1 to 4 truck Carriers need to find an Edge day to day…',
+    'Do you enjoy battling the spot market with 10 tabs open stressing over taking the load nobody else wants?',
+    'Our test group of carriers averaged over 22 logins daily — constant 2FA, constant passwords, constant click heres',
+    'ACE dials in your incoming load alerts and helps prioritize broker outreach that puts you first in line!',
+    'You WILL gain an EDGE with your 24/7 employee ACE',
+    'Let\'s get you onboarded and set up for increased results!',
   ];
   const IDLE_DONE_MS  = 45000;  // 45s with no new brokers = extraction complete
   const MAX_WAIT_MS   = 600000; // 10 min hard cap
@@ -408,34 +416,50 @@ async function handleContinue() {
     });
     if (!extractRes.ok) throw new Error('Extraction failed (HTTP ' + extractRes.status + ')');
 
-    // Background thread is now running — poll Supabase broker count every 2s
+    // Background thread is now running
+    // count poll: every 2s — keeps broker count fresh and checks done condition
+    // message rotation: every 6s with 0.5s fade each side
     const total = await new Promise((resolve) => {
-      let msgIdx    = 0;
-      let lastCount = 0;
+      let msgIdx     = 0;
+      let lastCount  = 0;
+      let countLabel = '';
       let lastChange = Date.now();
       const start    = Date.now();
 
-      setStatus(PATIENCE_MSGS[0] + ' — 0 brokers found so far', 'info');
+      setStatus(PATIENCE_MSGS[0], 'info');
+      const counterEl = document.getElementById('broker-counter');
+      const countNumEl = document.getElementById('broker-count-num');
+      counterEl.style.display = 'block';
 
-      const iv = setInterval(async () => {
-        msgIdx = (msgIdx + 1) % PATIENCE_MSGS.length;
-
+      const countIv = setInterval(async () => {
         const { count } = await _sb
           .from('brokers')
           .select('*', { count: 'exact', head: true })
           .eq('carrier_id', _session.user.id);
 
         const now = Date.now();
-        if (count !== lastCount) { lastCount = count; lastChange = now; }
-
-        const countLabel = count > 0 ? ' — ' + count + ' brokers found so far' : '';
-        setStatus(PATIENCE_MSGS[msgIdx] + countLabel, 'info');
+        if (count !== lastCount) {
+          lastCount = count; lastChange = now;
+          countNumEl.textContent = count;
+          countNumEl.style.transform = 'scale(1.15)';
+          countNumEl.style.color = '#fff';
+          setTimeout(() => { countNumEl.style.transform = 'scale(1)'; countNumEl.style.color = 'var(--gold)'; }, 150);
+        }
+        countLabel = count > 0 ? ' — ' + count + ' brokers found so far' : '';
         btn.innerHTML = 'ACE is working' + (count > 0 ? ' — ' + count + ' brokers' : '…');
 
         const idle    = (now - lastChange) > IDLE_DONE_MS && count > 0;
         const timeout = (now - start) > MAX_WAIT_MS;
-        if (idle || timeout) { clearInterval(iv); resolve(count); }
+        if (idle || timeout) { clearInterval(countIv); clearInterval(msgIv); resolve(count); }
       }, 2000);
+
+      const msgIv = setInterval(() => {
+        statusEl.style.opacity = '0';
+        setTimeout(() => {
+          msgIdx = (msgIdx + 1) % PATIENCE_MSGS.length;
+          setStatus(PATIENCE_MSGS[msgIdx] + countLabel, 'info');
+        }, 500);
+      }, 6000);
     });
 
     setStatus('✓ ' + total + ' brokers imported to your network — ACE is ready!', 'success');
