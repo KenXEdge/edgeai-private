@@ -351,7 +351,10 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
           <label>Password</label>
           <input type="password" placeholder="••••••••" id="signin-pass">
         </div>
-        <div class="forgot"><a href="#">Forgot password?</a></div>
+        <div class="forgot"><a href="#" onclick="handleForgotPassword(event)">Forgot password?</a></div>
+
+        <div id="signin-error" style="display:none;color:#e05c5c;font-size:12px;margin-bottom:0.75rem;font-weight:600"></div>
+        <div id="signin-msg" style="display:none;color:#4caf50;font-size:12px;margin-bottom:0.75rem;font-weight:600"></div>
 
         <button class="btn-submit" onclick="handleSignIn()">Sign In to EDGE →</button>
 
@@ -451,15 +454,32 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
         </div>
       </div>
 
+      <!-- ── RESET PASSWORD STATE ── -->
+      <div class="success-state" id="reset-state" style="display:none">
+        <span class="success-icon">🔐</span>
+        <div class="success-title">Set New Password</div>
+        <p class="success-sub">Choose a new password for your EDGE account.</p>
+        <div class="form-group" style="text-align:left;margin-bottom:0.75rem">
+          <label>New Password</label>
+          <input type="password" placeholder="Min 8 characters" id="reset-pass" style="width:100%;box-sizing:border-box">
+        </div>
+        <div class="form-group" style="text-align:left;margin-bottom:0.75rem">
+          <label>Confirm Password</label>
+          <input type="password" placeholder="Repeat password" id="reset-pass-confirm" style="width:100%;box-sizing:border-box">
+        </div>
+        <div id="reset-error" style="display:none;color:#e05c5c;font-size:12px;margin-bottom:0.75rem;font-weight:600"></div>
+        <button class="btn-dashboard" onclick="handleSetPassword()">Save Password & Go to Dashboard →</button>
+      </div>
+
       <!-- ── SUCCESS STATE ── -->
       <div class="success-state" id="success-state">
         <span class="success-icon">⚡</span>
         <div class="success-title">ACE Is Ready.</div>
         <p class="success-sub">Your account is set up. Connect your Gmail and ACE starts your broker outreach at 7AM tomorrow.</p>
-        <button class="btn-dashboard" onclick="window.location.href='XEdge_Dashboard.html'">
+        <button class="btn-dashboard" onclick="window.location.href='/dashboard'">
           Go to Dashboard →
         </button>
-        <div class="form-fine" style="margin-top:1rem">edgeai-dashboard.vercel.app</div>
+        <div class="form-fine" style="margin-top:1rem">xtxtec.com</div>
       </div>
 
     </div>
@@ -467,6 +487,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Tab switching
 function switchTab(tab) {
@@ -502,35 +523,87 @@ function selectPlan(plan) {
   }
 }
 
+const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQ0ODEsImV4cCI6MjA5MTM1MDQ4MX0.Ip6k_FlFeol25Kue6Hwq8MdD92Q_qc5QeGJBIVNgEtA';
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function showSignInError(msg) {
+  const el = document.getElementById('signin-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('signin-msg').style.display = 'none';
+}
+function showSignInMsg(msg) {
+  const el = document.getElementById('signin-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('signin-error').style.display = 'none';
+}
+
+async function redirectAfterAuth() {
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session) return;
+  const { data: carrier } = await _sb.from('carriers').select('subscription_status').eq('id', session.user.id).single();
+  if (carrier && carrier.subscription_status === 'active') {
+    window.location.href = '/dashboard';
+  } else {
+    window.location.href = '/subscribe';
+  }
+}
+
 // Sign In
-function handleSignIn() {
-  const email = document.getElementById('signin-email').value;
+async function handleSignIn() {
+  const email = document.getElementById('signin-email').value.trim();
+  const password = document.getElementById('signin-pass').value;
+  if (!email || !password) { showSignInError('Please enter your email and password.'); return; }
+  const { error } = await _sb.auth.signInWithPassword({ email, password });
+  if (error) { showSignInError(error.message); return; }
+  await redirectAfterAuth();
+}
+
+// Google Sign In / Sign Up (same OAuth flow — Supabase handles new vs existing)
+// Detect password recovery token on page load
+_sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    document.querySelectorAll('.auth-tabs, .tab-panel').forEach(el => el.style.display = 'none');
+    document.getElementById('success-state').style.display = 'none';
+    document.getElementById('reset-state').style.display = 'block';
+  }
+});
+
+// Set new password after recovery
+async function handleSetPassword() {
+  const pass = document.getElementById('reset-pass').value;
+  const confirm = document.getElementById('reset-pass-confirm').value;
+  const errEl = document.getElementById('reset-error');
+  if (pass.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; return; }
+  if (pass !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
+  const { error } = await _sb.auth.updateUser({ password: pass });
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  window.location.href = '/dashboard';
+}
+
+async function handleGoogleSignIn() {
+  await _sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://xtxtec.com/dashboard' } });
+}
+async function handleGoogleSignUp() {
+  await _sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://xtxtec.com/dashboard' } });
+}
+
+// Forgot Password
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  const email = document.getElementById('signin-email').value.trim();
+  if (!email) { showSignInError('Enter your email above first, then click Forgot password.'); return; }
+  const { error } = await _sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://xtxtec.com/login' });
+  if (error) { showSignInError(error.message); return; }
+  showSignInMsg('Password reset link sent — check your email.');
+}
+
+// Get Started — send OTP, redirect to /subscribe to begin onboarding
+async function handleSignUp() {
+  const email = document.getElementById('signup-email').value.trim();
   if (!email) { alert('Please enter your email address.'); return; }
-  // In production: supabase.auth.signInWithPassword()
-  // For demo — route to dashboard
-  window.location.href = 'XEdge_Dashboard.html';
-}
-
-// Google Sign In
-function handleGoogleSignIn() {
-  // In production: supabase.auth.signInWithOAuth({ provider: 'google' })
-  window.location.href = 'XEdge_Dashboard.html';
-}
-
-// Sign Up
-function handleSignUp() {
-  const name = document.getElementById('signup-name').value;
-  const email = document.getElementById('signup-email').value;
-  if (!name || !email) { alert('Please fill in your name and email.'); return; }
-  // In production: supabase.auth.signUp() then Stripe checkout
-  // For demo — show success state
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('success-state').style.display = 'block';
-}
-
-// Google Sign Up
-function handleGoogleSignUp() {
-  // In production: supabase.auth.signInWithOAuth({ provider: 'google' })
+  const { error } = await _sb.auth.signInWithOtp({ email });
+  if (error) { alert(error.message); return; }
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('success-state').style.display = 'block';
 }
