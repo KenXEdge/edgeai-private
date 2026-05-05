@@ -490,14 +490,8 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
         <div class="kpi">
           <div class="kpi-label">Response Rate</div>
           <div class="kpi-value" id="kpi-rate">—</div>
-          <div class="kpi-delta neutral" id="kpi-rate-sub">replies ÷ outreach</div>
+          <div class="kpi-delta neutral" id="kpi-rate-sub"></div>
           <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-rate-bar" style="width:0%"></div></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Load Wins</div>
-          <div class="kpi-value" id="kpi-wins">—</div>
-          <div class="kpi-delta neutral" id="kpi-wins-sub">confirmed loads won</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-wins-bar" style="width:0%"></div></div>
         </div>
       </div>
 
@@ -561,7 +555,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
             </div>
             <button class="panel-action">All Wins</button>
           </div>
-          <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
+          <div class="panel-body" style="max-height:440px;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
             <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No wins yet</div>
             <div style="font-size:11px;color:var(--text-dim)">Your first load win will appear here</div>
           </div>
@@ -575,7 +569,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
               <div class="panel-sub">Emails sent per day</div>
             </div>
           </div>
-          <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
+          <div class="panel-body" style="max-height:440px;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
             <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No outreach history yet</div>
             <div style="font-size:11px;color:var(--text-dim)">Chart builds once outreach is active</div>
           </div>
@@ -589,7 +583,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
               <div class="panel-sub">3 of 6 steps complete</div>
             </div>
           </div>
-          <div class="panel-body" style="padding:0 1.5rem">
+          <div class="panel-body" style="padding:0 1.5rem;max-height:440px;overflow-y:auto">
             <div class="setup-steps" id="setup-steps">
               <div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:13px">Loading…</div>
             </div>
@@ -933,10 +927,8 @@ async function loadSidebarCounts(carrier) {
     .eq('carrier_id', _session.user.id);
   if (!sums) return;
   const replies = sums.reduce((a, b) => a + (b.response_count || 0), 0);
-  const wins    = sums.reduce((a, b) => a + (b.load_count || 0), 0);
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
   set('kpi-replies', replies);
-  set('kpi-wins', wins);
   // kpi-outreach and kpi-rate wire to outreach_log once built
 }
 
