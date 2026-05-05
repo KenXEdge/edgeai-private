@@ -346,11 +346,9 @@ body.light .edit-row td{background:#f8f8f8!important}
 .mgmt-empty{padding:2.5rem;text-align:center;color:var(--text-dim);font-size:13px}
 .th-tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);font-size:9px;font-weight:700;cursor:default;margin-left:4px;vertical-align:middle}
 .th-tip:hover .th-tip-box{display:block}
-.th-tip-box{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#222;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.85);font-size:11px;font-weight:400;letter-spacing:0;text-transform:none;white-space:nowrap;padding:8px 12px;border-radius:4px;z-index:200;line-height:1.7;pointer-events:none}
-.th-tip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#222}
-body.light .th-tip{background:rgba(0,0,0,0.1);color:rgba(0,0,0,0.45)}
-body.light .th-tip-box{background:#fff;border-color:#ddd;color:#222}
-body.light .th-tip-box::after{border-top-color:#fff}
+.th-tip-box{display:none;position:fixed;background:#fff;border:1px solid #333;color:#111;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;white-space:nowrap;padding:10px 14px;border-radius:4px;z-index:9999;line-height:1.8;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
+body.light .th-tip{background:rgba(0,0,0,0.1);color:rgba(0,0,0,0.5)}
+body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
 /* ── CONFIRM MODAL ── */
 .confirm-modal{background:var(--dark);border:1px solid rgba(255,80,80,0.3);width:100%;max-width:380px;border-radius:2px}
 .confirm-modal .modal-header{border-bottom-color:rgba(255,80,80,0.2)}
@@ -947,7 +945,31 @@ function closeAddBrokerModal() {
   document.getElementById('add-broker-modal').classList.add('hidden');
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAddBrokerModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAddBrokerModal(); closeConfirm(); } });
+
+// Tooltip positioning via delegation
+document.addEventListener('mouseover', e => {
+  const tip = e.target.closest('.th-tip');
+  if (!tip) return;
+  const box = tip.querySelector('.th-tip-box');
+  if (!box) return;
+  box.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  const bw = box.offsetWidth, bh = box.offsetHeight;
+  let left = r.left + r.width / 2 - bw / 2;
+  let top  = r.top - bh - 8;
+  if (left < 8) left = 8;
+  if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
+  if (top < 8) top = r.bottom + 8;
+  box.style.left = left + 'px';
+  box.style.top  = top  + 'px';
+});
+document.addEventListener('mouseout', e => {
+  const tip = e.target.closest('.th-tip');
+  if (!tip) return;
+  const box = tip.querySelector('.th-tip-box');
+  if (box) box.style.display = 'none';
+});
 
 async function submitAddBroker() {
   const name    = document.getElementById('modal-name').value.trim();
