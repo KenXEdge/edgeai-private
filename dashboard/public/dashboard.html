@@ -322,7 +322,7 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
       </div>
     </div>
     <div class="topbar-center">
-      <div class="topbar-greeting">Good morning, <strong>Ken</strong> — ACE is running your 7AM outreach</div>
+      <div class="topbar-greeting" id="topbar-greeting">Welcome back — loading your profile…</div>
     </div>
     <div class="topbar-right">
       <div class="ace-status">
@@ -336,7 +336,7 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
         </div>
         <span class="toggle-label" id="label-light">Light</span>
       </div>
-      <div class="topbar-avatar">KK</div>
+      <div class="topbar-avatar" id="topbar-avatar">–</div>
     </div>
   </div>
 
@@ -350,22 +350,18 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
     <div class="nav-item" onclick="setActive(this)">
       <div class="nav-icon">📨</div>
       <div class="nav-label">Broker Outreach</div>
-      <div class="nav-badge">42</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
       <div class="nav-icon">🚛</div>
       <div class="nav-label">Load Alerts</div>
-      <div class="nav-badge">3</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
       <div class="nav-icon">📥</div>
       <div class="nav-label">Inbox</div>
-      <div class="nav-badge">7</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
       <div class="nav-icon">🏆</div>
       <div class="nav-label">Load Wins</div>
-      <div class="nav-badge dim">14</div>
     </div>
 
     <div class="sidebar-section">Network</div>
@@ -393,9 +389,9 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
     <div class="sidebar-bottom">
       <div class="tier-card">
         <div class="tier-card-name">Current Plan</div>
-        <div class="tier-card-plan">Base — ACE</div>
-        <div class="tier-card-price">$47 / month</div>
-        <button class="upgrade-btn">Upgrade to ACE+ →</button>
+        <div class="tier-card-plan" id="tier-plan">—</div>
+        <div class="tier-card-price" id="tier-price">—</div>
+        <button class="upgrade-btn">Upgrade to ACE Custom →</button>
       </div>
     </div>
   </div>
@@ -409,8 +405,8 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
         <div class="ace-mode-left">
           <div class="ace-mode-dot"></div>
           <div>
-            <div class="ace-mode-label">ACE Running — Morning Outreach Active</div>
-            <div class="ace-mode-detail">42 broker emails sent · 7:04 AM · Next run tomorrow 7:00 AM</div>
+            <div class="ace-mode-label" id="ace-mode-label">ACE Monitoring — Outreach not yet active</div>
+            <div class="ace-mode-detail" id="ace-mode-detail">Broker network ready · Automated outreach coming soon</div>
           </div>
         </div>
         <button class="ace-toggle" onclick="toggleAce()">Pause ACE</button>
@@ -420,7 +416,7 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
       <div class="page-header">
         <div>
           <div class="page-title">Command Center</div>
-          <div class="page-sub">Friday, April 18, 2026 &nbsp;·&nbsp; Box Truck &nbsp;·&nbsp; Dallas, TX 50mi radius</div>
+          <div class="page-sub" id="page-sub">Loading…</div>
         </div>
         <div class="page-actions">
           <button class="btn-sm btn-sm-outline">View Logs</button>
@@ -431,28 +427,28 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
       <!-- KPI STRIP -->
       <div class="kpi-grid" style="margin-bottom:1.5rem">
         <div class="kpi">
-          <div class="kpi-label">Emails Sent Today</div>
-          <div class="kpi-value">42</div>
-          <div class="kpi-delta up">↑ +8 vs last week</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:70%"></div></div>
+          <div class="kpi-label">Brokers in Network</div>
+          <div class="kpi-value" id="kpi-brokers">—</div>
+          <div class="kpi-delta neutral" id="kpi-brokers-sub">Loading…</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-brokers-bar" style="width:0%"></div></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Emails Sent</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neutral">Outreach not yet active</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Broker Replies</div>
-          <div class="kpi-value gold">7</div>
-          <div class="kpi-delta up">↑ 16.6% reply rate</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:45%"></div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neutral">Outreach not yet active</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Load Wins — April</div>
-          <div class="kpi-value">14</div>
-          <div class="kpi-delta up">↑ Best month so far</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:60%"></div></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Revenue — April</div>
-          <div class="kpi-value gold">$8.4K</div>
-          <div class="kpi-delta neutral">Est. $12K by month end</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:55%"></div></div>
+          <div class="kpi-label">Load Wins</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neutral">Outreach not yet active</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
         </div>
       </div>
 
@@ -463,15 +459,13 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
         <div class="panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Today's Outreach</div>
-              <div class="panel-sub">42 sent · 7 replied · 3 load offers</div>
+              <div class="panel-title">Broker Network</div>
+              <div class="panel-sub" id="outreach-panel-sub">Loading brokers…</div>
             </div>
             <button class="panel-action">View All</button>
           </div>
           <div class="tabs">
-            <div class="tab active">All <span class="tab-count">42</span></div>
-            <div class="tab">Replied <span class="tab-count" style="background:rgba(50,200,100,0.2);color:#32c864">7</span></div>
-            <div class="tab">Offers <span class="tab-count">3</span></div>
+            <div class="tab active">All <span class="tab-count" id="tab-count-all">—</span></div>
           </div>
           <div class="panel-body" style="padding:0 1.5rem">
             <table class="outreach-table">
@@ -498,52 +492,10 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
             </div>
             <button class="panel-action">Inbox →</button>
           </div>
-          <div class="panel-body">
-            <div class="alert-item">
-              <div class="alert-icon alert-icon-match">🚛</div>
-              <div class="alert-body">
-                <div class="alert-headline">SPOT ALERT — Dallas TX → OKC OK</div>
-                <div class="alert-detail">Box Truck · 244 mi · Pickup 4/18 · Shipment S3866353</div>
-                <div class="alert-time">2 min ago · SMS fired ✓</div>
-              </div>
-              <div class="alert-badge badge-match">MATCH</div>
-            </div>
-            <div class="alert-item">
-              <div class="alert-icon alert-icon-broker">✉️</div>
-              <div class="alert-body">
-                <div class="alert-headline">Coyote Logistics — Load Offer Reply</div>
-                <div class="alert-detail">Dallas → OKC · Box Truck · $680 flat</div>
-                <div class="alert-time">8 min ago · Classified: Load Offer</div>
-              </div>
-              <div class="alert-badge badge-reply">OFFER</div>
-            </div>
-            <div class="alert-item">
-              <div class="alert-icon alert-icon-match">🚛</div>
-              <div class="alert-body">
-                <div class="alert-headline">NTG ALERT — Houston TX → Miami FL</div>
-                <div class="alert-detail">1,308 mi · Exceeds 50mi max radius — discarded</div>
-                <div class="alert-time">14 min ago · No SMS — filtered out</div>
-              </div>
-              <div class="alert-badge badge-noise">NO MATCH</div>
-            </div>
-            <div class="alert-item">
-              <div class="alert-icon alert-icon-broker">👤</div>
-              <div class="alert-body">
-                <div class="alert-headline">New Broker Contact — Freight Connections LLC</div>
-                <div class="alert-detail">Inbound inquiry — Dallas lanes · Add to network?</div>
-                <div class="alert-time">22 min ago · Pending review</div>
-              </div>
-              <div class="alert-badge badge-reply">NEW</div>
-            </div>
-            <div class="alert-item">
-              <div class="alert-icon alert-icon-noise">🔕</div>
-              <div class="alert-body">
-                <div class="alert-headline">Apple iCloud — Storage notification</div>
-                <div class="alert-detail">Noise detected — silently discarded</div>
-                <div class="alert-time">31 min ago</div>
-              </div>
-              <div class="alert-badge badge-noise">NOISE</div>
-            </div>
+          <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
+            <div style="font-size:28px">📭</div>
+            <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No activity yet</div>
+            <div style="font-size:11px;color:var(--text-dim)">ACE inbox monitoring activates when outreach goes live</div>
           </div>
         </div>
 
@@ -561,57 +513,10 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
             </div>
             <button class="panel-action">All Wins</button>
           </div>
-          <div class="panel-body">
-            <div class="win-item">
-              <div class="win-left">
-                <div class="win-broker">Echo Global Freight</div>
-                <div class="win-lane">Dallas → OKC · 244 mi · Box Truck</div>
-              </div>
-              <div class="win-right">
-                <div class="win-amount">$680</div>
-                <div class="win-date">Apr 17</div>
-              </div>
-            </div>
-            <div class="win-item">
-              <div class="win-left">
-                <div class="win-broker">Arrive Logistics</div>
-                <div class="win-lane">Fort Worth → Houston · 262 mi</div>
-              </div>
-              <div class="win-right">
-                <div class="win-amount">$720</div>
-                <div class="win-date">Apr 16</div>
-              </div>
-            </div>
-            <div class="win-item">
-              <div class="win-left">
-                <div class="win-broker">Coyote Logistics</div>
-                <div class="win-lane">Dallas → Austin · 195 mi</div>
-              </div>
-              <div class="win-right">
-                <div class="win-amount">$540</div>
-                <div class="win-date">Apr 15</div>
-              </div>
-            </div>
-            <div class="win-item">
-              <div class="win-left">
-                <div class="win-broker">TQL</div>
-                <div class="win-lane">Irving → San Antonio · 263 mi</div>
-              </div>
-              <div class="win-right">
-                <div class="win-amount">$695</div>
-                <div class="win-date">Apr 14</div>
-              </div>
-            </div>
-            <div class="win-item">
-              <div class="win-left">
-                <div class="win-broker">RXO Transport</div>
-                <div class="win-lane">Plano → Shreveport · 197 mi</div>
-              </div>
-              <div class="win-right">
-                <div class="win-amount">$510</div>
-                <div class="win-date">Apr 13</div>
-              </div>
-            </div>
+          <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
+            <div style="font-size:28px">🏆</div>
+            <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No wins yet</div>
+            <div style="font-size:11px;color:var(--text-dim)">Your first load win will appear here</div>
           </div>
         </div>
 
@@ -623,49 +528,10 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
               <div class="panel-sub">Emails sent per day</div>
             </div>
           </div>
-          <div class="panel-body">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1.25rem">
-              <div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-size:2.5rem;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px">267</div>
-                <div style="font-size:10px;color:var(--text-dim);margin-top:4px;letter-spacing:1px;text-transform:uppercase">Emails This Week</div>
-              </div>
-              <div style="text-align:right">
-                <div style="font-size:13px;font-weight:700;color:#32c864">↑ 12%</div>
-                <div style="font-size:10px;color:var(--text-dim)">vs last week</div>
-              </div>
-            </div>
-            <div class="mini-chart">
-              <div class="bar" style="height:55%"></div>
-              <div class="bar" style="height:70%"></div>
-              <div class="bar" style="height:60%"></div>
-              <div class="bar" style="height:80%"></div>
-              <div class="bar" style="height:65%"></div>
-              <div class="bar" style="height:45%"></div>
-              <div class="bar active" style="height:90%"></div>
-            </div>
-            <div class="chart-labels">
-              <div class="chart-label">MON</div>
-              <div class="chart-label">TUE</div>
-              <div class="chart-label">WED</div>
-              <div class="chart-label">THU</div>
-              <div class="chart-label">FRI</div>
-              <div class="chart-label">SAT</div>
-              <div class="chart-label" style="color:var(--gold)">TODAY</div>
-            </div>
-            <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.6rem">
-              <div style="display:flex;justify-content:space-between;align-items:center">
-                <div style="font-size:12px;color:var(--text-dim)">Avg reply rate</div>
-                <div style="font-size:13px;font-weight:700;color:inherit">16.6%</div>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center">
-                <div style="font-size:12px;color:var(--text-dim)">Best broker</div>
-                <div style="font-size:13px;font-weight:700;color:var(--gold)">Coyote</div>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center">
-                <div style="font-size:12px;color:var(--text-dim)">Active brokers</div>
-                <div style="font-size:13px;font-weight:700;color:inherit">265</div>
-              </div>
-            </div>
+          <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
+            <div style="font-size:28px">📈</div>
+            <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No outreach history yet</div>
+            <div style="font-size:11px;color:var(--text-dim)">Chart builds once outreach is active</div>
           </div>
         </div>
 
@@ -678,50 +544,8 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
             </div>
           </div>
           <div class="panel-body" style="padding:0 1.5rem">
-            <div class="setup-steps">
-              <div class="setup-step">
-                <div class="step-check done">✓</div>
-                <div class="step-text">
-                  <div class="step-name">Account Created</div>
-                  <div class="step-detail">Email confirmed · Active</div>
-                </div>
-              </div>
-              <div class="setup-step">
-                <div class="step-check done">✓</div>
-                <div class="step-text">
-                  <div class="step-name">Plan Selected</div>
-                  <div class="step-detail">Base — ACE · $47/mo</div>
-                </div>
-              </div>
-              <div class="setup-step">
-                <div class="step-check done">✓</div>
-                <div class="step-text">
-                  <div class="step-name">Carrier Profile</div>
-                  <div class="step-detail">Box Truck · Dallas 50mi · Set</div>
-                </div>
-              </div>
-              <div class="setup-step">
-                <div class="step-check pending">→</div>
-                <div class="step-text">
-                  <div class="step-name">Connect Gmail</div>
-                  <div class="step-detail">ACE needs your ops Gmail to start</div>
-                </div>
-                <button class="step-action">Connect →</button>
-              </div>
-              <div class="setup-step">
-                <div class="step-check locked">○</div>
-                <div class="step-text">
-                  <div class="step-name dim">Import Broker List</div>
-                  <div class="step-detail">Unlocks after Gmail connected</div>
-                </div>
-              </div>
-              <div class="setup-step">
-                <div class="step-check locked">○</div>
-                <div class="step-text">
-                  <div class="step-name dim">ACE Goes Live</div>
-                  <div class="step-detail">Broker outreach begins at 7AM</div>
-                </div>
-              </div>
+            <div class="setup-steps" id="setup-steps">
+              <div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:13px">Loading…</div>
             </div>
           </div>
         </div>
@@ -752,7 +576,7 @@ let _sb = null, _session = null;
 
   const { data: carrier } = await _sb
     .from('carriers')
-    .select('subscription_status')
+    .select('subscription_status, subscription_tier, owner_name, truck_type, home_base_city, home_base_state, max_radius, gmail_token')
     .eq('id', session.user.id)
     .single();
 
@@ -762,7 +586,7 @@ let _sb = null, _session = null;
   }
 
   document.body.style.visibility = '';
-  loadDashboardData();
+  loadDashboardData(carrier);
 })();
 </script>
 
@@ -857,9 +681,64 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function loadDashboardData() {
+function loadDashboardData(carrier) {
+  wireCarrierData(carrier);
   loadBrokers();
   loadSidebarCounts();
+}
+
+function wireCarrierData(c) {
+  // greeting
+  const hour = new Date().getHours();
+  const tod = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const name = (c.owner_name || '').split(' ')[0] || 'there';
+  const el = document.getElementById('topbar-greeting');
+  if (el) el.innerHTML = tod + ', <strong>' + escHtml(name) + '</strong>';
+
+  // avatar initials
+  const parts = (c.owner_name || '').trim().split(/\s+/);
+  const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length-1][0] : (parts[0] || '?')[0];
+  const av = document.getElementById('topbar-avatar');
+  if (av) av.textContent = initials.toUpperCase();
+
+  // page sub
+  const today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  const truck = c.truck_type ? c.truck_type.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase()) : null;
+  const loc = [c.home_base_city, c.home_base_state].filter(Boolean).join(', ');
+  const parts2 = [today, truck, loc].filter(Boolean);
+  const sub = document.getElementById('page-sub');
+  if (sub) sub.textContent = parts2.join(' · ');
+
+  // tier card
+  const tierNames = { base: 'ACE Base', custom: 'ACE Custom', premium: 'ACE Premium Setup' };
+  const tierPrices = { base: '$47 / month', custom: '$97 / month', premium: '$349 one-time' };
+  const tier = (c.subscription_tier || 'base').toLowerCase();
+  const tp = document.getElementById('tier-plan');
+  const tpr = document.getElementById('tier-price');
+  if (tp) tp.textContent = tierNames[tier] || c.subscription_tier || 'Active';
+  if (tpr) tpr.textContent = tierPrices[tier] || '';
+
+  // setup checklist
+  const hasProfile = !!(c.owner_name);
+  const hasGmail   = !!(c.gmail_token);
+  function step(done, pending, label, detail, action) {
+    const cls = done ? 'done' : pending ? 'pending' : 'locked';
+    const icon = done ? '✓' : pending ? '→' : '○';
+    const nameCls = (!done && !pending) ? 'step-name dim' : 'step-name';
+    return '<div class="setup-step">' +
+      '<div class="step-check ' + cls + '">' + icon + '</div>' +
+      '<div class="step-text"><div class="' + nameCls + '">' + label + '</div><div class="step-detail">' + detail + '</div></div>' +
+      (action ? '<button class="step-action" onclick="' + action + '">' + (pending ? 'Go →' : '') + '</button>' : '') +
+      '</div>';
+  }
+  const stepsEl = document.getElementById('setup-steps');
+  if (stepsEl) stepsEl.innerHTML =
+    step(true,  false, 'Account Created',   'Signed in · Active') +
+    step(true,  false, 'Plan Selected',     tierNames[tier] || 'Active') +
+    step(hasProfile, !hasProfile, 'Carrier Profile', hasProfile ? 'Profile complete' : 'Complete your profile', !hasProfile ? "window.location.href='/onboard'" : '') +
+    step(hasGmail, !hasGmail, 'Connect Gmail', hasGmail ? 'Gmail connected' : 'ACE needs your ops Gmail to start', !hasGmail ? "window.location.href='/onboard/gmail'" : '') +
+    step(false, hasGmail, 'Broker Network', hasGmail ? 'Extraction complete — review your brokers' : 'Unlocks after Gmail connected') +
+    step(false, false, 'ACE Goes Live', 'Automated outreach — coming soon');
 }
 
 async function loadBrokers() {
@@ -907,15 +786,27 @@ async function loadSidebarCounts() {
   if (!_sb || !_session) return;
   const uid = _session.user.id;
 
-  const [{ count: brokerCount }, { count: unknownCount }] = await Promise.all([
-    _sb.from('brokers').select('id', { count: 'exact', head: true }).eq('carrier_id', uid),
-    _sb.from('unknown_brokers_inbox').select('id', { count: 'exact', head: true }).eq('carrier_id', uid),
-  ]);
+  const { count: brokerCount } = await _sb
+    .from('brokers')
+    .select('id', { count: 'exact', head: true })
+    .eq('carrier_id', uid);
 
   const bEl = document.getElementById('badge-brokers');
-  const uEl = document.getElementById('badge-unknown');
   if (bEl) bEl.textContent = brokerCount ?? '—';
-  if (uEl) uEl.textContent = unknownCount ?? '0';
+
+  // KPI card
+  const kpiEl = document.getElementById('kpi-brokers');
+  if (kpiEl) kpiEl.textContent = brokerCount ?? '—';
+  const kpiSub = document.getElementById('kpi-brokers-sub');
+  if (kpiSub) kpiSub.textContent = brokerCount > 0 ? 'In your network' : 'Complete Gmail setup';
+  const kpiBar = document.getElementById('kpi-brokers-bar');
+  if (kpiBar) kpiBar.style.width = Math.min((brokerCount || 0) / 2, 100) + '%';
+
+  // panel sub + tab count
+  const panelSub = document.getElementById('outreach-panel-sub');
+  if (panelSub) panelSub.textContent = brokerCount > 0 ? brokerCount + ' brokers in your network' : 'No brokers yet';
+  const tabCount = document.getElementById('tab-count-all');
+  if (tabCount) tabCount.textContent = brokerCount ?? '—';
 }
 
 function openAddBrokerModal() {
