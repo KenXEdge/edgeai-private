@@ -476,21 +476,27 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
           <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-brokers-bar" style="width:0%"></div></div>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Inbound Contacts</div>
-          <div class="kpi-value" id="kpi-touches">—</div>
-          <div class="kpi-delta neutral" id="kpi-touches-sub">brokers · inbound emails</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-touches-bar" style="width:0%"></div></div>
+          <div class="kpi-label">Outreach Sent</div>
+          <div class="kpi-value" id="kpi-outreach">—</div>
+          <div class="kpi-delta neutral" id="kpi-outreach-sub">emails sent to brokers</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-outreach-bar" style="width:0%"></div></div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Broker Replies</div>
           <div class="kpi-value" id="kpi-replies">—</div>
-          <div class="kpi-delta neutral" id="kpi-replies-sub">brokers · response_count</div>
+          <div class="kpi-delta neutral" id="kpi-replies-sub">broker responses received</div>
           <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-replies-bar" style="width:0%"></div></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Response Rate</div>
+          <div class="kpi-value" id="kpi-rate">—</div>
+          <div class="kpi-delta neutral" id="kpi-rate-sub">replies ÷ outreach</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-rate-bar" style="width:0%"></div></div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Load Wins</div>
           <div class="kpi-value" id="kpi-wins">—</div>
-          <div class="kpi-delta neutral" id="kpi-wins-sub">brokers · load_count</div>
+          <div class="kpi-delta neutral" id="kpi-wins-sub">confirmed loads won</div>
           <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-wins-bar" style="width:0%"></div></div>
         </div>
       </div>
@@ -926,15 +932,12 @@ async function loadSidebarCounts(carrier) {
     .select('touch_count, response_count, load_count')
     .eq('carrier_id', _session.user.id);
   if (!sums) return;
-  const touches = sums.reduce((a, b) => a + (b.touch_count || 0), 0);
   const replies = sums.reduce((a, b) => a + (b.response_count || 0), 0);
   const wins    = sums.reduce((a, b) => a + (b.load_count || 0), 0);
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
-  set('kpi-touches', touches);
   set('kpi-replies', replies);
   set('kpi-wins', wins);
-  const tb = document.getElementById('kpi-touches-bar');
-  if (tb) tb.style.width = Math.min(touches / 5, 100) + '%';
+  // kpi-outreach and kpi-rate wire to outreach_log once built
 }
 
 function openAddBrokerModal() {
