@@ -57,12 +57,12 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 
 /* ── SIDEBAR ── */
 .sidebar{background:var(--dark);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
-.sidebar-section{padding:1.25rem 1rem 0.5rem;font-size:9px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45)}
+.sidebar-section{padding:1.25rem 1rem 0.5rem;font-size:13px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45)}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 1rem;border-radius:2px;margin:1px 0.5rem;cursor:pointer;transition:all 0.15s;border:1px solid transparent;position:relative}
 .nav-item:hover{background:var(--dark3);color:#fff}
 .nav-item.active{background:var(--gold-dim);border-color:var(--gold-border);color:var(--gold)}
 .nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
-.nav-label{font-size:13px;font-weight:600;letter-spacing:0.3px}
+.nav-label{font-size:15px;font-weight:600;letter-spacing:0.3px}
 .nav-badge{margin-left:auto;background:var(--gold);color:var(--black);font-size:9px;font-weight:800;padding:2px 7px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
 .nav-badge.dim{background:rgba(255,255,255,0.08);color:var(--text-dim)}
 
@@ -372,7 +372,7 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
     </div>
     <div class="nav-item" onclick="setActive(this)">
       <div class="nav-icon">❓</div>
-      <div class="nav-label">Unknown Brokers</div>
+      <div class="nav-label">Pending Brokers</div>
       <div class="nav-badge" id="badge-unknown">—</div>
     </div>
 
@@ -807,6 +807,14 @@ async function loadSidebarCounts() {
   if (panelSub) panelSub.textContent = brokerCount > 0 ? brokerCount + ' brokers in your network' : 'No brokers yet';
   const tabCount = document.getElementById('tab-count-all');
   if (tabCount) tabCount.textContent = brokerCount ?? '—';
+
+  // pending brokers badge
+  const { count: pendingCount } = await _sb
+    .from('unknown_brokers_inbox')
+    .select('id', { count: 'exact', head: true })
+    .eq('carrier_id', uid);
+  const pEl = document.getElementById('badge-unknown');
+  if (pEl) pEl.textContent = pendingCount ?? '—';
 }
 
 function openAddBrokerModal() {
