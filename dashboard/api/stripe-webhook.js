@@ -44,20 +44,33 @@ export default async function handler(req, res) {
       case 'checkout.session.completed': {
         const session = event.data.object
         const carrierId = session.metadata?.carrier_id
+
+        // fetch Stripe customer to get name/email/phone for prefill
+        const customer = session.customer
+          ? await stripe.customers.retrieve(session.customer)
+          : null
+
+        const profileFields = {}
+        if (customer?.name)  profileFields.owner_name = customer.name
+        if (customer?.email) profileFields.email       = customer.email
+        if (customer?.phone) profileFields.phone       = customer.phone
+
         if (!carrierId) {
           console.warn('[stripe-webhook] checkout.session.completed: no carrier_id in metadata')
           break
         }
+
         const { error } = await supabase
           .from('carriers')
           .update({
             subscription_status: 'active',
-            subscription_tier: session.metadata.tier,
-            stripe_customer_id: session.customer,
+            subscription_tier:   session.metadata.tier,
+            stripe_customer_id:  session.customer,
+            ...profileFields,
           })
           .eq('id', carrierId)
         if (error) console.error('[stripe-webhook] activate failed:', error.message)
-        else console.log('[stripe-webhook] activated carrier:', carrierId)
+        else console.log('[stripe-webhook] activated carrier:', carrierId, '| profile fields set:', Object.keys(profileFields))
         break
       }
 
