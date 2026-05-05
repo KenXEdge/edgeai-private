@@ -344,6 +344,13 @@ body.light .edit-row td{background:#f8f8f8!important}
 .save-btn{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:var(--gold);color:#000;border:none;padding:6px 14px;border-radius:2px;cursor:pointer}
 .cancel-btn{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:rgba(255,255,255,0.06);color:var(--text-dim);border:none;padding:6px 14px;border-radius:2px;cursor:pointer}
 .mgmt-empty{padding:2.5rem;text-align:center;color:var(--text-dim);font-size:13px}
+.th-tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);font-size:9px;font-weight:700;cursor:default;margin-left:4px;vertical-align:middle}
+.th-tip:hover .th-tip-box{display:block}
+.th-tip-box{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#222;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.85);font-size:11px;font-weight:400;letter-spacing:0;text-transform:none;white-space:nowrap;padding:8px 12px;border-radius:4px;z-index:200;line-height:1.7;pointer-events:none}
+.th-tip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#222}
+body.light .th-tip{background:rgba(0,0,0,0.1);color:rgba(0,0,0,0.45)}
+body.light .th-tip-box{background:#fff;border-color:#ddd;color:#222}
+body.light .th-tip-box::after{border-top-color:#fff}
 /* ── CONFIRM MODAL ── */
 .confirm-modal{background:var(--dark);border:1px solid rgba(255,80,80,0.3);width:100%;max-width:380px;border-radius:2px}
 .confirm-modal .modal-header{border-bottom-color:rgba(255,80,80,0.2)}
@@ -618,7 +625,7 @@ body.light .edit-row td{background:#f8f8f8!important}
               <thead>
                 <tr>
                   <th class="cb-col"><input type="checkbox" id="broker-select-all" onchange="toggleSelectAll('broker')"></th>
-                  <th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Last Reply</th><th></th>
+                  <th>Name</th><th>Company</th><th>Email</th><th>Status <span class="th-tip">?<span class="th-tip-box">🔥 Hot — Active, recently engaged<br>✓ Warm — Has replied or shown interest<br>→ Cold — No recent engagement</span></span></th><th>Last Reply</th><th></th>
                 </tr>
               </thead>
               <tbody id="broker-mgmt-tbody">
@@ -648,7 +655,7 @@ body.light .edit-row td{background:#f8f8f8!important}
               <thead>
                 <tr>
                   <th class="cb-col"><input type="checkbox" id="pending-select-all" onchange="toggleSelectAll('pending')"></th>
-                  <th>Name / Email</th><th>Load</th><th>Rate</th><th>Type</th><th>Received</th><th></th>
+                  <th>Name / Email</th><th>Company</th><th>Phone</th><th>Touches <span class="th-tip">?<span class="th-tip-box">Number of times they contacted you</span></span></th><th>Status</th><th>Add to Network</th>
                 </tr>
               </thead>
               <tbody id="pending-mgmt-tbody">
@@ -1146,17 +1153,13 @@ function renderPendingMgmt() {
   tbody.innerHTML = _pendingRows.map(p => {
     const displayName = escHtml(p.name || p.sender_name || '—');
     const displayEmail = escHtml(p.email || p.sender_email || '—');
-    const load = (p.load_origin && p.load_destination) ? escHtml(p.load_origin + ' → ' + p.load_destination) : '—';
-    const rate = p.rate_offered ? '$' + Number(p.rate_offered).toLocaleString() : '—';
-    const cls = escHtml(p.classification || '—');
-    const dt = new Date(p.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'});
     return `<tr data-id="${p.id}">
       <td class="cb-col"><input type="checkbox" class="pending-cb" value="${p.id}" onchange="updateBulkBar('pending')"></td>
       <td><div style="font-weight:600">${displayName}</div><div style="font-size:11px;color:var(--text-dim)">${displayEmail}</div></td>
-      <td style="font-size:12px">${load}</td>
-      <td>${rate}</td>
-      <td style="font-size:11px;color:var(--text-dim)">${cls}</td>
-      <td style="font-size:11px;color:var(--text-dim)">${dt}</td>
+      <td style="color:var(--text-dim)">—</td>
+      <td style="color:var(--text-dim)">—</td>
+      <td style="color:var(--text-dim)">—</td>
+      <td><span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim)">cold</span></td>
       <td style="white-space:nowrap">
         <button class="add-net-btn" onclick="addPendingToNetwork('${p.id}')">Add →</button>
         <button class="del-btn" onclick="deletePendingRow('${p.id}')" title="Delete">🗑</button>
