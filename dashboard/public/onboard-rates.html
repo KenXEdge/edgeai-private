@@ -170,6 +170,34 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+
+/* ── TOOLTIPS ── */
+.tooltip-trigger{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:15px;height:15px;border-radius:50%;
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);
+  font-size:9px;font-weight:700;letter-spacing:0;text-transform:none;
+  color:var(--text-dim);cursor:default;
+  position:relative;vertical-align:middle;margin-left:5px;flex-shrink:0;
+  transition:border-color 0.15s,color 0.15s;
+}
+.tooltip-trigger:hover{border-color:var(--gold-border);color:var(--gold)}
+.tooltip-trigger:hover .tooltip-box{display:block}
+.tooltip-box{
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);left:0;
+  width:270px;
+  background:#1e1e1e;
+  border:1px solid rgba(232,160,32,0.28);
+  border-radius:3px;padding:10px 13px;
+  font-size:11px;font-weight:400;
+  letter-spacing:0;text-transform:none;
+  color:rgba(255,255,255,0.82);
+  line-height:1.6;
+  z-index:300;pointer-events:none;
+  box-shadow:0 6px 20px rgba(0,0,0,0.5);
+}
 </style>
 </head>
 <body>
@@ -245,84 +273,13 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     </div>
     <div class="section-body">
       <div class="field">
-        <div class="field-label">Minimum Rate per Mile</div>
+        <div class="field-label">Minimum Rate per Mile<span class="tooltip-trigger">?<span class="tooltip-box">Your lowest per mile target, not per load. ACE will automatically ignore any offer below this number, so set it strategically.</span></span></div>
         <div class="input-wrap has-prefix has-suffix">
           <span class="input-prefix">$</span>
           <input type="number" id="rate-floor" min="0" step="0.01" placeholder="2.50">
           <span class="input-suffix">/ mile</span>
         </div>
         <div class="field-hint">ACE will not accept load offers below this rate.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SECTION 2 — Preferred Load Value -->
-  <div class="form-section">
-    <div class="section-header">
-      <div class="section-icon">📋</div>
-      <div>
-        <div class="section-title">Preferred Load Value</div>
-        <div class="section-sub">Minimum total payout per load</div>
-      </div>
-    </div>
-    <div class="section-body">
-      <div class="field">
-        <div class="field-label">Minimum Load Value ($)</div>
-        <div class="input-wrap has-prefix">
-          <span class="input-prefix">$</span>
-          <input type="number" id="min-load-value" min="0" step="1" placeholder="500">
-        </div>
-        <div class="field-hint">Minimum total payout per load — ACE filters out loads below this amount.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SECTION 3 — Deadhead Tolerance -->
-  <div class="form-section">
-    <div class="section-header">
-      <div class="section-icon">🛣️</div>
-      <div>
-        <div class="section-title">Deadhead Tolerance</div>
-        <div class="section-sub">Max empty miles to reach a pickup</div>
-      </div>
-    </div>
-    <div class="section-body">
-      <div class="field">
-        <div class="field-label">Maximum Deadhead Miles</div>
-        <div class="input-wrap has-suffix">
-          <input type="number" id="deadhead" min="0" step="1" placeholder="e.g. 50">
-          <span class="input-suffix">miles</span>
-        </div>
-        <div class="field-hint">How far will you drive empty to get a load?</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SECTION 4 — Fuel Surcharge -->
-  <div class="form-section">
-    <div class="section-header">
-      <div class="section-icon">⛽</div>
-      <div>
-        <div class="section-title">Fuel Surcharge</div>
-        <div class="section-sub">Do you require a fuel surcharge on loads?</div>
-      </div>
-    </div>
-    <div class="section-body">
-      <div class="radio-row">
-        <div class="radio-item" id="fuel-yes" onclick="selectRadio('fuel','fuel-yes')">
-          <div class="radio-circle"><div class="radio-dot"></div></div>
-          <div class="radio-text">
-            <div class="radio-label">Yes — Required</div>
-            <div class="radio-desc">Must include FSC</div>
-          </div>
-        </div>
-        <div class="radio-item" id="fuel-no" onclick="selectRadio('fuel','fuel-no')">
-          <div class="radio-circle"><div class="radio-dot"></div></div>
-          <div class="radio-text">
-            <div class="radio-label">No — Not Required</div>
-            <div class="radio-desc">FSC not needed</div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -367,7 +324,7 @@ let _sb = null, _session = null;
 
   const { data: carrier } = await _sb
     .from('carriers')
-    .select('subscription_status')
+    .select('subscription_status, rate_floor')
     .eq('id', session.user.id)
     .single();
 
@@ -375,6 +332,8 @@ let _sb = null, _session = null;
     window.location.replace('https://xtxtec.com/subscribe');
     return;
   }
+
+  if (carrier.rate_floor) document.getElementById('rate-floor').value = carrier.rate_floor;
 
   document.body.style.visibility = '';
 })();
@@ -413,26 +372,11 @@ function toggleTheme() {
   }
 })();
 
-const radioGroups = {};
-
-function selectRadio(group, id) {
-  if (!radioGroups[group]) radioGroups[group] = [];
-  radioGroups[group].forEach(el => document.getElementById(el).classList.remove('on'));
-  document.getElementById(id).classList.add('on');
-  if (!radioGroups[group].includes(id)) radioGroups[group].push(id);
-}
-
-['fuel-yes','fuel-no'].forEach(id => { if(!radioGroups['fuel']) radioGroups['fuel']=[]; radioGroups['fuel'].push(id); });
 
 async function handleContinue() {
   if (!_session) { window.location.replace('https://xtxtec.com/auth'); return; }
 
-  const rateFloor    = parseFloat(document.getElementById('rate-floor').value) || null;
-  const minLoadValue = parseInt(document.getElementById('min-load-value').value) || null;
-  const deadhead     = parseInt(document.getElementById('deadhead').value) || null;
-
-  const fuelEl       = document.querySelector('#fuel-yes.on, #fuel-no.on');
-  const fuelSurcharge = fuelEl ? fuelEl.id === 'fuel-yes' : null;
+  const rateFloor = parseFloat(document.getElementById('rate-floor').value) || null;
 
   const btn = document.querySelector('.btn-continue');
   btn.disabled = true;
@@ -441,12 +385,7 @@ async function handleContinue() {
   try {
     const { error } = await _sb
       .from('carriers')
-      .update({
-        rate_floor:     rateFloor,
-        min_load_value: minLoadValue,
-        deadhead_miles: deadhead,
-        fuel_surcharge: fuelSurcharge,
-      })
+      .update({ rate_floor: rateFloor })
       .eq('id', _session.user.id);
     if (error) console.error('[onboard-rates] update failed:', error.message);
   } catch (err) {

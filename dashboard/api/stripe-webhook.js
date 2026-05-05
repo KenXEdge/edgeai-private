@@ -44,20 +44,44 @@ export default async function handler(req, res) {
       case 'checkout.session.completed': {
         const session = event.data.object
         const carrierId = session.metadata?.carrier_id
-        if (!carrierId) {
-          console.warn('[stripe-webhook] checkout.session.completed: no carrier_id in metadata')
-          break
+
+        // fetch Stripe customer to get name/email/phone for prefill
+        const customer = session.customer
+          ? await stripe.customers.retrieve(session.customer)
+          : null
+
+        const profileFields = {}
+        if (customer?.name)  profileFields.owner_name = customer.name
+        if (customer?.email) profileFields.email       = customer.email
+        if (customer?.phone) profileFields.phone       = customer.phone
+
+        const updatePayload = {
+          subscription_status: 'active',
+          subscription_tier:   session.metadata?.tier,
+          stripe_customer_id:  session.customer,
+          ...profileFields,
         }
-        const { error } = await supabase
-          .from('carriers')
-          .update({
-            subscription_status: 'active',
-            subscription_tier: session.metadata.tier,
-            stripe_customer_id: session.customer,
-          })
-          .eq('id', carrierId)
-        if (error) console.error('[stripe-webhook] activate failed:', error.message)
-        else console.log('[stripe-webhook] activated carrier:', carrierId)
+
+        if (carrierId) {
+          // primary path — carrier_id in metadata (standard signup)
+          const { error } = await supabase
+            .from('carriers')
+            .update(updatePayload)
+            .eq('id', carrierId)
+          if (error) console.error('[stripe-webhook] activate by id failed:', error.message)
+          else console.log('[stripe-webhook] activated carrier:', carrierId)
+        } else if (customer?.email) {
+          // fallback — OTP signup where carrier_id wasn't in metadata yet
+          console.warn('[stripe-webhook] no carrier_id in metadata — falling back to email match:', customer.email)
+          const { error } = await supabase
+            .from('carriers')
+            .update(updatePayload)
+            .eq('email', customer.email)
+          if (error) console.error('[stripe-webhook] activate by email failed:', error.message)
+          else console.log('[stripe-webhook] activated carrier by email fallback:', customer.email)
+        } else {
+          console.error('[stripe-webhook] cannot activate — no carrier_id and no customer email')
+        }
         break
       }
 

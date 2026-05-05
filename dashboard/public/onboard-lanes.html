@@ -200,6 +200,57 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 .btn-continue:hover{background:#f5b030}
 .btn-continue:active{transform:scale(0.98)}
 
+/* ── FIELD ROWS (focus zone section) ── */
+.field-row{display:grid;gap:0.875rem;margin-bottom:0.875rem}
+.field-row.cols-4{grid-template-columns:1fr 1fr 1fr 1fr}
+.field-row:last-child{margin-bottom:0}
+.field{display:flex;flex-direction:column;gap:5px}
+.field-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)}
+.field input,.field select{
+  background:var(--dark2);border:1px solid var(--border);
+  color:#fff;font-family:'Barlow',sans-serif;font-size:14px;
+  padding:10px 12px;border-radius:2px;outline:none;
+  transition:border 0.15s,background 0.15s;width:100%;
+  appearance:none;-webkit-appearance:none;
+}
+.field input::placeholder{color:var(--text-dim)}
+.field input:focus,.field select:focus{border-color:var(--gold-border);background:rgba(232,160,32,0.04)}
+.field select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(255,255,255,0.3)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+  padding-right:32px;cursor:pointer;
+}
+.field select option{background:#1c1c1c;color:#fff}
+.field-hint{font-size:11px;color:var(--text-dim);line-height:1.4}
+
+/* ── TOOLTIPS ── */
+.tooltip-trigger{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:15px;height:15px;border-radius:50%;
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);
+  font-size:9px;font-weight:700;letter-spacing:0;text-transform:none;
+  color:var(--text-dim);cursor:default;
+  position:relative;vertical-align:middle;margin-left:5px;flex-shrink:0;
+  transition:border-color 0.15s,color 0.15s;
+}
+.tooltip-trigger:hover{border-color:var(--gold-border);color:var(--gold)}
+.tooltip-trigger:hover .tooltip-box{display:block}
+.tooltip-box{
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);left:0;
+  width:270px;
+  background:#1e1e1e;
+  border:1px solid rgba(232,160,32,0.28);
+  border-radius:3px;padding:10px 13px;
+  font-size:11px;font-weight:400;
+  letter-spacing:0;text-transform:none;
+  color:rgba(255,255,255,0.82);
+  line-height:1.6;
+  z-index:300;pointer-events:none;
+  box-shadow:0 6px 20px rgba(0,0,0,0.5);
+}
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -234,7 +285,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     <div class="progress-steps">
       <div class="progress-step done">
         <div class="step-dot done">✓</div>
-        <div class="step-label">Truck</div>
+        <div class="step-label">Profile</div>
       </div>
       <div class="progress-step">
         <div class="step-dot active">2</div>
@@ -242,14 +293,10 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
       </div>
       <div class="progress-step">
         <div class="step-dot pending">3</div>
-        <div class="step-label">Rates</div>
-      </div>
-      <div class="progress-step">
-        <div class="step-dot pending">4</div>
         <div class="step-label">Gmail</div>
       </div>
       <div class="progress-step">
-        <div class="step-dot pending">5</div>
+        <div class="step-dot pending">4</div>
         <div class="step-label">Review</div>
       </div>
     </div>
@@ -263,7 +310,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <div class="page">
 
   <div class="page-header">
-    <div class="page-eyebrow">Step 2 of 5</div>
+    <div class="page-eyebrow">Step 2 of 4</div>
     <div class="page-title">Service Lanes</div>
     <div class="page-sub">Tell ACE where you operate so it only sends loads that fit your territory.</div>
   </div>
@@ -345,42 +392,99 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     <div class="section-body">
       <div class="check-group">
         <div class="check-item" id="chk-ftl" onclick="toggleCheck('chk-ftl')">
-          <div class="check-box">
-            <svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
           <div class="check-label">Full Truckload (FTL)</div>
         </div>
         <div class="check-item" id="chk-ltl" onclick="toggleCheck('chk-ltl')">
-          <div class="check-box">
-            <svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
           <div class="check-label">Less Than Truckload (LTL)</div>
         </div>
-        <div class="check-item" id="chk-partial" onclick="toggleCheck('chk-partial')">
-          <div class="check-box">
-            <svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div class="check-label">Partial Load</div>
+        <div class="check-item" id="chk-ptl" onclick="toggleCheck('chk-ptl')">
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="check-label">Partial Truckload (PTL)</div>
         </div>
         <div class="check-item" id="chk-power" onclick="toggleCheck('chk-power')">
-          <div class="check-box">
-            <svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
           <div class="check-label">Power Only</div>
         </div>
         <div class="check-item" id="chk-drop" onclick="toggleCheck('chk-drop')">
-          <div class="check-box">
-            <svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
           <div class="check-label">Drop and Hook</div>
         </div>
-        <div class="check-item" id="chk-live" onclick="toggleCheck('chk-live')">
-          <div class="check-box">
-            <svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div class="check-label">Live Load / Unload</div>
+        <div class="check-item" id="chk-expedite" onclick="toggleCheck('chk-expedite')">
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="check-label">Expedite</div>
+        </div>
+        <div class="check-item" id="chk-whiteglove" onclick="toggleCheck('chk-whiteglove')">
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="check-label">White Glove</div>
+        </div>
+        <div class="check-item" id="chk-parcel" onclick="toggleCheck('chk-parcel')">
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6 9 1" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="check-label">Parcel and Retail</div>
         </div>
       </div>
+    </div>
+  </div>
+
+
+  <!-- SECTION 5 — Deadhead Tolerance -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">🛣️</div>
+      <div>
+        <div class="section-title">Deadhead Tolerance</div>
+        <div class="section-sub">Max empty miles you'll drive to reach a pickup</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field-row cols-4">
+        <div class="field" style="grid-column:span 2">
+          <div class="field-label">Maximum Deadhead Miles</div>
+          <input type="number" id="deadhead" min="0" step="1" placeholder="e.g. 50">
+          <div class="field-hint">ACE will skip loads that require more empty miles than this to reach the pickup.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6 — Today's Starting Location -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">📍</div>
+      <div>
+        <div class="section-title">Today's Starting Location<span class="tooltip-trigger">?<span class="tooltip-box">ACE uses this for your outreach efforts. Update it anytime from your dashboard — so when you're running in a different area ACE can ensure the right people know where you're headed.</span></span></div>
+        <div class="section-sub">ACE targets your morning brief for loads near this location</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field-row cols-4">
+        <div class="field" style="grid-column:span 2">
+          <div class="field-label">City</div>
+          <input type="text" id="focus-city" placeholder="e.g. Dallas">
+        </div>
+        <div class="field">
+          <div class="field-label">State</div>
+          <select id="focus-state">
+            <option value="">—</option>
+            <option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option>
+            <option>CO</option><option>CT</option><option>DE</option><option>FL</option><option>GA</option>
+            <option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+            <option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+            <option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option>
+            <option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option>
+            <option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+            <option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+            <option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option>
+            <option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">ZIP Code</div>
+          <input type="text" id="focus-zip" placeholder="75201" maxlength="5">
+        </div>
+      </div>
+      <div class="field-hint" style="margin-top:0.75rem">Update this anytime from your dashboard to redirect ACE's morning outreach to wherever you're running that week.</div>
     </div>
   </div>
 
@@ -390,9 +494,9 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <div class="bottom-bar">
   <div class="bottom-inner">
     <div class="bottom-step-info">
-      <div class="bottom-step-label">Step 2 of 5</div>
+      <div class="bottom-step-label">Step 2 of 4</div>
       <div class="bottom-step-name">Service Lanes</div>
-      <div class="bottom-step-next">Next: Rates →</div>
+      <div class="bottom-step-next">Next: Gmail →</div>
     </div>
     <div class="bottom-actions">
       <button class="btn-back" onclick="window.location.href='/onboard'">← Back</button>
@@ -406,7 +510,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-let _sb = null, _session = null;
+let _sb = null, _session = null, _prefillData = null;
 (async function authGate() {
   document.body.style.visibility = 'hidden';
 
@@ -423,7 +527,7 @@ let _sb = null, _session = null;
 
   const { data: carrier } = await _sb
     .from('carriers')
-    .select('subscription_status')
+    .select('subscription_status, preferred_lanes, max_radius, load_types, deadhead_miles, active_focus_city, active_focus_state, active_focus_zip')
     .eq('id', session.user.id)
     .single();
 
@@ -432,6 +536,7 @@ let _sb = null, _session = null;
     return;
   }
 
+  _prefillData = carrier;
   document.body.style.visibility = '';
 })();
 </script>
@@ -496,6 +601,51 @@ function toggleTheme() {
 buildGrid('pickup-grid', 'pickup-count');
 buildGrid('delivery-grid', 'delivery-count');
 
+function prefillLanes(c) {
+  if (!c) return;
+
+  // restore state grid selections
+  if (c.preferred_lanes && c.preferred_lanes.length) {
+    const selected = new Set(c.preferred_lanes);
+    document.querySelectorAll('#pickup-grid .state-btn, #delivery-grid .state-btn').forEach(btn => {
+      if (selected.has(btn.textContent.trim())) btn.classList.add('on');
+    });
+    updateCount('pickup-grid', 'pickup-count');
+    updateCount('delivery-grid', 'delivery-count');
+  }
+
+  // restore radius — reverse map integer → radio id
+  if (c.max_radius !== null && c.max_radius !== undefined) {
+    const radiusRevMap = { 100: 'rad-local', 500: 'rad-regional', 1500: 'rad-otr' };
+    const radId = radiusRevMap[c.max_radius] || 'rad-all';
+    selectRadius(radId);
+  }
+
+  // restore load types
+  if (c.load_types) {
+    const active = new Set(c.load_types.split(',').map(v => v.trim()));
+    const typeMap = { ftl:'chk-ftl', ltl:'chk-ltl', ptl:'chk-ptl', power:'chk-power',
+                      drop:'chk-drop', expedite:'chk-expedite', whiteglove:'chk-whiteglove', parcel:'chk-parcel' };
+    Object.entries(typeMap).forEach(([val, id]) => {
+      if (active.has(val)) document.getElementById(id).classList.add('on');
+    });
+  }
+
+  // restore deadhead
+  if (c.deadhead_miles) document.getElementById('deadhead').value = c.deadhead_miles;
+
+  // restore focus zone
+  if (c.active_focus_city)  document.getElementById('focus-city').value  = c.active_focus_city;
+  if (c.active_focus_state) document.getElementById('focus-state').value = c.active_focus_state;
+  if (c.active_focus_zip)   document.getElementById('focus-zip').value   = c.active_focus_zip;
+}
+
+// run prefill after grids are built and auth is ready
+(function waitAndPrefill() {
+  if (_prefillData) { prefillLanes(_prefillData); return; }
+  setTimeout(waitAndPrefill, 80);
+})();
+
 function selectRadius(id) {
   ['rad-local','rad-regional','rad-otr','rad-all'].forEach(r => {
     document.getElementById(r).classList.remove('on');
@@ -510,19 +660,34 @@ function toggleCheck(id) {
 async function handleContinue() {
   if (!_session) { window.location.replace('https://xtxtec.com/auth'); return; }
 
-  const pickupStates   = Array.from(document.querySelectorAll('#pickup-grid .state-btn.on')).map(el => el.textContent);
-  const deliveryStates = Array.from(document.querySelectorAll('#delivery-grid .state-btn.on')).map(el => el.textContent);
+  const pickupStates   = Array.from(document.querySelectorAll('#pickup-grid .state-btn.on')).map(el => el.textContent.trim());
+  const deliveryStates = Array.from(document.querySelectorAll('#delivery-grid .state-btn.on')).map(el => el.textContent.trim());
   const preferredLanes = [...new Set([...pickupStates, ...deliveryStates])];
 
-  const radiusMap = { 'rad-local': 'local', 'rad-regional': 'regional', 'rad-otr': 'otr', 'rad-all': 'all' };
-  const radiusEl  = document.querySelector('.radio-item.on');
-  const maxRadius = radiusEl ? radiusMap[radiusEl.id] : null;
+  // map radio selection to integer miles for max_radius INTEGER column
+  const radiusIntMap = { 'rad-local': 100, 'rad-regional': 500, 'rad-otr': 1500, 'rad-all': null };
+  const radiusEl = document.querySelector('.radio-item.on');
+  const maxRadius = radiusEl ? radiusIntMap[radiusEl.id] : null;
 
-  const loadTypeMap = { 'chk-ftl': 'ftl', 'chk-ltl': 'ltl', 'chk-partial': 'partial', 'chk-power': 'power', 'chk-drop': 'drop', 'chk-live': 'live' };
+  const loadTypeMap = {
+    'chk-ftl':        'ftl',
+    'chk-ltl':        'ltl',
+    'chk-ptl':        'ptl',
+    'chk-power':      'power',
+    'chk-drop':       'drop',
+    'chk-expedite':   'expedite',
+    'chk-whiteglove': 'whiteglove',
+    'chk-parcel':     'parcel',
+  };
   const loadTypes = Object.entries(loadTypeMap)
     .filter(([id]) => document.getElementById(id).classList.contains('on'))
     .map(([, val]) => val)
     .join(', ');
+
+  const deadhead   = parseInt(document.getElementById('deadhead').value) || null;
+  const focusCity  = document.getElementById('focus-city').value.trim() || null;
+  const focusState = document.getElementById('focus-state').value || null;
+  const focusZip   = document.getElementById('focus-zip').value.trim() || null;
 
   const btn = document.querySelector('.btn-continue');
   btn.disabled = true;
@@ -532,17 +697,26 @@ async function handleContinue() {
     const { error } = await _sb
       .from('carriers')
       .update({
-        preferred_lanes: preferredLanes,
-        max_radius:      maxRadius,
-        load_types:      loadTypes || null,
+        preferred_lanes:    preferredLanes.length ? preferredLanes : null,
+        max_radius:         maxRadius,
+        load_types:         loadTypes || null,
+        deadhead_miles:     deadhead,
+        active_focus_city:  focusCity,
+        active_focus_state: focusState,
+        active_focus_zip:   focusZip,
       })
       .eq('id', _session.user.id);
-    if (error) console.error('[onboard-lanes] update failed:', error.message);
+    if (error) {
+      console.error('[onboard-lanes] update failed:', error.message);
+      btn.disabled = false;
+      btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      return;
+    }
   } catch (err) {
     console.error('[onboard-lanes] exception:', err.message);
   }
 
-  window.location.href = '/onboard/rates';
+  window.location.href = '/onboard/gmail';
 }
 </script>
 </body>

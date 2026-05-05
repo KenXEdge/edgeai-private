@@ -115,6 +115,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 /* ── FIELDS ── */
 .field{display:flex;flex-direction:column;gap:5px}
 .field-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)}
+.field-label .req{color:var(--gold);margin-left:2px}
 .field input,.field select{
   background:var(--dark2);border:1px solid var(--border);
   color:#fff;font-family:'Barlow',sans-serif;font-size:14px;
@@ -133,6 +134,10 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 }
 .field select option{background:#1c1c1c;color:#fff}
 .field-hint{font-size:11px;color:var(--text-dim);margin-top:3px;line-height:1.4}
+
+/* ── TRUCK TYPE ROWS ── */
+#truck-type-rows .field-row{margin-bottom:0.875rem}
+#truck-type-rows .field-row:last-child{margin-bottom:0}
 
 /* ── TOGGLES ── */
 .toggle-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem}
@@ -195,6 +200,34 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 .btn-continue:hover{background:#f5b030}
 .btn-continue:active{transform:scale(0.98)}
 
+/* ── TOOLTIPS ── */
+.tooltip-trigger{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:15px;height:15px;border-radius:50%;
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);
+  font-size:9px;font-weight:700;letter-spacing:0;text-transform:none;
+  color:var(--text-dim);cursor:default;
+  position:relative;vertical-align:middle;margin-left:5px;flex-shrink:0;
+  transition:border-color 0.15s,color 0.15s;
+}
+.tooltip-trigger:hover{border-color:var(--gold-border);color:var(--gold)}
+.tooltip-trigger:hover .tooltip-box{display:block}
+.tooltip-box{
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);left:0;
+  width:270px;
+  background:#1e1e1e;
+  border:1px solid rgba(232,160,32,0.28);
+  border-radius:3px;padding:10px 13px;
+  font-size:11px;font-weight:400;
+  letter-spacing:0;text-transform:none;
+  color:rgba(255,255,255,0.82);
+  line-height:1.6;
+  z-index:300;pointer-events:none;
+  box-shadow:0 6px 20px rgba(0,0,0,0.5);
+}
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -219,7 +252,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
   </div>
   <div class="topbar-right">
     <div class="topbar-label">Carrier Setup</div>
-    <div class="topbar-avatar">KK</div>
+    <div class="topbar-avatar" id="topbar-initials">—</div>
   </div>
 </div>
 
@@ -229,7 +262,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     <div class="progress-steps">
       <div class="progress-step">
         <div class="step-dot active">1</div>
-        <div class="step-label active">Truck</div>
+        <div class="step-label active">Profile</div>
       </div>
       <div class="progress-step">
         <div class="step-dot pending">2</div>
@@ -237,14 +270,10 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
       </div>
       <div class="progress-step">
         <div class="step-dot pending">3</div>
-        <div class="step-label">Rates</div>
-      </div>
-      <div class="progress-step">
-        <div class="step-dot pending">4</div>
         <div class="step-label">Gmail</div>
       </div>
       <div class="progress-step">
-        <div class="step-dot pending">5</div>
+        <div class="step-dot pending">4</div>
         <div class="step-label">Review</div>
       </div>
     </div>
@@ -260,53 +289,136 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
   <div class="page-header">
     <div class="page-eyebrow">Step 1 of 5</div>
     <div class="page-title">Set Up Your ACE Profile</div>
-    <div class="page-sub">Tell ACE about your truck so it can find the right loads and send outreach that matches your operation.</div>
+    <div class="page-sub">Tell ACE who you are and what you run. This powers your morning briefs, load matching, and automated outreach.</div>
   </div>
 
-  <!-- SECTION 1 — Truck Information -->
+  <!-- SECTION 1 — Carrier Identity -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">👤</div>
+      <div>
+        <div class="section-title">Carrier Identity</div>
+        <div class="section-sub">Your name, contact info, and base terminal location</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Full Name <span class="req">*</span></div>
+          <input type="text" id="owner-name" placeholder="e.g. Ken Korbel" autocomplete="name">
+        </div>
+      </div>
+      <div class="field-row cols-2">
+        <div class="field">
+          <div class="field-label">Mobile Phone <span class="req">*</span></div>
+          <input type="tel" id="owner-phone" placeholder="e.g. 972-677-8688" autocomplete="tel">
+          <div class="field-hint">ACE texts load alerts to this number</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Operations Email <span class="req">*</span><span class="tooltip-trigger">?<span class="tooltip-box">The email you use strictly for your Carrier business — this is where you correspond with brokers and where loadboard notifications land. Not your personal email, just for freight!</span></span></div>
+          <input type="email" id="ops-email" placeholder="e.g. dispatch@yourcompany.com" autocomplete="email">
+          <div class="field-hint">Where brokers send load offers — verified in Gmail step</div>
+        </div>
+      </div>
+      <div class="field-row cols-4">
+        <div class="field" style="grid-column:span 2">
+          <div class="field-label">Base Terminal City <span class="req">*</span></div>
+          <input type="text" id="home-city" placeholder="e.g. Dallas" autocomplete="address-level2">
+        </div>
+        <div class="field">
+          <div class="field-label">State <span class="req">*</span></div>
+          <select id="home-state">
+            <option value="">—</option>
+            <option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option>
+            <option>CO</option><option>CT</option><option>DE</option><option>FL</option><option>GA</option>
+            <option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+            <option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+            <option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option>
+            <option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option>
+            <option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+            <option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+            <option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option>
+            <option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">ZIP Code</div>
+          <input type="text" id="home-zip" placeholder="75201" maxlength="5" autocomplete="postal-code">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2 — Equipment -->
   <div class="form-section">
     <div class="section-header">
       <div class="section-icon">🚛</div>
       <div>
-        <div class="section-title">Truck Information</div>
-        <div class="section-sub">Your equipment type and specs</div>
+        <div class="section-title">Equipment</div>
+        <div class="section-sub">Your truck specs and carrier authority numbers</div>
       </div>
     </div>
     <div class="section-body">
-      <div class="field-row cols-2">
+
+      <!-- fleet size + dynamic truck type rows -->
+      <div class="field-row cols-2" style="margin-bottom:0.875rem">
         <div class="field">
-          <div class="field-label">Truck Type</div>
-          <select id="truck-type">
-            <option value="">— Select Type —</option>
-            <option value="box_truck">Box Truck</option>
-            <option value="straight_truck">Straight Truck</option>
-            <option value="sprinter_van">Sprinter Van</option>
-            <option value="cargo_van">Cargo Van</option>
-            <option value="flatbed">Flatbed</option>
-            <option value="reefer">Reefer</option>
-            <option value="power_only">Power Only</option>
-            <option value="other">Other</option>
+          <div class="field-label">Number of Units <span class="req">*</span></div>
+          <input type="number" id="num-units" min="1" max="20" value="1" placeholder="1" oninput="renderTruckTypeRows()">
+        </div>
+      </div>
+
+      <div id="truck-type-rows">
+        <!-- rendered dynamically by renderTruckTypeRows() -->
+      </div>
+
+      <div class="field-row cols-2" style="margin-top:0.875rem">
+        <div class="field">
+          <div class="field-label">Truck Length</div>
+          <select id="truck-length">
+            <option value="">— Select Length —</option>
+            <option value="14">12-14 ft</option>
+            <option value="24">20-24 ft</option>
+            <option value="26" selected>26 ft</option>
+            <option value="40">40 ft</option>
+            <option value="43">43 ft</option>
+            <option value="48">48 ft</option>
+            <option value="53">53 ft</option>
           </select>
         </div>
         <div class="field">
-          <div class="field-label">Number of Units</div>
-          <input type="number" id="num-units" min="1" value="1" placeholder="1">
+          <div class="field-label">Max Load Weight (lbs)</div>
+          <input type="number" id="max-weight" min="0" placeholder="e.g. 15000">
         </div>
       </div>
+
       <div class="field-row cols-2">
         <div class="field">
-          <div class="field-label">Truck Length (ft)</div>
-          <input type="number" id="truck-length" min="1" value="26" placeholder="26">
+          <div class="field-label">Authority Type</div>
+          <select id="carrier-authority">
+            <option value="">— Select —</option>
+            <option value="interstate">Interstate</option>
+            <option value="intrastate">Intrastate</option>
+          </select>
         </div>
         <div class="field">
-          <div class="field-label">Max Load Weight (lbs)</div>
-          <input type="number" id="max-weight" min="0" placeholder="e.g. 15000" value="">
+          <div class="field-label">MC Number</div>
+          <input type="text" id="mc-number" placeholder="e.g. 1234567">
         </div>
       </div>
+
+      <div class="field-row cols-2">
+        <div class="field">
+          <div class="field-label">DOT Number</div>
+          <input type="text" id="dot-number" placeholder="e.g. 3456789">
+        </div>
+        <div class="field"></div>
+      </div>
+
     </div>
   </div>
 
-  <!-- SECTION 2 — Equipment Accessories -->
+  <!-- SECTION 3 — Equipment Accessories -->
   <div class="form-section">
     <div class="section-header">
       <div class="section-icon">⚙️</div>
@@ -342,46 +454,59 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     </div>
   </div>
 
-  <!-- SECTION 3 — Home Base -->
+  <!-- SECTION 4 — Certifications -->
   <div class="form-section">
     <div class="section-header">
-      <div class="section-icon">📍</div>
+      <div class="section-icon">📋</div>
       <div>
-        <div class="section-title">Home Base</div>
-        <div class="section-sub">Where your truck is based — ACE finds loads near you</div>
+        <div class="section-title">Certifications</div>
+        <div class="section-sub">Select all that apply — used for specialized load matching</div>
       </div>
     </div>
     <div class="section-body">
-      <div class="field-row cols-4">
-        <div class="field" style="grid-column:span 2">
-          <div class="field-label">City</div>
-          <input type="text" id="home-city" placeholder="e.g. Dallas">
+      <div class="toggle-grid" style="grid-template-columns:1fr 1fr">
+        <div class="toggle-item" id="tog-twictsa" onclick="toggleItem('tog-twictsa')">
+          <div class="toggle-left">
+            <div class="toggle-name">TWIC / TSA</div>
+            <div class="toggle-desc">Port & secure facility access</div>
+          </div>
+          <div class="toggle-switch"><div class="toggle-knob"></div></div>
         </div>
-        <div class="field">
-          <div class="field-label">State</div>
-          <select id="home-state">
-            <option value="">—</option>
-            <option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option>
-            <option>CO</option><option>CT</option><option>DE</option><option>FL</option><option>GA</option>
-            <option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option>
-            <option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option>
-            <option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option>
-            <option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option>
-            <option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option>
-            <option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option>
-            <option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option>
-            <option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option>
-          </select>
-        </div>
-        <div class="field">
-          <div class="field-label">Zip Code</div>
-          <input type="text" id="home-zip" placeholder="75201" maxlength="5">
+        <div class="toggle-item" id="tog-hazmat" onclick="toggleItem('tog-hazmat')">
+          <div class="toggle-left">
+            <div class="toggle-name">HAZMAT</div>
+            <div class="toggle-desc">Hazardous materials certified</div>
+          </div>
+          <div class="toggle-switch"><div class="toggle-knob"></div></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- SECTION 4 — Rate Floor -->
+  <!-- SECTION 5 — Operation Type -->
+  <div class="form-section">
+    <div class="section-header">
+      <div class="section-icon">👥</div>
+      <div>
+        <div class="section-title">Operation Type</div>
+        <div class="section-sub">How your drivers operate</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="toggle-grid" style="grid-template-columns:1fr 1fr">
+        <div class="toggle-item" id="tog-team" onclick="toggleItem('tog-team')">
+          <div class="toggle-left">
+            <div class="toggle-name">Team Driving</div>
+            <div class="toggle-desc">Two drivers — longer runs</div>
+          </div>
+          <div class="toggle-switch"><div class="toggle-knob"></div></div>
+        </div>
+        <div style="background:transparent;border:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6 — Rate Floor -->
   <div class="form-section">
     <div class="section-header">
       <div class="section-icon">💰</div>
@@ -393,7 +518,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
     <div class="section-body">
       <div class="field-row cols-2">
         <div class="field">
-          <div class="field-label">Minimum Rate per Mile ($)</div>
+          <div class="field-label">Minimum Rate per Mile ($)<span class="tooltip-trigger">?<span class="tooltip-box">Your lowest per mile target, not per load. ACE will automatically ignore any offer below this number, so set it strategically.</span></span></div>
           <div class="rate-input-wrap">
             <span class="rate-prefix">$</span>
             <input type="number" id="rate-floor" min="0" step="0.01" placeholder="2.50" style="padding-left:28px;padding-right:56px">
@@ -411,8 +536,8 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 <div class="bottom-bar">
   <div class="bottom-inner">
     <div class="bottom-step-info">
-      <div class="bottom-step-label">Step 1 of 5</div>
-      <div class="bottom-step-name">Truck Information</div>
+      <div class="bottom-step-label">Step 1 of 4</div>
+      <div class="bottom-step-name">Carrier Profile</div>
       <div class="bottom-step-next">Next: Service Lanes →</div>
     </div>
     <button class="btn-continue" onclick="handleContinue()">
@@ -441,7 +566,7 @@ let _sb = null, _session = null;
 
   const { data: carrier } = await _sb
     .from('carriers')
-    .select('subscription_status')
+    .select('subscription_status, owner_name, phone, email, home_base_city, home_base_state, home_base_zip, truck_type, truck_types, fleet_size, truck_length, max_load_weight, mc_number, dot_number, carrier_authority, has_lift_gate, has_pallet_jack, has_air_ride, has_twic_tsa, has_hazmat, has_team, rate_floor')
     .eq('id', session.user.id)
     .single();
 
@@ -450,11 +575,105 @@ let _sb = null, _session = null;
     return;
   }
 
+  prefillForm(carrier);
   document.body.style.visibility = '';
 })();
+
+function prefillForm(c) {
+  if (c.owner_name) document.getElementById('owner-name').value = c.owner_name;
+  if (c.phone)      document.getElementById('owner-phone').value = c.phone;
+  if (c.email)      document.getElementById('ops-email').value = c.email;
+  if (c.home_base_city)  document.getElementById('home-city').value = c.home_base_city;
+  if (c.home_base_state) document.getElementById('home-state').value = c.home_base_state;
+  if (c.home_base_zip)   document.getElementById('home-zip').value = c.home_base_zip;
+  if (c.fleet_size) document.getElementById('num-units').value = c.fleet_size;
+  if (c.truck_length)     document.getElementById('truck-length').value = c.truck_length;
+  if (c.max_load_weight)  document.getElementById('max-weight').value = c.max_load_weight;
+  if (c.mc_number)        document.getElementById('mc-number').value = c.mc_number;
+  if (c.dot_number)       document.getElementById('dot-number').value = c.dot_number;
+  if (c.carrier_authority) document.getElementById('carrier-authority').value = c.carrier_authority;
+  if (c.rate_floor)       document.getElementById('rate-floor').value = c.rate_floor;
+  if (c.has_lift_gate)   document.getElementById('tog-liftgate').classList.add('on');
+  if (c.has_pallet_jack) document.getElementById('tog-palletjack').classList.add('on');
+  if (c.has_air_ride)    document.getElementById('tog-airride').classList.add('on');
+  if (c.has_twic_tsa)    document.getElementById('tog-twictsa').classList.add('on');
+  if (c.has_hazmat)      document.getElementById('tog-hazmat').classList.add('on');
+  if (c.has_team)        document.getElementById('tog-team').classList.add('on');
+
+  renderTruckTypeRows();
+
+  const savedTypes = c.truck_types || (c.truck_type ? [c.truck_type] : []);
+  const selects = document.querySelectorAll('#truck-type-rows select');
+  selects.forEach((sel, i) => {
+    if (savedTypes[i]) sel.value = savedTypes[i];
+  });
+
+  // set topbar initials from owner_name
+  if (c.owner_name) {
+    const parts = c.owner_name.trim().split(' ');
+    const initials = parts.length >= 2
+      ? parts[0][0] + parts[parts.length - 1][0]
+      : parts[0].slice(0, 2);
+    document.getElementById('topbar-initials').textContent = initials.toUpperCase();
+  }
+}
 </script>
 
 <script>
+const TRUCK_TYPES = [
+  { value: '',               label: '— Select Type —' },
+  { value: 'van',            label: 'Van' },
+  { value: 'reefer',         label: 'Reefer' },
+  { value: 'flatbed',        label: 'Flatbed' },
+  { value: 'power_only',     label: 'Power Only' },
+  { value: 'hotshot',        label: 'Hotshot' },
+  { value: 'large_straight', label: 'Straight Truck 26 ft' },
+  { value: 'small_straight', label: 'Straight Truck 12-24 ft' },
+  { value: 'cargo_van',      label: 'Cargo Van' },
+  { value: 'sprinter_van',   label: 'Sprinter Van' },
+  { value: 'container',      label: 'Container' },
+  { value: 'tanker',         label: 'Tanker' },
+  { value: 'lowboy',         label: 'Lowboy' },
+  { value: 'curtain_side',   label: 'Curtain Side' },
+  { value: 'other',          label: 'Other' },
+];
+
+function renderTruckTypeRows() {
+  const n = Math.min(Math.max(parseInt(document.getElementById('num-units').value) || 1, 1), 20);
+  const container = document.getElementById('truck-type-rows');
+  const current = Array.from(container.querySelectorAll('select')).map(s => s.value);
+  container.innerHTML = '';
+
+  for (let i = 0; i < n; i += 2) {
+    const row = document.createElement('div');
+    row.className = 'field-row cols-2';
+
+    for (let j = i; j < Math.min(i + 2, n); j++) {
+      const field = document.createElement('div');
+      field.className = 'field';
+      const label = document.createElement('div');
+      label.className = 'field-label';
+      label.innerHTML = n === 1
+        ? 'Truck Type <span class="req">*</span>'
+        : `Unit ${j + 1} — Truck Type${j === 0 ? ' <span class="req">*</span>' : ''}`;
+      const sel = document.createElement('select');
+      sel.id = `truck-type-${j}`;
+      TRUCK_TYPES.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.value;
+        opt.textContent = t.label;
+        sel.appendChild(opt);
+      });
+      if (current[j]) sel.value = current[j];
+      field.appendChild(label);
+      field.appendChild(sel);
+      row.appendChild(field);
+    }
+
+    container.appendChild(row);
+  }
+}
+
 function toggleItem(id) {
   document.getElementById(id).classList.toggle('on');
 }
@@ -462,17 +681,27 @@ function toggleItem(id) {
 async function handleContinue() {
   if (!_session) { window.location.replace('https://xtxtec.com/auth'); return; }
 
-  const truckType = document.getElementById('truck-type').value;
-  const city      = document.getElementById('home-city').value.trim();
-  const state     = document.getElementById('home-state').value;
+  const ownerName  = document.getElementById('owner-name').value.trim();
+  const phone      = document.getElementById('owner-phone').value.trim();
+  const opsEmail   = document.getElementById('ops-email').value.trim();
+  const city       = document.getElementById('home-city').value.trim();
+  const state      = document.getElementById('home-state').value;
 
-  if (!truckType) {
-    highlight('truck-type', 'Select your truck type to continue.');
-    return;
+  if (!ownerName) { highlight('owner-name', 'Enter your full name.'); return; }
+  if (!phone)     { highlight('owner-phone', 'Enter your mobile number.'); return; }
+  if (!opsEmail)  { highlight('ops-email', 'Enter your operations email.'); return; }
+  if (!city)      { highlight('home-city', 'Enter your base terminal city.'); return; }
+  if (!state)     { highlight('home-state', 'Select your state.'); return; }
+
+  const fleetSize = parseInt(document.getElementById('num-units').value) || 1;
+  const truckTypes = [];
+  for (let i = 0; i < fleetSize; i++) {
+    const sel = document.getElementById(`truck-type-${i}`);
+    if (sel && sel.value) truckTypes.push(sel.value);
   }
-  if (!city || !state) {
-    if (!city) highlight('home-city', 'Enter your home base city.');
-    else       highlight('home-state', 'Select your state.');
+  if (truckTypes.length === 0) {
+    const firstSel = document.getElementById('truck-type-0');
+    if (firstSel) { highlight('truck-type-0', 'Select your truck type.'); }
     return;
   }
 
@@ -483,19 +712,37 @@ async function handleContinue() {
   const { error } = await _sb
     .from('carriers')
     .update({
-      truck_type:          truckType,
-      fleet_size:          parseInt(document.getElementById('num-units').value) || 1,
-      truck_length:        parseInt(document.getElementById('truck-length').value) || null,
-      max_load_weight:     parseInt(document.getElementById('max-weight').value) || null,
-      home_base_city:      city,
-      home_base_state:     state,
-      home_base_zip:       document.getElementById('home-zip').value.trim() || null,
-      rate_floor:          parseFloat(document.getElementById('rate-floor').value) || null,
+      owner_name:      ownerName,
+      phone:           phone,
+      email:           opsEmail,
+      home_base_city:  city,
+      home_base_state: state,
+      home_base_zip:   document.getElementById('home-zip').value.trim() || null,
+      fleet_size:      fleetSize,
+      truck_type:      truckTypes[0],
+      truck_types:     truckTypes,
+      truck_length:    parseInt(document.getElementById('truck-length').value) || null,
+      max_load_weight: parseInt(document.getElementById('max-weight').value) || null,
+      mc_number:        document.getElementById('mc-number').value.trim() || null,
+      dot_number:       document.getElementById('dot-number').value.trim() || null,
+      carrier_authority: document.getElementById('carrier-authority').value || null,
+      has_lift_gate:    document.getElementById('tog-liftgate').classList.contains('on'),
+      has_pallet_jack:  document.getElementById('tog-palletjack').classList.contains('on'),
+      has_air_ride:     document.getElementById('tog-airride').classList.contains('on'),
+      has_twic_tsa:     document.getElementById('tog-twictsa').classList.contains('on'),
+      has_hazmat:       document.getElementById('tog-hazmat').classList.contains('on'),
+      has_team:         document.getElementById('tog-team').classList.contains('on'),
+      rate_floor:      parseFloat(document.getElementById('rate-floor').value) || null,
       onboarding_complete: false,
     })
     .eq('id', _session.user.id);
 
-  if (error) console.error('[onboard] update failed:', error.message);
+  if (error) {
+    console.error('[onboard] update failed:', error.message);
+    btn.disabled = false;
+    btn.innerHTML = 'Save &amp; Continue <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return;
+  }
 
   window.location.href = '/onboard/lanes';
 }
@@ -534,11 +781,14 @@ function toggleTheme() {
 
 function highlight(id, msg) {
   const el = document.getElementById(id);
+  if (!el) return;
   el.style.borderColor = 'rgba(255,80,80,0.6)';
   el.focus();
   setTimeout(() => el.style.borderColor = '', 2500);
   console.warn(msg);
 }
+
+renderTruckTypeRows();
 </script>
 </body>
 </html>

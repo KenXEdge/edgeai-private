@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACE Patience Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #E8A020;
+    --dark: #1a1a1a;
+    --dark2: #222;
+    --dark3: #2a2a2a;
+    --border: rgba(255,255,255,0.08);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--dark); color: #fff; font-family: 'Barlow Condensed', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+  .card { background: var(--dark3); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; width: 100%; max-width: 520px; }
+  .card-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1.5rem; text-align: center; }
+  #extract-status {
+    display: block;
+    margin: 0 0 1rem;
+    padding: 12px 16px;
+    border-radius: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    transition: opacity 1s;
+    opacity: 1;
+    background: rgba(232,160,32,0.08);
+    border: 1px solid rgba(232,160,32,0.25);
+    color: rgba(232,160,32,0.9);
+    min-height: 44px;
+  }
+  #broker-counter { text-align: center; margin: 0.5rem 0 1.5rem; }
+  #broker-counter .label { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+  #broker-count-num { font-family: 'Barlow Condensed', sans-serif; font-size: 64px; font-weight: 800; color: var(--gold); line-height: 1; transition: transform 0.15s, color 0.15s; }
+  #broker-counter .sub { font-size: 10px; color: var(--text-dim); margin-top: 4px; letter-spacing: 1px; }
+  .controls { display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.5rem; }
+  button { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; }
+  .btn-start { background: var(--gold); color: #000; }
+  .btn-reset { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+  .msg-index { font-size: 10px; color: var(--text-dim); text-align: center; margin-top: 0.75rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-title">ACE Extraction — Patience Sequence Demo</div>
+
+  <div id="extract-status">Press Start to preview</div>
+
+  <div id="broker-counter">
+    <div class="label">Brokers Found</div>
+    <div id="broker-count-num">0</div>
+    <div class="sub" id="counter-sub">waiting…</div>
+  </div>
+
+  <div class="msg-index" id="msg-index">Message 0 of 13</div>
+
+  <div class="controls">
+    <button class="btn-start" onclick="startDemo()">▶ Start</button>
+    <button class="btn-reset" onclick="resetDemo()">↺ Reset</button>
+  </div>
+</div>
+
+<script>
+const PATIENCE_MSGS = [
+  'Broker Extraction in Progress…',
+  'ACE is working on it — this takes a few minutes',
+  'So just who is ACE — you may be asking?',
+  'ACE — Agentic Carrier Employee',
+  'EDGE is the platform ACE lives in — Built for Carriers, by Carriers who care about our community!',
+  'Hang in there — ACE has it handled',
+  'Thank you for helping us help you! Support for the EDGE platform is growing fast — you\'re part of it — we\'re just getting started!',
+  'So, why EDGE? Well — 1 to 4 truck Carriers need to find an Edge day to day…',
+  'Do you enjoy battling the spot market with 10 tabs open stressing over taking the load nobody else wants?',
+  'Our test group of carriers averaged over 22 logins daily — constant 2FA, constant passwords, constant click heres',
+  'ACE dials in your incoming load alerts and helps prioritize broker outreach that puts you first in line!',
+  'You WILL gain an EDGE with your 24/7 employee — ACE',
+  'EDGE — Helping carriers move up the ladder — that\'s our goal!',
+];
+
+const FAKE_COUNTS = [0,0,0,4,11,18,27,35,44,52,61,73,89,103,119,130,136];
+let msgIdx = 0, countIdx = 0, msgIv = null, countIv = null;
+
+const statusEl   = document.getElementById('extract-status');
+const countNumEl = document.getElementById('broker-count-num');
+const counterSub = document.getElementById('counter-sub');
+const msgIndexEl = document.getElementById('msg-index');
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+  statusEl.style.opacity = '1';
+}
+
+function bumpCount(n) {
+  countNumEl.textContent = n;
+  countNumEl.style.transform = 'scale(1.15)';
+  countNumEl.style.color = '#fff';
+  setTimeout(() => { countNumEl.style.transform = 'scale(1)'; countNumEl.style.color = 'var(--gold)'; }, 150);
+  if (n > 0) counterSub.textContent = 'and counting…';
+}
+
+function startDemo() {
+  resetDemo();
+  setStatus(PATIENCE_MSGS[0]);
+  msgIndexEl.textContent = 'Message 1 of ' + PATIENCE_MSGS.length;
+
+  countIv = setInterval(() => {
+    if (countIdx < FAKE_COUNTS.length) {
+      bumpCount(FAKE_COUNTS[countIdx++]);
+    }
+  }, 1500);
+
+  msgIv = setInterval(() => {
+    statusEl.style.opacity = '0';
+    setTimeout(() => {
+      msgIdx = (msgIdx + 1) % PATIENCE_MSGS.length;
+      setStatus(PATIENCE_MSGS[msgIdx]);
+      msgIndexEl.textContent = 'Message ' + (msgIdx + 1) + ' of ' + PATIENCE_MSGS.length;
+    }, 3000);
+  }, 13000);
+}
+
+function resetDemo() {
+  clearInterval(msgIv); clearInterval(countIv);
+  msgIdx = 0; countIdx = 0;
+  statusEl.style.opacity = '1';
+  statusEl.textContent = 'Press Start to preview';
+  countNumEl.textContent = '0';
+  countNumEl.style.transform = 'scale(1)';
+  countNumEl.style.color = 'var(--gold)';
+  counterSub.textContent = 'waiting…';
+  msgIndexEl.textContent = 'Message 0 of ' + PATIENCE_MSGS.length;
+}
+</script>
+</body>
+</html>
