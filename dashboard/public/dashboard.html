@@ -83,7 +83,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .page-title{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:1px;line-height:1}
 .page-sub{font-size:13px;color:var(--text-dim);margin-top:4px}
 .page-actions{display:flex;gap:0.75rem}
-.btn-sm{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:9px 18px;border-radius:2px;cursor:pointer;border:none;transition:all 0.15s}
+.btn-sm{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:9px 18px;border-radius:2px;cursor:pointer;border:none;transition:all 0.15s}
 .btn-sm-gold{background:var(--gold);color:var(--black)}
 .btn-sm-gold:hover{background:#f5b030}
 .btn-sm-outline{background:transparent;color:var(--text-mid);border:1px solid var(--border)}
@@ -123,7 +123,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .ace-mode-dot.paused{background:#ff8800}
 .ace-mode-label{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold)}
 .ace-mode-detail{font-size:11px;color:rgba(232,160,32,0.6);margin-top:1px}
-.ace-toggle{background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:7px 14px;border-radius:2px;border:none;cursor:pointer}
+.ace-toggle{background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:9px 18px;border-radius:2px;border:none;cursor:pointer;transition:all 0.15s}
 
 /* ── OUTREACH TABLE ── */
 .outreach-table{width:100%;border-collapse:collapse}
@@ -276,6 +276,9 @@ body.light .kpi-value{color:#111}
 body.light .tier-card-plan{color:#111}
 body.light .nav-item:hover{color:#111}
 body.light .btn-sm-outline:hover{color:#111}
+body.light .btn-sm-outline{color:#111;border-color:rgba(0,0,0,0.2)}
+body.light .btn-sm-gold{color:#111}
+body.light .ace-toggle{color:#111}
 body.light .topbar-greeting strong{color:#111;font-weight:800}
 body.light .sidebar-section{color:#111;font-weight:900}
 body.light .broker-name{color:#111;font-weight:800}
@@ -623,7 +626,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
               <thead>
                 <tr>
                   <th class="cb-col"><input type="checkbox" id="broker-select-all" onchange="toggleSelectAll('broker')"></th>
-                  <th>Name</th><th>Company</th><th>Email</th><th>Status <span class="th-tip">?<span class="th-tip-box">🔥 Hot — Active, recently engaged<br>✓ Warm — Has replied or shown interest<br>→ Cold — No recent engagement</span></span></th><th>Last Reply</th><th></th>
+                  <th>Name</th><th>Company</th><th>Email</th><th>Status <span class="th-tip">?<span class="th-tip-box">Hot — Active, recently engaged<br>Warm — Has replied or shown interest<br>Cold — No recent engagement</span></span></th><th>Last Reply</th><th></th>
                 </tr>
               </thead>
               <tbody id="broker-mgmt-tbody">
@@ -896,9 +899,9 @@ async function loadBrokers() {
   }
 
   const pillMap = {
-    hot:  '<div class="status-pill pill-offer">🔥 Hot</div>',
-    warm: '<div class="status-pill pill-replied">✓ Active</div>',
-    cold: '<div class="status-pill pill-sent">→ Cold</div>',
+    hot:  '<span style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold)">Hot</span>',
+    warm: '<span style="font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-mid)">Warm</span>',
+    cold: '<span style="font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim)">Cold</span>',
   };
 
   tbody.innerHTML = brokers.map(b => {
