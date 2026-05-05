@@ -279,7 +279,8 @@ body.light .btn-sm-outline:hover{color:#111}
 body.light .btn-sm-outline{color:#111;border-color:rgba(0,0,0,0.2)}
 body.light .btn-sm-gold{color:#111}
 body.light .ace-toggle{color:#111}
-body.light .topbar-greeting strong{color:#111;font-weight:800}
+body.light .topbar-greeting{color:#fff}
+body.light .topbar-greeting strong{color:#fff;font-weight:800}
 body.light .sidebar-section{color:#111;font-weight:900}
 body.light .broker-name{color:#111;font-weight:800}
 body.light .alert-headline{color:#111;font-weight:800}
@@ -679,7 +680,7 @@ let _sb = null, _session = null, _carrier = null;
 
   const { data: carrier } = await _sb
     .from('carriers')
-    .select('subscription_status, subscription_tier, owner_name, truck_type, home_base_city, home_base_state, max_radius, gmail_token, broker_count, pending_count')
+    .select('subscription_status, subscription_tier, owner_name, company_name, truck_type, home_base_city, home_base_state, max_radius, gmail_token, broker_count, pending_count')
     .eq('id', session.user.id)
     .single();
 
@@ -809,10 +810,9 @@ function loadDashboardData(carrier) {
 function wireCarrierData(c) {
   // greeting
   const hour = new Date().getHours();
-  const tod = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const name = (c.owner_name || '').split(' ')[0] || 'there';
+  const company = escHtml(c.company_name || c.owner_name || 'there');
   const el = document.getElementById('topbar-greeting');
-  if (el) el.innerHTML = tod + ', <strong>' + escHtml(name) + '</strong>';
+  if (el) el.innerHTML = 'Good day, <strong>' + company + '</strong>';
 
   // avatar initials
   const parts = (c.owner_name || '').trim().split(/\s+/);
