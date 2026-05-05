@@ -476,22 +476,22 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
           <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-brokers-bar" style="width:0%"></div></div>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Emails Sent</div>
-          <div class="kpi-value">—</div>
-          <div class="kpi-delta neutral">Outreach not yet active</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          <div class="kpi-label">Broker Touches</div>
+          <div class="kpi-value" id="kpi-touches">—</div>
+          <div class="kpi-delta neutral" id="kpi-touches-sub">brokers · touch_count</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-touches-bar" style="width:0%"></div></div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Broker Replies</div>
-          <div class="kpi-value">—</div>
-          <div class="kpi-delta neutral">Outreach not yet active</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          <div class="kpi-value" id="kpi-replies">—</div>
+          <div class="kpi-delta neutral" id="kpi-replies-sub">brokers · response_count</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-replies-bar" style="width:0%"></div></div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Load Wins</div>
-          <div class="kpi-value">—</div>
-          <div class="kpi-delta neutral">Outreach not yet active</div>
-          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" style="width:0%"></div></div>
+          <div class="kpi-value" id="kpi-wins">—</div>
+          <div class="kpi-delta neutral" id="kpi-wins-sub">brokers · load_count</div>
+          <div class="kpi-sparkline"><div class="kpi-sparkline-fill" id="kpi-wins-bar" style="width:0%"></div></div>
         </div>
       </div>
 
@@ -907,7 +907,7 @@ async function loadBrokers() {
   }).join('');
 }
 
-function loadSidebarCounts(carrier) {
+async function loadSidebarCounts(carrier) {
   const bc = carrier ? (carrier.broker_count ?? 0) : 0;
   const kpiEl = document.getElementById('kpi-brokers');
   if (kpiEl) kpiEl.textContent = bc || '—';
@@ -919,6 +919,22 @@ function loadSidebarCounts(carrier) {
   if (panelSub) panelSub.textContent = bc > 0 ? bc + ' brokers in your network' : 'No brokers yet';
   const tabCount = document.getElementById('tab-count-all');
   if (tabCount) tabCount.textContent = bc || '—';
+
+  if (!_sb || !_session) return;
+  const { data: sums } = await _sb
+    .from('brokers')
+    .select('touch_count, response_count, load_count')
+    .eq('carrier_id', _session.user.id);
+  if (!sums) return;
+  const touches = sums.reduce((a, b) => a + (b.touch_count || 0), 0);
+  const replies = sums.reduce((a, b) => a + (b.response_count || 0), 0);
+  const wins    = sums.reduce((a, b) => a + (b.load_count || 0), 0);
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
+  set('kpi-touches', touches);
+  set('kpi-replies', replies);
+  set('kpi-wins', wins);
+  const tb = document.getElementById('kpi-touches-bar');
+  if (tb) tb.style.width = Math.min(touches / 5, 100) + '%';
 }
 
 function openAddBrokerModal() {
