@@ -511,7 +511,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
             <div class="tab active">All <span class="tab-count" id="tab-count-all">—</span></div>
           </div>
           <div class="panel-body" style="padding:0 1.5rem">
-            <table class="outreach-table">
+            <table class="outreach-table" style="width:100%">
               <thead>
                 <tr>
                   <th>Broker</th>
@@ -519,10 +519,14 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
                   <th>Time</th>
                 </tr>
               </thead>
-              <tbody id="broker-tbody">
-                <tr><td colspan="3" style="padding:2rem;text-align:center;color:var(--text-dim);font-size:13px">Loading brokers…</td></tr>
-              </tbody>
             </table>
+            <div style="max-height:480px;overflow-y:auto">
+              <table class="outreach-table" style="width:100%">
+                <tbody id="broker-tbody">
+                  <tr><td colspan="3" style="padding:2rem;text-align:center;color:var(--text-dim);font-size:13px">Loading brokers…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -535,7 +539,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
             </div>
             <button class="panel-action">Inbox →</button>
           </div>
-          <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
+          <div class="panel-body" style="max-height:480px;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
             <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No activity yet</div>
             <div style="font-size:11px;color:var(--text-dim)">ACE inbox monitoring activates when outreach goes live</div>
           </div>
