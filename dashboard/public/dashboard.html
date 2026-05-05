@@ -61,7 +61,6 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 1rem;border-radius:2px;margin:1px 0.5rem;cursor:pointer;transition:all 0.15s;border:1px solid transparent;position:relative}
 .nav-item:hover{background:var(--dark3);color:#fff}
 .nav-item.active{background:var(--gold-dim);border-color:var(--gold-border);color:var(--gold)}
-.nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
 .nav-label{font-size:15px;font-weight:600;letter-spacing:0.3px}
 .nav-badge{margin-left:auto;background:var(--gold);color:var(--black);font-size:15px;font-weight:500;padding:2px 8px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
 .nav-badge.dim{background:rgba(255,255,255,0.08);color:var(--text-dim)}
@@ -395,45 +394,36 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
   <div class="sidebar">
     <div class="sidebar-section">Operations</div>
     <div class="nav-item active" onclick="setActive(this);showView('dashboard')">
-      <div class="nav-icon">⚡</div>
       <div class="nav-label">Dashboard</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
-      <div class="nav-icon">📨</div>
       <div class="nav-label">Broker Outreach</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
-      <div class="nav-icon">🚛</div>
       <div class="nav-label">Load Alerts</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
-      <div class="nav-icon">📥</div>
       <div class="nav-label">Inbox</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
-      <div class="nav-icon">🏆</div>
       <div class="nav-label">Load Wins</div>
     </div>
 
     <div class="sidebar-section">Network</div>
     <div class="nav-item" onclick="setActive(this);showView('brokers')">
-      <div class="nav-icon">🤝</div>
       <div class="nav-label">Brokers</div>
       <div class="nav-badge dim" id="badge-brokers">—</div>
     </div>
     <div class="nav-item" onclick="setActive(this);showView('pending')">
-      <div class="nav-icon">⏳</div>
       <div class="nav-label">Pending Brokers</div>
       <div class="nav-badge" id="badge-unknown">—</div>
     </div>
 
     <div class="sidebar-section">Account</div>
     <div class="nav-item" onclick="setActive(this)">
-      <div class="nav-icon">⚙️</div>
       <div class="nav-label">ACE Settings</div>
     </div>
     <div class="nav-item" onclick="setActive(this)">
-      <div class="nav-icon">👤</div>
       <div class="nav-label">Profile</div>
     </div>
 
@@ -544,7 +534,6 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
             <button class="panel-action">Inbox →</button>
           </div>
           <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
-            <div style="font-size:28px">📭</div>
             <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No activity yet</div>
             <div style="font-size:11px;color:var(--text-dim)">ACE inbox monitoring activates when outreach goes live</div>
           </div>
@@ -565,7 +554,6 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
             <button class="panel-action">All Wins</button>
           </div>
           <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
-            <div style="font-size:28px">🏆</div>
             <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No wins yet</div>
             <div style="font-size:11px;color:var(--text-dim)">Your first load win will appear here</div>
           </div>
@@ -580,7 +568,6 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
             </div>
           </div>
           <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;gap:8px">
-            <div style="font-size:28px">📈</div>
             <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">No outreach history yet</div>
             <div style="font-size:11px;color:var(--text-dim)">Chart builds once outreach is active</div>
           </div>
