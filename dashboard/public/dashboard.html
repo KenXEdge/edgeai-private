@@ -308,6 +308,45 @@ body.light .modal-title{color:#111}
 body.light .modal-field label{color:rgba(0,0,0,0.6)}
 body.light .modal-field input{background:#f8f8f8;border-color:#e0e0e0;color:#111}
 body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
+/* ── VIEWS ── */
+.view{display:none}.view.active{display:block}
+/* ── MGMT TABLE ── */
+.mgmt-table{width:100%;border-collapse:collapse}
+.mgmt-table th{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.mgmt-table td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-mid);vertical-align:middle}
+.mgmt-table tr:hover td{background:var(--dark2)}
+.mgmt-table .cb-col{width:36px;padding:0 8px 0 12px}
+.mgmt-table input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:pointer}
+.del-btn{background:none;border:none;color:rgba(255,80,80,0.5);font-size:16px;cursor:pointer;padding:2px 6px;border-radius:2px;transition:color 0.15s}
+.del-btn:hover{color:rgba(255,80,80,1)}
+.edit-btn{background:none;border:none;color:rgba(255,255,255,0.3);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:2px;transition:color 0.15s}
+.edit-btn:hover{color:var(--gold)}
+.add-net-btn{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:var(--gold-dim);border:1px solid var(--gold-border);color:var(--gold);padding:4px 10px;border-radius:2px;cursor:pointer;white-space:nowrap}
+.add-net-btn:hover{background:rgba(232,160,32,0.2)}
+.inline-confirm{display:inline-flex;align-items:center;gap:6px;font-size:11px}
+.inline-confirm span{color:rgba(255,255,255,0.6)}
+.inline-confirm .yes{color:rgba(255,80,80,0.9);font-weight:700;cursor:pointer;border:none;background:none;font-size:11px}
+.inline-confirm .no{color:var(--text-dim);cursor:pointer;border:none;background:none;font-size:11px}
+.bulk-bar{display:none;align-items:center;gap:0.75rem;padding:10px 1.5rem;background:rgba(232,160,32,0.07);border-bottom:1px solid var(--gold-border);font-size:12px;color:var(--text-dim)}
+.bulk-bar.visible{display:flex}
+.bulk-bar .bulk-count{color:var(--gold);font-weight:700}
+.bulk-bar button{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 14px;border-radius:2px;border:none;cursor:pointer}
+.bulk-del-btn{background:rgba(255,80,80,0.12);color:rgba(255,100,100,0.9);border:1px solid rgba(255,80,80,0.2)!important}
+.bulk-add-btn{background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-border)!important}
+.edit-row td{background:var(--dark3)!important}
+.edit-row input{width:100%;background:var(--dark2);border:1px solid var(--border);color:#fff;font-family:'Barlow',sans-serif;font-size:13px;padding:6px 8px;border-radius:2px;outline:none}
+.edit-row input:focus{border-color:rgba(232,160,32,0.4)}
+.edit-row select{background:var(--dark2);border:1px solid var(--border);color:#fff;font-family:'Barlow',sans-serif;font-size:13px;padding:6px 8px;border-radius:2px;outline:none;cursor:pointer}
+.save-btn{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:var(--gold);color:#000;border:none;padding:6px 14px;border-radius:2px;cursor:pointer}
+.cancel-btn{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:rgba(255,255,255,0.06);color:var(--text-dim);border:none;padding:6px 14px;border-radius:2px;cursor:pointer}
+.mgmt-empty{padding:2.5rem;text-align:center;color:var(--text-dim);font-size:13px}
+/* ── CONFIRM MODAL ── */
+.confirm-modal{background:var(--dark);border:1px solid rgba(255,80,80,0.3);width:100%;max-width:380px;border-radius:2px}
+.confirm-modal .modal-header{border-bottom-color:rgba(255,80,80,0.2)}
+.confirm-modal .modal-title{color:rgba(255,100,100,0.9)}
+.confirm-msg{padding:1.25rem 1.5rem;font-size:14px;color:var(--text-mid)}
+.confirm-modal .modal-footer{border-top-color:rgba(255,255,255,0.06)}
+.btn-danger{background:rgba(255,80,80,0.15);color:rgba(255,100,100,0.9);border:1px solid rgba(255,80,80,0.3)!important}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@800&display=swap" rel="stylesheet">
 </head>
@@ -343,7 +382,7 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-section">Operations</div>
-    <div class="nav-item active">
+    <div class="nav-item active" onclick="setActive(this);showView('dashboard')">
       <div class="nav-icon">⚡</div>
       <div class="nav-label">Dashboard</div>
     </div>
@@ -365,13 +404,13 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
     </div>
 
     <div class="sidebar-section">Network</div>
-    <div class="nav-item" onclick="setActive(this)">
+    <div class="nav-item" onclick="setActive(this);showView('brokers')">
       <div class="nav-icon">🤝</div>
       <div class="nav-label">Brokers</div>
       <div class="nav-badge dim" id="badge-brokers">—</div>
     </div>
-    <div class="nav-item" onclick="setActive(this)">
-      <div class="nav-icon">❓</div>
+    <div class="nav-item" onclick="setActive(this);showView('pending')">
+      <div class="nav-icon">⏳</div>
       <div class="nav-label">Pending Brokers</div>
       <div class="nav-badge" id="badge-unknown">—</div>
     </div>
@@ -400,7 +439,7 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
   <div class="main">
     <div class="main-inner">
 
-      <!-- ACE MODE BAR -->
+      <div class="view active" id="view-dashboard"><!-- ACE MODE BAR -->
       <div class="ace-mode" style="margin-bottom:1.5rem;border:1px solid var(--gold-border)">
         <div class="ace-mode-left">
           <div class="ace-mode-dot"></div>
@@ -552,6 +591,70 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
 
       </div>
 
+      </div><!-- /view-dashboard -->
+
+      <!-- BROKERS VIEW -->
+      <div class="view" id="view-brokers">
+        <div class="page-header" style="margin-bottom:1.5rem">
+          <div>
+            <div class="page-title">Broker Network</div>
+            <div class="page-sub" id="brokers-view-sub">Loading…</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn-sm btn-sm-gold" onclick="openAddBrokerModal()">+ Add Broker</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="bulk-bar" id="broker-bulk-bar">
+            <span class="bulk-count" id="broker-bulk-count">0 selected</span>
+            <button class="bulk-del-btn" onclick="bulkDeleteBrokers()">Delete Selected</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="mgmt-table">
+              <thead>
+                <tr>
+                  <th class="cb-col"><input type="checkbox" id="broker-select-all" onchange="toggleSelectAll('broker')"></th>
+                  <th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Last Reply</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="broker-mgmt-tbody">
+                <tr><td colspan="7" class="mgmt-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PENDING BROKERS VIEW -->
+      <div class="view" id="view-pending">
+        <div class="page-header" style="margin-bottom:1.5rem">
+          <div>
+            <div class="page-title">Pending Brokers</div>
+            <div class="page-sub" id="pending-view-sub">Review contacts extracted from your inbox</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="bulk-bar" id="pending-bulk-bar">
+            <span class="bulk-count" id="pending-bulk-count">0 selected</span>
+            <button class="bulk-add-btn" onclick="bulkAddToNetwork()">Add to Network</button>
+            <button class="bulk-del-btn" onclick="bulkDeletePending()">Delete Selected</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="mgmt-table">
+              <thead>
+                <tr>
+                  <th class="cb-col"><input type="checkbox" id="pending-select-all" onchange="toggleSelectAll('pending')"></th>
+                  <th>Name / Email</th><th>Load</th><th>Rate</th><th>Type</th><th>Received</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="pending-mgmt-tbody">
+                <tr><td colspan="7" class="mgmt-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /main-inner -->
   </div><!-- /main -->
 
@@ -559,7 +662,7 @@ body.light .modal-field input::placeholder{color:rgba(0,0,0,0.35)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-let _sb = null, _session = null;
+let _sb = null, _session = null, _carrier = null;
 (async function authGate() {
   document.body.style.visibility = 'hidden';
 
@@ -576,7 +679,7 @@ let _sb = null, _session = null;
 
   const { data: carrier } = await _sb
     .from('carriers')
-    .select('subscription_status, subscription_tier, owner_name, truck_type, home_base_city, home_base_state, max_radius, gmail_token')
+    .select('subscription_status, subscription_tier, owner_name, truck_type, home_base_city, home_base_state, max_radius, gmail_token, broker_count, pending_count')
     .eq('id', session.user.id)
     .single();
 
@@ -647,6 +750,21 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+<!-- CONFIRM DELETE MODAL -->
+<div class="modal-overlay hidden" id="confirm-modal">
+  <div class="confirm-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="confirm-title">Confirm Delete</div>
+      <button class="modal-close" onclick="closeConfirm()">×</button>
+    </div>
+    <div class="confirm-msg" id="confirm-msg">Are you sure?</div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-sm-outline" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-sm btn-danger" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD BROKER MODAL -->
 <div class="modal-overlay hidden" id="add-broker-modal">
   <div class="modal">
@@ -682,9 +800,10 @@ function escHtml(s) {
 }
 
 function loadDashboardData(carrier) {
+  _carrier = carrier;
   wireCarrierData(carrier);
   loadBrokers();
-  loadSidebarCounts();
+  loadSidebarCounts(carrier);
 }
 
 function wireCarrierData(c) {
@@ -708,6 +827,12 @@ function wireCarrierData(c) {
   const parts2 = [today, truck, loc].filter(Boolean);
   const sub = document.getElementById('page-sub');
   if (sub) sub.textContent = parts2.join(' · ');
+
+  // sidebar badges from pre-computed columns
+  const bBadge = document.getElementById('badge-brokers');
+  if (bBadge) bBadge.textContent = c.broker_count ?? '—';
+  const pBadge = document.getElementById('badge-unknown');
+  if (pBadge) pBadge.textContent = c.pending_count ?? '—';
 
   // tier card
   const tierNames = { base: 'ACE Base', custom: 'ACE Custom', premium: 'ACE Premium Setup' };
@@ -782,39 +907,18 @@ async function loadBrokers() {
   }).join('');
 }
 
-async function loadSidebarCounts() {
-  if (!_sb || !_session) return;
-  const uid = _session.user.id;
-
-  const { count: brokerCount } = await _sb
-    .from('brokers')
-    .select('id', { count: 'exact', head: true })
-    .eq('carrier_id', uid);
-
-  const bEl = document.getElementById('badge-brokers');
-  if (bEl) bEl.textContent = brokerCount ?? '—';
-
-  // KPI card
+function loadSidebarCounts(carrier) {
+  const bc = carrier ? (carrier.broker_count ?? 0) : 0;
   const kpiEl = document.getElementById('kpi-brokers');
-  if (kpiEl) kpiEl.textContent = brokerCount ?? '—';
+  if (kpiEl) kpiEl.textContent = bc || '—';
   const kpiSub = document.getElementById('kpi-brokers-sub');
-  if (kpiSub) kpiSub.textContent = brokerCount > 0 ? 'In your network' : 'Complete Gmail setup';
+  if (kpiSub) kpiSub.textContent = bc > 0 ? 'In your network' : 'Complete Gmail setup';
   const kpiBar = document.getElementById('kpi-brokers-bar');
-  if (kpiBar) kpiBar.style.width = Math.min((brokerCount || 0) / 2, 100) + '%';
-
-  // panel sub + tab count
+  if (kpiBar) kpiBar.style.width = Math.min(bc / 2, 100) + '%';
   const panelSub = document.getElementById('outreach-panel-sub');
-  if (panelSub) panelSub.textContent = brokerCount > 0 ? brokerCount + ' brokers in your network' : 'No brokers yet';
+  if (panelSub) panelSub.textContent = bc > 0 ? bc + ' brokers in your network' : 'No brokers yet';
   const tabCount = document.getElementById('tab-count-all');
-  if (tabCount) tabCount.textContent = brokerCount ?? '—';
-
-  // pending brokers badge
-  const { count: pendingCount } = await _sb
-    .from('unknown_brokers_inbox')
-    .select('id', { count: 'exact', head: true })
-    .eq('carrier_id', uid);
-  const pEl = document.getElementById('badge-unknown');
-  if (pEl) pEl.textContent = pendingCount ?? '—';
+  if (tabCount) tabCount.textContent = bc || '—';
 }
 
 function openAddBrokerModal() {
@@ -871,7 +975,245 @@ async function submitAddBroker() {
 
   closeAddBrokerModal();
   loadBrokers();
-  loadSidebarCounts();
+  if (_carrier) { _carrier.broker_count = (_carrier.broker_count || 0) + 1; loadSidebarCounts(_carrier); }
+}
+
+// ── VIEW SWITCHER ────────────────────────────────────────────────────────────
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const v = document.getElementById('view-' + name);
+  if (v) v.classList.add('active');
+  if (name === 'brokers') loadBrokerMgmt();
+  if (name === 'pending') loadPendingMgmt();
+}
+
+// ── CONFIRM MODAL ────────────────────────────────────────────────────────────
+let _confirmCb = null;
+function showConfirm(title, msg, cb) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  _confirmCb = cb;
+  document.getElementById('confirm-ok').onclick = () => { closeConfirm(); cb(); };
+  document.getElementById('confirm-modal').classList.remove('hidden');
+}
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.add('hidden');
+  _confirmCb = null;
+}
+
+// ── BROKER MGMT TABLE ────────────────────────────────────────────────────────
+let _brokerRows = [];
+async function loadBrokerMgmt() {
+  const tbody = document.getElementById('broker-mgmt-tbody');
+  if (!tbody || !_sb || !_session) return;
+  const sub = document.getElementById('brokers-view-sub');
+  const { data, error } = await _sb.from('brokers')
+    .select('id, name, company, email, status, last_reply_at')
+    .eq('carrier_id', _session.user.id)
+    .order('name', { ascending: true });
+  if (error || !data) { tbody.innerHTML = '<tr><td colspan="7" class="mgmt-empty">Failed to load.</td></tr>'; return; }
+  _brokerRows = data;
+  if (sub) sub.textContent = data.length + ' brokers in your network';
+  renderBrokerMgmt();
+}
+
+function renderBrokerMgmt() {
+  const tbody = document.getElementById('broker-mgmt-tbody');
+  if (!_brokerRows.length) { tbody.innerHTML = '<tr><td colspan="7" class="mgmt-empty">No brokers yet.</td></tr>'; return; }
+  const statusOpts = ['cold','warm','hot'].map(s => `<option value="${s}">${s}</option>`).join('');
+  tbody.innerHTML = _brokerRows.map(b => {
+    const dt = b.last_reply_at ? new Date(b.last_reply_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+    return `<tr data-id="${b.id}">
+      <td class="cb-col"><input type="checkbox" class="broker-cb" value="${b.id}" onchange="updateBulkBar('broker')"></td>
+      <td>${escHtml(b.name||'—')}</td>
+      <td>${escHtml(b.company||'—')}</td>
+      <td>${escHtml(b.email||'—')}</td>
+      <td>${escHtml(b.status||'cold')}</td>
+      <td>${dt}</td>
+      <td style="white-space:nowrap">
+        <button class="edit-btn" onclick="editBrokerRow('${b.id}')" title="Edit">✏️</button>
+        <button class="del-btn" onclick="deleteBrokerRow('${b.id}')" title="Delete">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function editBrokerRow(id) {
+  const b = _brokerRows.find(r => r.id === id);
+  if (!b) return;
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  if (!tr) return;
+  const existing = document.getElementById('edit-row-' + id);
+  if (existing) { existing.remove(); return; }
+  const editTr = document.createElement('tr');
+  editTr.className = 'edit-row';
+  editTr.id = 'edit-row-' + id;
+  editTr.innerHTML = `
+    <td></td>
+    <td><input id="ef-name-${id}" value="${escHtml(b.name||'')}"></td>
+    <td><input id="ef-company-${id}" value="${escHtml(b.company||'')}"></td>
+    <td><input id="ef-email-${id}" value="${escHtml(b.email||'')}"></td>
+    <td><select id="ef-status-${id}">
+      <option value="cold"${b.status==='cold'?' selected':''}>cold</option>
+      <option value="warm"${b.status==='warm'?' selected':''}>warm</option>
+      <option value="hot"${b.status==='hot'?' selected':''}>hot</option>
+    </select></td>
+    <td></td>
+    <td style="white-space:nowrap"><button class="save-btn" onclick="saveBrokerRow('${id}')">Save</button> <button class="cancel-btn" onclick="document.getElementById('edit-row-${id}').remove()">Cancel</button></td>`;
+  tr.after(editTr);
+}
+
+async function saveBrokerRow(id) {
+  const payload = {
+    name:    document.getElementById('ef-name-'+id).value.trim()||null,
+    company: document.getElementById('ef-company-'+id).value.trim()||null,
+    email:   document.getElementById('ef-email-'+id).value.trim()||null,
+    status:  document.getElementById('ef-status-'+id).value,
+  };
+  const { error } = await _sb.from('brokers').update(payload).eq('id', id).eq('carrier_id', _session.user.id);
+  if (error) { alert('Save failed: ' + error.message); return; }
+  const idx = _brokerRows.findIndex(r => r.id === id);
+  if (idx > -1) _brokerRows[idx] = { ..._brokerRows[idx], ...payload };
+  document.getElementById('edit-row-'+id)?.remove();
+  renderBrokerMgmt();
+}
+
+function deleteBrokerRow(id) {
+  showConfirm('Delete Broker', 'Remove this broker from your network? This cannot be undone.', async () => {
+    const { error } = await _sb.from('brokers').delete().eq('id', id).eq('carrier_id', _session.user.id);
+    if (error) { alert('Delete failed: ' + error.message); return; }
+    _brokerRows = _brokerRows.filter(r => r.id !== id);
+    if (_carrier) { _carrier.broker_count = Math.max((_carrier.broker_count||1)-1,0); loadSidebarCounts(_carrier); const b=document.getElementById('badge-brokers'); if(b) b.textContent=_carrier.broker_count; }
+    renderBrokerMgmt();
+  });
+}
+
+function toggleSelectAll(type) {
+  const all = document.getElementById(type+'-select-all').checked;
+  document.querySelectorAll('.'+type+'-cb').forEach(cb => cb.checked = all);
+  updateBulkBar(type);
+}
+
+function updateBulkBar(type) {
+  const selected = document.querySelectorAll('.'+type+'-cb:checked');
+  const bar = document.getElementById(type+'-bulk-bar');
+  const count = document.getElementById(type+'-bulk-count');
+  if (bar) bar.classList.toggle('visible', selected.length > 0);
+  if (count) count.textContent = selected.length + ' selected';
+}
+
+function getSelectedIds(type) {
+  return Array.from(document.querySelectorAll('.'+type+'-cb:checked')).map(cb => cb.value);
+}
+
+async function bulkDeleteBrokers() {
+  const ids = getSelectedIds('broker');
+  if (!ids.length) return;
+  showConfirm('Delete ' + ids.length + ' Broker' + (ids.length>1?'s':''), 'This cannot be undone.', async () => {
+    const { error } = await _sb.from('brokers').delete().in('id', ids).eq('carrier_id', _session.user.id);
+    if (error) { alert('Delete failed: ' + error.message); return; }
+    _brokerRows = _brokerRows.filter(r => !ids.includes(r.id));
+    if (_carrier) { _carrier.broker_count = Math.max((_carrier.broker_count||ids.length)-ids.length,0); loadSidebarCounts(_carrier); const b=document.getElementById('badge-brokers'); if(b) b.textContent=_carrier.broker_count; }
+    document.getElementById('broker-select-all').checked = false;
+    updateBulkBar('broker');
+    renderBrokerMgmt();
+  });
+}
+
+// ── PENDING MGMT TABLE ───────────────────────────────────────────────────────
+let _pendingRows = [];
+async function loadPendingMgmt() {
+  const tbody = document.getElementById('pending-mgmt-tbody');
+  if (!tbody || !_sb || !_session) return;
+  const { data, error } = await _sb.from('unknown_brokers_inbox')
+    .select('id, name, email, sender_name, sender_email, load_origin, load_destination, rate_offered, classification, created_at')
+    .eq('carrier_id', _session.user.id)
+    .order('created_at', { ascending: false });
+  if (error || !data) { tbody.innerHTML = '<tr><td colspan="7" class="mgmt-empty">Failed to load.</td></tr>'; return; }
+  _pendingRows = data;
+  const sub = document.getElementById('pending-view-sub');
+  if (sub) sub.textContent = data.length + ' pending — review and add to your network';
+  renderPendingMgmt();
+}
+
+function renderPendingMgmt() {
+  const tbody = document.getElementById('pending-mgmt-tbody');
+  if (!_pendingRows.length) { tbody.innerHTML = '<tr><td colspan="7" class="mgmt-empty">No pending brokers.</td></tr>'; return; }
+  tbody.innerHTML = _pendingRows.map(p => {
+    const displayName = escHtml(p.name || p.sender_name || '—');
+    const displayEmail = escHtml(p.email || p.sender_email || '—');
+    const load = (p.load_origin && p.load_destination) ? escHtml(p.load_origin + ' → ' + p.load_destination) : '—';
+    const rate = p.rate_offered ? '$' + Number(p.rate_offered).toLocaleString() : '—';
+    const cls = escHtml(p.classification || '—');
+    const dt = new Date(p.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return `<tr data-id="${p.id}">
+      <td class="cb-col"><input type="checkbox" class="pending-cb" value="${p.id}" onchange="updateBulkBar('pending')"></td>
+      <td><div style="font-weight:600">${displayName}</div><div style="font-size:11px;color:var(--text-dim)">${displayEmail}</div></td>
+      <td style="font-size:12px">${load}</td>
+      <td>${rate}</td>
+      <td style="font-size:11px;color:var(--text-dim)">${cls}</td>
+      <td style="font-size:11px;color:var(--text-dim)">${dt}</td>
+      <td style="white-space:nowrap">
+        <button class="add-net-btn" onclick="addPendingToNetwork('${p.id}')">Add →</button>
+        <button class="del-btn" onclick="deletePendingRow('${p.id}')" title="Delete">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function addPendingToNetwork(id) {
+  const p = _pendingRows.find(r => r.id === id);
+  if (!p) return;
+  const { error } = await _sb.from('brokers').insert({
+    carrier_id: _session.user.id,
+    name:    p.name || p.sender_name || null,
+    email:   p.email || p.sender_email || null,
+    status:  'cold',
+  });
+  if (error) { alert('Failed: ' + error.message); return; }
+  await _sb.from('unknown_brokers_inbox').delete().eq('id', id).eq('carrier_id', _session.user.id);
+  _pendingRows = _pendingRows.filter(r => r.id !== id);
+  if (_carrier) { _carrier.broker_count=(_carrier.broker_count||0)+1; _carrier.pending_count=Math.max((_carrier.pending_count||1)-1,0); wireCarrierData(_carrier); loadSidebarCounts(_carrier); }
+  renderPendingMgmt();
+}
+
+async function bulkAddToNetwork() {
+  const ids = getSelectedIds('pending');
+  if (!ids.length) return;
+  const rows = _pendingRows.filter(r => ids.includes(r.id));
+  const inserts = rows.map(p => ({ carrier_id: _session.user.id, name: p.name||p.sender_name||null, email: p.email||p.sender_email||null, status: 'cold' }));
+  const { error } = await _sb.from('brokers').insert(inserts);
+  if (error) { alert('Failed: ' + error.message); return; }
+  await _sb.from('unknown_brokers_inbox').delete().in('id', ids).eq('carrier_id', _session.user.id);
+  _pendingRows = _pendingRows.filter(r => !ids.includes(r.id));
+  if (_carrier) { _carrier.broker_count=(_carrier.broker_count||0)+ids.length; _carrier.pending_count=Math.max((_carrier.pending_count||ids.length)-ids.length,0); wireCarrierData(_carrier); loadSidebarCounts(_carrier); }
+  document.getElementById('pending-select-all').checked = false;
+  updateBulkBar('pending');
+  renderPendingMgmt();
+}
+
+function deletePendingRow(id) {
+  showConfirm('Delete Pending Broker', 'Remove this contact permanently?', async () => {
+    const { error } = await _sb.from('unknown_brokers_inbox').delete().eq('id', id).eq('carrier_id', _session.user.id);
+    if (error) { alert('Delete failed: ' + error.message); return; }
+    _pendingRows = _pendingRows.filter(r => r.id !== id);
+    if (_carrier) { _carrier.pending_count=Math.max((_carrier.pending_count||1)-1,0); wireCarrierData(_carrier); }
+    renderPendingMgmt();
+  });
+}
+
+async function bulkDeletePending() {
+  const ids = getSelectedIds('pending');
+  if (!ids.length) return;
+  showConfirm('Delete ' + ids.length + ' Pending Broker' + (ids.length>1?'s':''), 'This cannot be undone.', async () => {
+    const { error } = await _sb.from('unknown_brokers_inbox').delete().in('id', ids).eq('carrier_id', _session.user.id);
+    if (error) { alert('Delete failed: ' + error.message); return; }
+    _pendingRows = _pendingRows.filter(r => !ids.includes(r.id));
+    if (_carrier) { _carrier.pending_count=Math.max((_carrier.pending_count||ids.length)-ids.length,0); wireCarrierData(_carrier); }
+    document.getElementById('pending-select-all').checked = false;
+    updateBulkBar('pending');
+    renderPendingMgmt();
+  });
 }
 </script>
 </body>
