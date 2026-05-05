@@ -55,22 +55,33 @@ export default async function handler(req, res) {
         if (customer?.email) profileFields.email       = customer.email
         if (customer?.phone) profileFields.phone       = customer.phone
 
-        if (!carrierId) {
-          console.warn('[stripe-webhook] checkout.session.completed: no carrier_id in metadata')
-          break
+        const updatePayload = {
+          subscription_status: 'active',
+          subscription_tier:   session.metadata?.tier,
+          stripe_customer_id:  session.customer,
+          ...profileFields,
         }
 
-        const { error } = await supabase
-          .from('carriers')
-          .update({
-            subscription_status: 'active',
-            subscription_tier:   session.metadata.tier,
-            stripe_customer_id:  session.customer,
-            ...profileFields,
-          })
-          .eq('id', carrierId)
-        if (error) console.error('[stripe-webhook] activate failed:', error.message)
-        else console.log('[stripe-webhook] activated carrier:', carrierId, '| profile fields set:', Object.keys(profileFields))
+        if (carrierId) {
+          // primary path — carrier_id in metadata (standard signup)
+          const { error } = await supabase
+            .from('carriers')
+            .update(updatePayload)
+            .eq('id', carrierId)
+          if (error) console.error('[stripe-webhook] activate by id failed:', error.message)
+          else console.log('[stripe-webhook] activated carrier:', carrierId)
+        } else if (customer?.email) {
+          // fallback — OTP signup where carrier_id wasn't in metadata yet
+          console.warn('[stripe-webhook] no carrier_id in metadata — falling back to email match:', customer.email)
+          const { error } = await supabase
+            .from('carriers')
+            .update(updatePayload)
+            .eq('email', customer.email)
+          if (error) console.error('[stripe-webhook] activate by email failed:', error.message)
+          else console.log('[stripe-webhook] activated carrier by email fallback:', customer.email)
+        } else {
+          console.error('[stripe-webhook] cannot activate — no carrier_id and no customer email')
+        }
         break
       }
 
