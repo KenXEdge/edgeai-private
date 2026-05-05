@@ -59,11 +59,11 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0a0a0a;color:#
 .sidebar{background:var(--dark);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
 .sidebar-section{padding:1.25rem 1rem 0.5rem;font-size:13px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45)}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 1rem;border-radius:2px;margin:1px 0.5rem;cursor:pointer;transition:all 0.15s;border:1px solid transparent;position:relative}
-.nav-item:hover{background:var(--dark3);color:#fff}
-.nav-item.active{background:var(--gold-dim);border-color:var(--gold-border);color:var(--gold)}
+.nav-item:hover{background:rgba(232,160,32,0.12);color:var(--gold)}
+.nav-item.active{background:rgba(232,160,32,0.18);border-color:var(--gold-border);color:var(--gold)}
 .nav-label{font-size:15px;font-weight:600;letter-spacing:0.3px}
-.nav-badge{margin-left:auto;background:var(--gold);color:var(--black);font-size:15px;font-weight:500;padding:2px 8px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
-.nav-badge.dim{background:rgba(255,255,255,0.08);color:var(--text-dim)}
+.nav-badge{margin-left:auto;background:var(--gold);color:var(--black);font-size:15px;font-weight:700;padding:2px 8px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
+.nav-badge.dim{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85);font-weight:700}
 
 .sidebar-bottom{margin-top:auto;padding:1rem 0.5rem;border-top:1px solid var(--border)}
 .tier-card{background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:2px;padding:1rem;margin:0 0.5rem 0.75rem}
@@ -416,7 +416,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
     </div>
     <div class="nav-item" onclick="setActive(this);showView('pending')">
       <div class="nav-label">Pending Brokers</div>
-      <div class="nav-badge" id="badge-unknown">—</div>
+      <div class="nav-badge dim" id="badge-unknown">—</div>
     </div>
 
     <div class="sidebar-section">Account</div>
@@ -613,7 +613,7 @@ body.light .th-tip-box{background:#111;border-color:#444;color:#fff}
               <thead>
                 <tr>
                   <th class="cb-col"><input type="checkbox" id="broker-select-all" onchange="toggleSelectAll('broker')"></th>
-                  <th>Name</th><th>Company</th><th>Email</th><th>Status <span class="th-tip">?<span class="th-tip-box">Hot — Active, recently engaged<br>Warm — Has replied or shown interest<br>Cold — No recent engagement</span></span></th><th>Last Reply</th><th></th>
+                  <th>Name</th><th>Company</th><th>Email</th><th>Status <span class="th-tip">?<span class="th-tip-box">Hot — Active, recently engaged<br>Warm — Has replied or shown interest<br>Cold — No recent engagement</span></span></th><th>Last Reply</th><th>Contact</th><th></th>
                 </tr>
               </thead>
               <tbody id="broker-mgmt-tbody">
@@ -1031,9 +1031,9 @@ async function loadBrokerMgmt() {
   if (!tbody || !_sb || !_session) return;
   const sub = document.getElementById('brokers-view-sub');
   const { data, error } = await _sb.from('brokers')
-    .select('id, name, company, email, status, last_reply_at')
+    .select('id, name, company, email, status, last_reply_at, contact_enabled')
     .eq('carrier_id', _session.user.id)
-    .order('name', { ascending: true });
+    .order('company', { ascending: true, nullsFirst: false });
   if (error || !data) { tbody.innerHTML = '<tr><td colspan="7" class="mgmt-empty">Failed to load.</td></tr>'; return; }
   _brokerRows = data;
   if (sub) sub.textContent = data.length + ' brokers in your network';
@@ -1046,13 +1046,18 @@ function renderBrokerMgmt() {
   const statusOpts = ['cold','warm','hot'].map(s => `<option value="${s}">${s}</option>`).join('');
   tbody.innerHTML = _brokerRows.map(b => {
     const dt = b.last_reply_at ? new Date(b.last_reply_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
-    return `<tr data-id="${b.id}">
+    const ce = b.contact_enabled !== false;
+    const contactEl = ce
+      ? '<span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#32c864">On</span>'
+      : '<span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,80,80,0.7)">Off</span>';
+    return `<tr data-id="${b.id}" style="${ce ? '' : 'opacity:0.5'}">
       <td class="cb-col"><input type="checkbox" class="broker-cb" value="${b.id}" onchange="updateBulkBar('broker')"></td>
       <td>${escHtml(b.name||'—')}</td>
       <td>${escHtml(b.company||'—')}</td>
       <td>${escHtml(b.email||'—')}</td>
       <td>${escHtml(b.status||'cold')}</td>
       <td>${dt}</td>
+      <td>${contactEl}</td>
       <td style="white-space:nowrap">
         <button class="edit-btn" onclick="editBrokerRow('${b.id}')" title="Edit">✏️</button>
         <button class="del-btn" onclick="deleteBrokerRow('${b.id}')" title="Delete">🗑</button>
@@ -1071,27 +1076,30 @@ function editBrokerRow(id) {
   const editTr = document.createElement('tr');
   editTr.className = 'edit-row';
   editTr.id = 'edit-row-' + id;
+  const ceChecked = b.contact_enabled !== false;
   editTr.innerHTML = `
     <td></td>
     <td><input id="ef-name-${id}" value="${escHtml(b.name||'')}"></td>
     <td><input id="ef-company-${id}" value="${escHtml(b.company||'')}"></td>
     <td><input id="ef-email-${id}" value="${escHtml(b.email||'')}"></td>
     <td><select id="ef-status-${id}">
-      <option value="cold"${b.status==='cold'?' selected':''}>cold</option>
-      <option value="warm"${b.status==='warm'?' selected':''}>warm</option>
-      <option value="hot"${b.status==='hot'?' selected':''}>hot</option>
+      <option value="cold"${b.status==='cold'?' selected':''}>Cold</option>
+      <option value="warm"${b.status==='warm'?' selected':''}>Warm</option>
+      <option value="hot"${b.status==='hot'?' selected':''}>Hot</option>
     </select></td>
     <td></td>
+    <td><label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap"><input type="checkbox" id="ef-contact-${id}" ${ceChecked?'checked':''} style="width:15px;height:15px;accent-color:var(--gold)"> Contact On</label></td>
     <td style="white-space:nowrap"><button class="save-btn" onclick="saveBrokerRow('${id}')">Save</button> <button class="cancel-btn" onclick="document.getElementById('edit-row-${id}').remove()">Cancel</button></td>`;
   tr.after(editTr);
 }
 
 async function saveBrokerRow(id) {
   const payload = {
-    name:    document.getElementById('ef-name-'+id).value.trim()||null,
-    company: document.getElementById('ef-company-'+id).value.trim()||null,
-    email:   document.getElementById('ef-email-'+id).value.trim()||null,
-    status:  document.getElementById('ef-status-'+id).value,
+    name:            document.getElementById('ef-name-'+id).value.trim()||null,
+    company:         document.getElementById('ef-company-'+id).value.trim()||null,
+    email:           document.getElementById('ef-email-'+id).value.trim()||null,
+    status:          document.getElementById('ef-status-'+id).value,
+    contact_enabled: document.getElementById('ef-contact-'+id).checked,
   };
   const { error } = await _sb.from('brokers').update(payload).eq('id', id).eq('carrier_id', _session.user.id);
   if (error) { alert('Save failed: ' + error.message); return; }
