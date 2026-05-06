@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE CMO — Carrier Acquisition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:#0d0d0d;color:#fff;overflow:hidden}
+
+:root{
+  --gold:#E8A020;
+  --gold-dim:rgba(232,160,32,0.10);
+  --gold-border:rgba(232,160,32,0.25);
+  --bg:#0d0d0d;
+  --panel:#151515;
+  --panel2:#1a1a1a;
+  --panel3:#202020;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.04);
+  --text:#ffffff;
+  --text-mid:rgba(255,255,255,0.75);
+  --text-dim:rgba(255,255,255,0.45);
+  --text-faint:rgba(255,255,255,0.25);
+  --sidebar-w:220px;
+  --amber:#E8A020;
+  --active-bg:rgba(232,160,32,0.08);
+}
+
+/* ── LAYOUT ── */
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:#111111;
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;
+  z-index:10;
+}
+.sidebar-logo{
+  padding:18px 16px 14px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.sidebar-logo .logo-mark{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:20px;font-weight:900;letter-spacing:1px;
+  color:var(--gold);
+}
+.sidebar-logo .logo-sub{
+  font-size:10px;font-weight:600;letter-spacing:2px;
+  color:var(--text-dim);text-transform:uppercase;
+  margin-top:1px;
+}
+.sidebar-section-label{
+  font-size:10px;font-weight:700;letter-spacing:2px;
+  color:var(--text-faint);text-transform:uppercase;
+  padding:18px 16px 6px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 16px;
+  font-size:13px;font-weight:500;
+  color:var(--text-dim);
+  cursor:pointer;
+  border-left:2px solid transparent;
+  transition:all 0.15s;
+  white-space:nowrap;
+}
+.nav-item:hover{background:rgba(255,255,255,0.04);color:var(--text)}
+.nav-item.active{
+  background:var(--active-bg);
+  color:var(--gold);
+  border-left-color:var(--gold);
+}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:0.7}
+.nav-item.active svg{opacity:1}
+.nav-badge{
+  margin-left:auto;
+  background:var(--gold);color:#000;
+  font-size:10px;font-weight:700;
+  padding:1px 6px;border-radius:10px;
+  min-width:18px;text-align:center;
+}
+.sidebar-footer{
+  margin-top:auto;
+  padding:14px 16px;
+  border-top:1px solid var(--border);
+  font-size:11px;color:var(--text-faint);
+}
+.sidebar-footer a{color:var(--text-dim);text-decoration:none}
+.sidebar-footer a:hover{color:var(--gold)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+
+/* ── TOPBAR ── */
+.topbar{
+  height:52px;min-height:52px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 20px;gap:16px;
+}
+.topbar-title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:17px;font-weight:700;letter-spacing:0.5px;
+  color:var(--text);
+}
+.topbar-breadcrumb{
+  font-size:12px;color:var(--text-dim);
+  display:flex;align-items:center;gap:6px;
+}
+.topbar-breadcrumb span{color:var(--text-faint)}
+.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.btn{
+  font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;
+  padding:6px 14px;border-radius:5px;border:none;cursor:pointer;
+  transition:all 0.15s;white-space:nowrap;
+}
+.btn-primary{background:var(--gold);color:#000}
+.btn-primary:hover{background:#f5a820}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}
+.btn-ghost:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* ── CONTENT AREA ── */
+.content{flex:1;overflow-y:auto;overflow-x:hidden}
+.view{display:none;height:100%}
+.view.active{display:flex;flex-direction:column}
+
+/* ── KPI STRIP ── */
+.kpi-strip{
+  display:flex;gap:1px;
+  background:var(--border);
+  border-bottom:1px solid var(--border);
+}
+.kpi-card{
+  flex:1;background:var(--panel);
+  padding:14px 18px;
+}
+.kpi-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px}
+.kpi-value{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;color:var(--text);line-height:1}
+.kpi-sub{font-size:11px;color:var(--text-faint);margin-top:3px}
+.kpi-value.gold{color:var(--gold)}
+
+/* ── FILTER BAR ── */
+.filter-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 16px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.filter-label{font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-right:4px}
+.filter-input{
+  background:var(--panel3);border:1px solid var(--border);
+  color:var(--text);font-family:'Barlow',sans-serif;font-size:12px;
+  padding:5px 10px;border-radius:4px;outline:none;
+}
+.filter-input:focus{border-color:var(--gold-border)}
+.filter-select{
+  background:var(--panel3);border:1px solid var(--border);
+  color:var(--text);font-family:'Barlow',sans-serif;font-size:12px;
+  padding:5px 8px;border-radius:4px;outline:none;cursor:pointer;
+}
+.filter-select option{background:#1a1a1a}
+.filter-divider{width:1px;height:20px;background:var(--border);margin:0 4px}
+
+/* ── TABLE ── */
+.table-wrap{flex:1;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{position:sticky;top:0;z-index:5}
+thead tr{background:#111111}
+th{
+  padding:9px 14px;
+  font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text-dim);text-align:left;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;cursor:pointer;user-select:none;
+}
+th:hover{color:var(--text)}
+th .sort-icon{opacity:0.3;margin-left:4px}
+td{
+  padding:9px 14px;
+  border-bottom:1px solid var(--border2);
+  color:var(--text-mid);
+  vertical-align:middle;
+  white-space:nowrap;
+}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.td-name{font-weight:600;color:var(--text)}
+.td-code{
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;
+  color:var(--gold);letter-spacing:0.5px;
+}
+.td-mono{font-family:monospace;font-size:11px;color:var(--text-dim)}
+
+/* ── STATUS BADGES ── */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  padding:2px 8px;border-radius:3px;
+}
+.badge-active{background:rgba(232,160,32,0.12);color:var(--gold);border:1px solid rgba(232,160,32,0.25)}
+.badge-draft{background:rgba(255,255,255,0.05);color:var(--text-dim);border:1px solid var(--border)}
+.badge-paused{background:rgba(255,255,255,0.08);color:#aaa;border:1px solid rgba(255,255,255,0.12)}
+.badge-complete{background:rgba(255,255,255,0.04);color:var(--text-faint);border:1px solid var(--border2)}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* ── PROGRESS BAR ── */
+.prog-bar{height:4px;background:var(--panel3);border-radius:2px;min-width:80px}
+.prog-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s}
+
+/* ── STAT CELLS ── */
+.stat-group{display:flex;gap:16px}
+.stat-item{text-align:right}
+.stat-val{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--text)}
+.stat-lbl{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:1px}
+
+/* ── PANEL GRID ── */
+.panel-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1px;background:var(--border);
+  flex:1;
+}
+.panel-grid-3{grid-template-columns:1fr 1fr 1fr}
+.panel-block{background:var(--panel);padding:0;display:flex;flex-direction:column;overflow:hidden}
+.panel-head{
+  padding:12px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+  background:#111;
+}
+.panel-head-title{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-mid)}
+.panel-head-sub{font-size:11px;color:var(--text-faint);margin-left:auto}
+.panel-body{flex:1;overflow-y:auto;padding:0}
+
+/* ── SEGMENT BUILDER ── */
+.builder-form{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:12px;padding:16px;
+}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.span2{grid-column:span 2}
+.form-group.span3{grid-column:span 3}
+.form-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)}
+.form-input{
+  background:var(--panel3);border:1px solid var(--border);
+  color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;
+  padding:8px 10px;border-radius:4px;outline:none;
+}
+.form-input:focus{border-color:var(--gold-border);background:var(--panel2)}
+.form-select{
+  background:var(--panel3);border:1px solid var(--border);
+  color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;
+  padding:8px 10px;border-radius:4px;outline:none;cursor:pointer;
+}
+.form-select option{background:#1a1a1a}
+.form-hint{font-size:10px;color:var(--text-faint);margin-top:2px}
+.count-preview{
+  background:var(--panel3);border:1px solid var(--gold-border);
+  border-radius:4px;padding:12px 16px;
+  display:flex;align-items:center;gap:16px;
+}
+.count-num{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:700;color:var(--gold)}
+.count-sub{font-size:11px;color:var(--text-dim)}
+
+/* ── PERF TABLE ── */
+.perf-bar-cell{display:flex;align-items:center;gap:8px}
+.perf-pct{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;min-width:36px;text-align:right}
+.perf-bar-wrap{flex:1;height:6px;background:var(--panel3);border-radius:3px;min-width:60px}
+.perf-bar-fill{height:100%;border-radius:3px;background:var(--gold)}
+
+/* ── EMPTY STATE ── */
+.empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:60px 20px;gap:10px;color:var(--text-faint);text-align:center;
+}
+.empty-icon{font-size:32px;opacity:0.3}
+.empty-text{font-size:13px}
+.empty-sub{font-size:11px;color:var(--text-faint)}
+
+/* ── MODAL ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.75);z-index:100;
+  align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:6px;width:640px;max-width:95vw;max-height:90vh;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.modal-head{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.modal-title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--text)}
+.modal-close{margin-left:auto;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px;padding:2px 6px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* ── ACTION ROW ── */
+.action-row{display:flex;gap:6px}
+.icon-btn{
+  background:none;border:1px solid var(--border);
+  color:var(--text-dim);cursor:pointer;
+  padding:4px 8px;border-radius:3px;font-size:11px;
+  transition:all 0.1s;
+}
+.icon-btn:hover{background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.15)}
+.icon-btn.gold{color:var(--gold);border-color:var(--gold-border)}
+.icon-btn.gold:hover{background:var(--gold-dim)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:24px;right:24px;z-index:999;
+  background:#1e1e1e;border:1px solid var(--border);
+  padding:12px 18px;border-radius:5px;
+  font-size:13px;color:var(--text);
+  transform:translateY(80px);opacity:0;transition:all 0.25s;
+  pointer-events:none;max-width:320px;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.gold{border-color:var(--gold-border);background:var(--gold-dim)}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div>
+      <div class="logo-mark">EDGE</div>
+      <div class="logo-sub">CMO Console</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section-label">Markets</div>
+  <div class="nav-item active" onclick="switchView('markets')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    Segments
+  </div>
+  <div class="nav-item" onclick="switchView('builder')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+    Build Segment
+  </div>
+
+  <div class="sidebar-section-label">Campaigns</div>
+  <div class="nav-item" onclick="switchView('campaigns')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    All Campaigns
+    <span class="nav-badge" id="badge-active">0</span>
+  </div>
+  <div class="nav-item" onclick="openNewCampaign()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    New Campaign
+  </div>
+  <div class="nav-item" onclick="switchView('queue')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Send Queue
+  </div>
+
+  <div class="sidebar-section-label">Analytics</div>
+  <div class="nav-item" onclick="switchView('performance')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Performance
+  </div>
+  <div class="nav-item" onclick="switchView('prospects-view')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Prospects
+  </div>
+
+  <div class="sidebar-section-label">Config</div>
+  <div class="nav-item" onclick="switchView('settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    Send Settings
+  </div>
+
+  <div class="sidebar-footer">
+    <a href="/dashboard">← Carrier Dashboard</a>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Market Segments</div>
+      <div class="topbar-breadcrumb">CMO Console <span>›</span> <span id="topbar-crumb">Segments</span></div>
+    </div>
+    <div class="topbar-actions">
+      <div style="font-size:11px;color:var(--text-faint)" id="topbar-stat">3,592,412 prospects indexed</div>
+      <button class="btn btn-ghost btn-sm" onclick="refreshData()">↻ Refresh</button>
+      <button class="btn btn-primary btn-sm" onclick="switchView('builder')">+ New Segment</button>
+    </div>
+  </div>
+
+  <!-- ── VIEW: SEGMENTS ── -->
+  <div class="view active" id="view-markets">
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Segments</div>
+        <div class="kpi-value" id="kpi-segments">—</div>
+        <div class="kpi-sub">market areas defined</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Targeted</div>
+        <div class="kpi-value" id="kpi-targeted">—</div>
+        <div class="kpi-sub">carriers in segments</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Available to Send</div>
+        <div class="kpi-value gold" id="kpi-available">—</div>
+        <div class="kpi-sub">not yet contacted</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Markets Untouched</div>
+        <div class="kpi-value" id="kpi-untouched">—</div>
+        <div class="kpi-sub">segments at 0 sends</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <span class="filter-label">Filter</span>
+      <input class="filter-input" id="seg-search" placeholder="Search market, state..." style="width:180px" oninput="filterSegments()">
+      <select class="filter-select" id="seg-state" onchange="filterSegments()">
+        <option value="">All States</option>
+      </select>
+      <div class="filter-divider"></div>
+      <span style="font-size:11px;color:var(--text-faint)" id="seg-count-label">Loading...</span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Segment</th>
+            <th>Market</th>
+            <th>Radius</th>
+            <th>Fleet Filter</th>
+            <th>Total</th>
+            <th>Has Email</th>
+            <th>Remaining</th>
+            <th>Coverage</th>
+            <th>Built</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="seg-tbody">
+          <tr><td colspan="10"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">Loading segments...</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── VIEW: SEGMENT BUILDER ── -->
+  <div class="view" id="view-builder">
+    <div class="kpi-strip">
+      <div class="kpi-card" style="flex:2">
+        <div class="kpi-label">Segment Builder</div>
+        <div class="kpi-value" style="font-size:18px">Define a geographic market target area</div>
+        <div class="kpi-sub">Uses radius + fleet size + FMCSA status to build a prospect list</div>
+      </div>
+      <div class="kpi-card count-preview" style="flex:1" id="builder-preview-card">
+        <div>
+          <div class="count-num" id="preview-count">—</div>
+          <div class="count-sub">carriers in range</div>
+          <div style="font-size:10px;color:var(--text-faint);margin-top:2px" id="preview-email-count"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="builder-form">
+      <div class="form-group">
+        <label class="form-label">Segment Name</label>
+        <input class="form-input" id="b-name" placeholder="ATL_30" oninput="autoFillName()">
+        <div class="form-hint">Convention: [CITY]_[RADIUS] e.g. ATL_30</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Market Code</label>
+        <input class="form-input" id="b-code" placeholder="ATL" maxlength="5">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Market City</label>
+        <input class="form-input" id="b-city" placeholder="Atlanta">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">State</label>
+        <select class="form-select" id="b-state">
+          <option value="">Select state...</option>
+          <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+          <option>CA</option><option>CO</option><option>CT</option><option>DE</option>
+          <option>FL</option><option>GA</option><option>HI</option><option>ID</option>
+          <option>IL</option><option>IN</option><option>IA</option><option>KS</option>
+          <option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+          <option>MA</option><option>MI</option><option>MN</option><option>MS</option>
+          <option>MO</option><option>MT</option><option>NE</option><option>NV</option>
+          <option>NH</option><option>NJ</option><option>NM</option><option>NY</option>
+          <option>NC</option><option>ND</option><option>OH</option><option>OK</option>
+          <option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+          <option>SD</option><option>TN</option><option>TX</option><option>UT</option>
+          <option>VT</option><option>VA</option><option>WA</option><option>WV</option>
+          <option>WI</option><option>WY</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Center ZIP</label>
+        <input class="form-input" id="b-zip" placeholder="30301" maxlength="5" oninput="lookupZip()">
+        <div class="form-hint" id="b-zip-hint">Enter ZIP to auto-fill lat/lng</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Radius (miles)</label>
+        <input class="form-input" id="b-radius" type="number" value="30" min="5" max="200">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Fleet Size Min</label>
+        <input class="form-input" id="b-fleet-min" type="number" placeholder="1" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fleet Size Max</label>
+        <input class="form-input" id="b-fleet-max" type="number" placeholder="2" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fleet Size Codes</label>
+        <input class="form-input" id="b-fleet-codes" placeholder="A,B" value="A,B">
+        <div class="form-hint">A=1 truck B=2 C=3-5 D=6-10</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Require Email</label>
+        <select class="form-select" id="b-req-email">
+          <option value="true">Yes — email required</option>
+          <option value="false">No — include all</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Auth for Hire</label>
+        <select class="form-select" id="b-req-hire">
+          <option value="true">Yes — authorized only</option>
+          <option value="false">No — include all</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Exclude Hazmat</label>
+        <select class="form-select" id="b-excl-hm">
+          <option value="true">Yes — exclude HM</option>
+          <option value="false">No — include HM</option>
+        </select>
+      </div>
+
+      <div class="form-group span3" style="display:flex;gap:10px;align-items:center">
+        <button class="btn btn-ghost" onclick="previewSegment()">Preview Count</button>
+        <button class="btn btn-primary" onclick="buildSegment()">Build &amp; Save Segment</button>
+        <div style="font-size:11px;color:var(--text-faint);margin-left:auto" id="builder-status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIEW: CAMPAIGNS ── -->
+  <div class="view" id="view-campaigns">
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Active Campaigns</div>
+        <div class="kpi-value gold" id="kpi-camp-active">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Sent</div>
+        <div class="kpi-value" id="kpi-camp-sent">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Open Rate</div>
+        <div class="kpi-value" id="kpi-camp-open">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Click Rate</div>
+        <div class="kpi-value" id="kpi-camp-click">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Conversions</div>
+        <div class="kpi-value gold" id="kpi-camp-conv">—</div>
+        <div class="kpi-sub">signed up as carriers</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <span class="filter-label">Filter</span>
+      <input class="filter-input" id="camp-search" placeholder="Campaign name..." style="width:200px" oninput="filterCampaigns()">
+      <select class="filter-select" id="camp-status" onchange="filterCampaigns()">
+        <option value="">All Status</option>
+        <option value="active">Active</option>
+        <option value="draft">Draft</option>
+        <option value="paused">Paused</option>
+        <option value="complete">Complete</option>
+      </select>
+      <select class="filter-select" id="camp-type" onchange="filterCampaigns()">
+        <option value="">All Types</option>
+        <option value="mktg">Marketing</option>
+        <option value="followup">Follow-up</option>
+        <option value="reactivation">Reactivation</option>
+      </select>
+      <div class="filter-divider"></div>
+      <span style="font-size:11px;color:var(--text-faint)" id="camp-count-label"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Campaign</th>
+            <th>Segment</th>
+            <th>Type</th>
+            <th>Variant</th>
+            <th>Status</th>
+            <th>Sent</th>
+            <th>Opens</th>
+            <th>Clicks</th>
+            <th>Replies</th>
+            <th>Conv</th>
+            <th>Progress</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="camp-tbody">
+          <tr><td colspan="12"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No campaigns yet</div><div class="empty-sub">Create a segment first, then launch a campaign</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── VIEW: PERFORMANCE ── -->
+  <div class="view" id="view-performance">
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Sends (All Time)</div>
+        <div class="kpi-value" id="perf-total-sent">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Best Open Rate</div>
+        <div class="kpi-value gold" id="perf-best-open">—</div>
+        <div class="kpi-sub" id="perf-best-open-camp"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Best Click Rate</div>
+        <div class="kpi-value gold" id="perf-best-click">—</div>
+        <div class="kpi-sub" id="perf-best-click-camp"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Conversions</div>
+        <div class="kpi-value gold" id="perf-total-conv">—</div>
+        <div class="kpi-sub">carriers acquired</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Best Market</div>
+        <div class="kpi-value" id="perf-best-market" style="font-size:18px">—</div>
+        <div class="kpi-sub">by conversion rate</div>
+      </div>
+    </div>
+
+    <div class="panel-grid" style="flex:1">
+      <div class="panel-block">
+        <div class="panel-head">
+          <div class="panel-head-title">Campaign Performance</div>
+          <div class="panel-head-sub">sorted by open rate</div>
+        </div>
+        <div class="panel-body">
+          <table>
+            <thead><tr>
+              <th>Campaign</th>
+              <th>Sent</th>
+              <th>Open %</th>
+              <th>Click %</th>
+              <th>Conv %</th>
+            </tr></thead>
+            <tbody id="perf-camp-tbody">
+              <tr><td colspan="5"><div class="empty" style="padding:30px"><div class="empty-text">No data yet</div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel-block">
+        <div class="panel-head">
+          <div class="panel-head-title">Market Performance</div>
+          <div class="panel-head-sub">by segment</div>
+        </div>
+        <div class="panel-body">
+          <table>
+            <thead><tr>
+              <th>Market</th>
+              <th>Campaigns</th>
+              <th>Sent</th>
+              <th>Best Open</th>
+              <th>Conv</th>
+            </tr></thead>
+            <tbody id="perf-market-tbody">
+              <tr><td colspan="5"><div class="empty" style="padding:30px"><div class="empty-text">No data yet</div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIEW: QUEUE ── -->
+  <div class="view" id="view-queue">
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Scheduled Today</div>
+        <div class="kpi-value gold" id="q-today">—</div>
+        <div class="kpi-sub">sends queued</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Sent Today</div>
+        <div class="kpi-value" id="q-sent">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active Campaigns</div>
+        <div class="kpi-value" id="q-active">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Send Domain</div>
+        <div class="kpi-value" style="font-size:14px;margin-top:4px">ace@edge.xtxtransport.com</div>
+        <div class="kpi-sub">→ reply-to: ken@xtxtec.com</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <span class="filter-label">Today's Queue</span>
+      <div class="filter-divider"></div>
+      <span style="font-size:11px;color:var(--text-faint)">Sends fire via n8n at 6:00 AM daily</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm">Preview Next 200</button>
+        <button class="btn btn-ghost btn-sm" style="color:#aaa">Pause All</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Campaign</th>
+            <th>Prospect</th>
+            <th>Company</th>
+            <th>City, State</th>
+            <th>Fleet</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Sent At</th>
+          </tr>
+        </thead>
+        <tbody id="queue-tbody">
+          <tr><td colspan="8"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No sends queued</div><div class="empty-sub">Launch a campaign to populate the queue</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── VIEW: PROSPECTS ── -->
+  <div class="view" id="view-prospects-view">
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Prospects</div>
+        <div class="kpi-value" id="pros-total">3,592,412</div>
+        <div class="kpi-sub">FMCSA database</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active Carriers</div>
+        <div class="kpi-value" id="pros-active">—</div>
+        <div class="kpi-sub">status_code = A</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Have Email</div>
+        <div class="kpi-value" id="pros-email">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Contacted</div>
+        <div class="kpi-value" id="pros-contacted">—</div>
+        <div class="kpi-sub">do_not_contact excluded</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Do Not Contact</div>
+        <div class="kpi-value" id="pros-dnc">—</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <span class="filter-label">Browse</span>
+      <input class="filter-input" id="pros-search" placeholder="Name, company, DOT..." style="width:200px">
+      <select class="filter-select" id="pros-state-filter">
+        <option value="">All States</option>
+      </select>
+      <select class="filter-select" id="pros-fleet-filter">
+        <option value="">All Fleet Sizes</option>
+        <option value="A">A — 1 unit</option>
+        <option value="B">B — 2 units</option>
+        <option value="C">C — 3–5 units</option>
+        <option value="D">D — 6–10 units</option>
+      </select>
+      <select class="filter-select" id="pros-contacted-filter">
+        <option value="">All</option>
+        <option value="false">Not Contacted</option>
+        <option value="true">Contacted</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="searchProspects()">Search</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>DOT #</th>
+            <th>Legal Name</th>
+            <th>DBA</th>
+            <th>Officer</th>
+            <th>City, State</th>
+            <th>Fleet</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Contacted</th>
+            <th>Campaign</th>
+          </tr>
+        </thead>
+        <tbody id="pros-tbody">
+          <tr><td colspan="10"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">Run a search to browse prospects</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── VIEW: SETTINGS ── -->
+  <div class="view" id="view-settings">
+    <div style="padding:24px;max-width:600px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;margin-bottom:20px">Send Configuration</div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel-block" style="border:1px solid var(--border);border-radius:5px">
+          <div class="panel-head"><div class="panel-head-title">Deliverability</div></div>
+          <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label class="form-label">From Address</label>
+              <input class="form-input" value="ace@edge.xtxtransport.com" id="cfg-from">
+              <div class="form-hint">Established domain — inbox delivery</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Reply-To</label>
+              <input class="form-input" value="ken@xtxtec.com" id="cfg-replyto">
+              <div class="form-hint">Warms xtxtec.com reputation via replies</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Default Landing URL</label>
+              <input class="form-input" value="https://xtxtec.com/edge" id="cfg-landing" style="grid-column:span 2">
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-block" style="border:1px solid var(--border);border-radius:5px">
+          <div class="panel-head"><div class="panel-head-title">Send Limits</div></div>
+          <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Daily Send Limit</label>
+              <input class="form-input" type="number" value="200" id="cfg-limit">
+              <div class="form-hint">Per active campaign per day</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Send Time (n8n)</label>
+              <input class="form-input" value="06:00 AM" id="cfg-time">
+              <div class="form-hint">n8n workflow fires at this time daily</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-block" style="border:1px solid var(--border);border-radius:5px">
+          <div class="panel-head"><div class="panel-head-title">Default Tone</div></div>
+          <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Tone Variant</label>
+              <select class="form-select" id="cfg-tone">
+                <option value="peer">Peer — carrier to carrier voice</option>
+                <option value="direct">Direct — short, no-nonsense</option>
+                <option value="warm">Warm — relationship building</option>
+                <option value="urgent">Urgent — market timing hook</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Prompt Version</label>
+              <input class="form-input" value="v1.0" id="cfg-prompt">
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" style="width:fit-content">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── NEW CAMPAIGN MODAL ── -->
+<div class="modal-overlay" id="modal-campaign">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">New Campaign</div>
+      <button class="modal-close" onclick="closeModal('modal-campaign')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group span2" style="grid-column:span 2">
+          <label class="form-label">Campaign Name</label>
+          <input class="form-input" id="nc-name" placeholder="ATL_30_mktg_001">
+          <div class="form-hint">Convention: [SEGMENT]_[TYPE]_[VARIANT] e.g. ATL_30_mktg_001</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Segment</label>
+          <select class="form-select" id="nc-segment"><option value="">Select segment...</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Campaign Type</label>
+          <select class="form-select" id="nc-type">
+            <option value="mktg">Marketing — cold outreach</option>
+            <option value="followup">Follow-up — non-responders</option>
+            <option value="reactivation">Reactivation — 90+ days cold</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Variant #</label>
+          <input class="form-input" id="nc-variant" type="number" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Batch Size</label>
+          <input class="form-input" id="nc-batch" type="number" value="200" min="1" max="1000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Batch Offset</label>
+          <input class="form-input" id="nc-offset" type="number" value="0" min="0">
+          <div class="form-hint">001→0, 002→200, 003→400</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tone Variant</label>
+          <select class="form-select" id="nc-tone">
+            <option value="peer">Peer — carrier to carrier</option>
+            <option value="direct">Direct</option>
+            <option value="warm">Warm</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:span 2">
+          <label class="form-label">Subject Template</label>
+          <input class="form-input" id="nc-subject" placeholder="Hey {{first_name}} — quick question about your routes">
+        </div>
+        <div class="form-group" style="grid-column:span 2">
+          <label class="form-label">Body Template (Haiku prompt context)</label>
+          <textarea class="form-input" id="nc-body" rows="5" style="resize:vertical"
+            placeholder="Write a short, peer-to-peer email from Ken (a carrier like them) explaining how EDGE/ACE helped him stop missing load offers. Personalize with {{company}}, {{city}}, {{officer_name}}. Keep it under 120 words. No corporate tone. End with a single CTA link."></textarea>
+        </div>
+        <div class="form-group" style="grid-column:span 2">
+          <label class="form-label">Landing URL</label>
+          <input class="form-input" id="nc-landing" placeholder="https://xtxtec.com/edge?utm_campaign=ATL_30_mktg_001">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('modal-campaign')">Cancel</button>
+      <button class="btn btn-ghost" onclick="saveCampaignDraft()">Save Draft</button>
+      <button class="btn btn-primary" onclick="saveCampaignLaunch()">Save &amp; Launch</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyNDMzNjQsImV4cCI6MjA1OTgxOTM2NH0.VlrXJeENGFmBONCtGlnGqTIEwAUlJBpYPSOtPQkQ9zY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── STATE ──
+let allSegments = [], allCampaigns = [];
+let currentView = 'markets';
+
+// ── NAVIGATION ──
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
+  event && event.currentTarget && event.currentTarget.classList.add('active');
+  currentView = name;
+  const titles = {
+    markets:'Market Segments', builder:'Build Segment',
+    campaigns:'Campaigns', performance:'Performance',
+    queue:'Send Queue', 'prospects-view':'Prospect Browser', settings:'Send Settings'
+  };
+  const crumbs = {
+    markets:'Segments', builder:'Build Segment',
+    campaigns:'All Campaigns', performance:'Performance',
+    queue:'Send Queue', 'prospects-view':'Prospects', settings:'Settings'
+  };
+  document.getElementById('topbar-title').textContent = titles[name] || name;
+  document.getElementById('topbar-crumb').textContent = crumbs[name] || name;
+
+  if (name === 'markets') loadSegments();
+  if (name === 'campaigns') loadCampaigns();
+  if (name === 'performance') loadPerformance();
+  if (name === 'queue') loadQueue();
+}
+
+// Manually fix active nav on click since event won't always have currentTarget
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// ── TOAST ──
+function toast(msg, gold=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (gold ? ' gold' : '');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── MODAL ──
+function openNewCampaign() {
+  loadSegmentOptions();
+  document.getElementById('modal-campaign').classList.add('open');
+  switchView('campaigns');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── LOAD SEGMENTS ──
+async function loadSegments() {
+  const { data, error } = await sb.from('cmo_segments').select('*').order('created_at', {ascending:false});
+  if (error) { toast('Error loading segments'); return; }
+  allSegments = data || [];
+  renderSegments(allSegments);
+  updateSegmentKPIs(allSegments);
+  populateStateFilter('seg-state', allSegments.map(s=>s.market_state));
+}
+
+function renderSegments(segs) {
+  const tb = document.getElementById('seg-tbody');
+  document.getElementById('seg-count-label').textContent = segs.length + ' segment' + (segs.length!==1?'s':'');
+  if (!segs.length) {
+    tb.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No segments yet</div><div class="empty-sub">Click "Build Segment" to create your first market</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = segs.map(s => {
+    const rem = s.remaining_count || 0;
+    const total = s.email_count || s.total_count || 0;
+    const contacted = s.contacted_count || 0;
+    const pct = total ? Math.round(contacted/total*100) : 0;
+    return `<tr>
+      <td class="td-code">${s.name}</td>
+      <td class="td-name">${s.market_city}, ${s.market_state}</td>
+      <td>${s.radius_miles} mi</td>
+      <td>${(s.fleetsize_codes||[]).join(',') || '—'}</td>
+      <td>${(s.total_count||0).toLocaleString()}</td>
+      <td>${(s.email_count||0).toLocaleString()}</td>
+      <td style="color:var(--gold);font-weight:600">${rem.toLocaleString()}</td>
+      <td>
+        <div class="prog-bar" style="min-width:80px">
+          <div class="prog-fill" style="width:${pct}%"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:2px">${pct}% contacted</div>
+      </td>
+      <td class="td-mono">${s.built_at ? new Date(s.built_at).toLocaleDateString() : '—'}</td>
+      <td>
+        <div class="action-row">
+          <button class="icon-btn gold" onclick="launchFromSegment('${s.id}','${s.name}')">+ Campaign</button>
+          <button class="icon-btn" onclick="refreshSegment('${s.id}')">↻</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateSegmentKPIs(segs) {
+  document.getElementById('kpi-segments').textContent = segs.length;
+  document.getElementById('kpi-targeted').textContent = segs.reduce((a,s)=>a+(s.total_count||0),0).toLocaleString();
+  document.getElementById('kpi-available').textContent = segs.reduce((a,s)=>a+(s.remaining_count||0),0).toLocaleString();
+  document.getElementById('kpi-untouched').textContent = segs.filter(s=>!(s.contacted_count)).length;
+}
+
+function filterSegments() {
+  const q = document.getElementById('seg-search').value.toLowerCase();
+  const st = document.getElementById('seg-state').value;
+  const filtered = allSegments.filter(s => {
+    const matchQ = !q || s.name.toLowerCase().includes(q) || s.market_city.toLowerCase().includes(q);
+    const matchSt = !st || s.market_state === st;
+    return matchQ && matchSt;
+  });
+  renderSegments(filtered);
+}
+
+// ── LOAD CAMPAIGNS ──
+async function loadCampaigns() {
+  const { data, error } = await sb.from('cmo_campaigns').select('*, cmo_segments(name,market_city,market_state)').order('created_at',{ascending:false});
+  if (error) { toast('Error loading campaigns'); return; }
+  allCampaigns = data || [];
+  renderCampaigns(allCampaigns);
+  updateCampaignKPIs(allCampaigns);
+  document.getElementById('badge-active').textContent = allCampaigns.filter(c=>c.status==='active').length;
+}
+
+function renderCampaigns(camps) {
+  const tb = document.getElementById('camp-tbody');
+  document.getElementById('camp-count-label').textContent = camps.length + ' campaign' + (camps.length!==1?'s':'');
+  if (!camps.length) {
+    tb.innerHTML = `<tr><td colspan="12"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No campaigns yet</div><div class="empty-sub">Create a segment first, then launch a campaign</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = camps.map(c => {
+    const sent = c.sent_count||0;
+    const batchSize = c.batch_size||200;
+    const pct = batchSize ? Math.min(100,Math.round(sent/batchSize*100)) : 0;
+    const openPct = sent ? (c.opened_count/sent*100).toFixed(1)+'%' : '—';
+    const clickPct = sent ? (c.clicked_count/sent*100).toFixed(1)+'%' : '—';
+    const seg = c.cmo_segments;
+    return `<tr>
+      <td class="td-code">${c.name}</td>
+      <td>${seg ? seg.name : '—'}</td>
+      <td style="text-transform:uppercase;font-size:10px;letter-spacing:1px;color:var(--text-dim)">${c.campaign_type}</td>
+      <td style="text-align:center">${c.variant_number}</td>
+      <td><span class="badge badge-${c.status}"><span class="badge-dot"></span>${c.status}</span></td>
+      <td>${sent.toLocaleString()}</td>
+      <td>${openPct}</td>
+      <td>${clickPct}</td>
+      <td>${(c.replied_count||0)}</td>
+      <td style="color:var(--gold);font-weight:600">${(c.converted_count||0)}</td>
+      <td>
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:2px">${pct}% of ${batchSize}</div>
+      </td>
+      <td>
+        <div class="action-row">
+          ${c.status==='draft' ? `<button class="icon-btn gold" onclick="launchCampaign('${c.id}')">Launch</button>` : ''}
+          ${c.status==='active' ? `<button class="icon-btn" onclick="pauseCampaign('${c.id}')">Pause</button>` : ''}
+          ${c.status==='paused' ? `<button class="icon-btn gold" onclick="resumeCampaign('${c.id}')">Resume</button>` : ''}
+          <button class="icon-btn" onclick="cloneCampaign('${c.id}')">Clone</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateCampaignKPIs(camps) {
+  const active = camps.filter(c=>c.status==='active');
+  const totalSent = camps.reduce((a,c)=>a+(c.sent_count||0),0);
+  const withSends = camps.filter(c=>c.sent_count>0);
+  const avgOpen = withSends.length ? (withSends.reduce((a,c)=>a+(c.opened_count||0),0)/withSends.reduce((a,c)=>a+(c.sent_count||0),0)*100).toFixed(1)+'%' : '—';
+  const avgClick = withSends.length ? (withSends.reduce((a,c)=>a+(c.clicked_count||0),0)/withSends.reduce((a,c)=>a+(c.sent_count||0),0)*100).toFixed(1)+'%' : '—';
+  const totalConv = camps.reduce((a,c)=>a+(c.converted_count||0),0);
+  document.getElementById('kpi-camp-active').textContent = active.length;
+  document.getElementById('kpi-camp-sent').textContent = totalSent.toLocaleString();
+  document.getElementById('kpi-camp-open').textContent = avgOpen;
+  document.getElementById('kpi-camp-click').textContent = avgClick;
+  document.getElementById('kpi-camp-conv').textContent = totalConv;
+  document.getElementById('badge-active').textContent = active.length;
+}
+
+function filterCampaigns() {
+  const q = document.getElementById('camp-search').value.toLowerCase();
+  const st = document.getElementById('camp-status').value;
+  const ty = document.getElementById('camp-type').value;
+  const filtered = allCampaigns.filter(c => {
+    const matchQ = !q || c.name.toLowerCase().includes(q);
+    const matchSt = !st || c.status===st;
+    const matchTy = !ty || c.campaign_type===ty;
+    return matchQ && matchSt && matchTy;
+  });
+  renderCampaigns(filtered);
+}
+
+// ── PERFORMANCE ──
+async function loadPerformance() {
+  const { data } = await sb.from('cmo_campaigns').select('*').order('opened_count',{ascending:false});
+  if (!data || !data.length) return;
+  const withSends = data.filter(c=>c.sent_count>0);
+  const totalSent = data.reduce((a,c)=>a+(c.sent_count||0),0);
+  const totalConv = data.reduce((a,c)=>a+(c.converted_count||0),0);
+  document.getElementById('perf-total-sent').textContent = totalSent.toLocaleString();
+  document.getElementById('perf-total-conv').textContent = totalConv;
+  if (withSends.length) {
+    const bestOpen = withSends.sort((a,b)=>(b.opened_count/b.sent_count)-(a.opened_count/a.sent_count))[0];
+    const bestClick = withSends.sort((a,b)=>(b.clicked_count/b.sent_count)-(a.clicked_count/a.sent_count))[0];
+    document.getElementById('perf-best-open').textContent = (bestOpen.opened_count/bestOpen.sent_count*100).toFixed(1)+'%';
+    document.getElementById('perf-best-open-camp').textContent = bestOpen.name;
+    document.getElementById('perf-best-click').textContent = (bestClick.clicked_count/bestClick.sent_count*100).toFixed(1)+'%';
+    document.getElementById('perf-best-click-camp').textContent = bestClick.name;
+  }
+
+  const tbody = document.getElementById('perf-camp-tbody');
+  tbody.innerHTML = data.slice(0,20).map(c => {
+    const s = c.sent_count||0;
+    const op = s ? (c.opened_count/s*100).toFixed(1) : 0;
+    const cl = s ? (c.clicked_count/s*100).toFixed(1) : 0;
+    const cv = s ? (c.converted_count/s*100).toFixed(2) : 0;
+    return `<tr>
+      <td class="td-code">${c.name}</td>
+      <td>${s.toLocaleString()}</td>
+      <td><div class="perf-bar-cell"><span class="perf-pct">${op}%</span><div class="perf-bar-wrap"><div class="perf-bar-fill" style="width:${Math.min(op,100)}%"></div></div></div></td>
+      <td><div class="perf-bar-cell"><span class="perf-pct">${cl}%</span><div class="perf-bar-wrap"><div class="perf-bar-fill" style="width:${Math.min(cl*5,100)}%"></div></div></div></td>
+      <td style="color:var(--gold)">${cv}%</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── QUEUE ──
+async function loadQueue() {
+  const today = new Date().toISOString().split('T')[0];
+  const { data: sends } = await sb.from('cmo_sends')
+    .select('*, cmo_campaigns(name), prospects(legal_name,dba_name,company_officer_1,phy_city,phy_state,fleetsize,email_address)')
+    .gte('sent_at', today+'T00:00:00')
+    .order('sent_at',{ascending:false})
+    .limit(200);
+
+  const { data: camps } = await sb.from('cmo_campaigns').select('id').eq('status','active');
+  document.getElementById('q-active').textContent = camps?.length||0;
+  document.getElementById('q-sent').textContent = (sends?.length||0).toLocaleString();
+  document.getElementById('q-today').textContent = (sends?.length||0).toLocaleString();
+
+  const tb = document.getElementById('queue-tbody');
+  if (!sends?.length) {
+    tb.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No sends today</div><div class="empty-sub">Active campaigns fire via n8n at 6:00 AM</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = sends.map(s => {
+    const p = s.prospects;
+    const name = p?.dba_name||p?.legal_name||'—';
+    return `<tr>
+      <td class="td-code">${s.cmo_campaigns?.name||'—'}</td>
+      <td>${p?.company_officer_1||'—'}</td>
+      <td class="td-name">${name}</td>
+      <td>${p?.phy_city||'—'}, ${p?.phy_state||'—'}</td>
+      <td>${p?.fleetsize||'—'}</td>
+      <td class="td-mono">${p?.email_address||'—'}</td>
+      <td><span class="badge badge-${s.status==='sent'?'active':'draft'}">${s.status}</span></td>
+      <td class="td-mono">${s.sent_at ? new Date(s.sent_at).toLocaleTimeString() : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── SEGMENT BUILDER ──
+function autoFillName() {
+  const code = document.getElementById('b-code').value.trim().toUpperCase();
+  const radius = document.getElementById('b-radius').value;
+  if (code && radius && !document.getElementById('b-name').value.includes('_')) {
+    document.getElementById('b-name').value = code + '_' + radius;
+  }
+}
+
+let zipLookupTimer;
+function lookupZip() {
+  clearTimeout(zipLookupTimer);
+  const zip = document.getElementById('b-zip').value.trim();
+  if (zip.length !== 5) return;
+  zipLookupTimer = setTimeout(async () => {
+    const { data } = await sb.from('us_zipcodes').select('city,state,latitude,longitude').eq('zip',zip).single();
+    if (data) {
+      document.getElementById('b-zip-hint').textContent = `✓ ${data.city}, ${data.state}  (${parseFloat(data.latitude).toFixed(4)}, ${parseFloat(data.longitude).toFixed(4)})`;
+      if (!document.getElementById('b-city').value) document.getElementById('b-city').value = data.city;
+      if (!document.getElementById('b-state').value) document.getElementById('b-state').value = data.state;
+    }
+  }, 400);
+}
+
+async function previewSegment() {
+  const zip = document.getElementById('b-zip').value.trim();
+  const radius = parseFloat(document.getElementById('b-radius').value)||30;
+  const fleetsizes = document.getElementById('b-fleet-codes').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const reqEmail = document.getElementById('b-req-email').value === 'true';
+  const reqHire = document.getElementById('b-req-hire').value === 'true';
+  const exclHM = document.getElementById('b-excl-hm').value === 'true';
+
+  document.getElementById('builder-status').textContent = 'Querying…';
+  document.getElementById('preview-count').textContent = '…';
+
+  const { data: zd } = await sb.from('us_zipcodes').select('latitude,longitude').eq('zip',zip).single();
+  if (!zd) { document.getElementById('builder-status').textContent = 'ZIP not found'; return; }
+
+  const lat = parseFloat(zd.latitude), lng = parseFloat(zd.longitude);
+
+  // Use RPC or raw SQL approximation via bounding box first for speed
+  const latDelta = radius / 69;
+  const lngDelta = radius / (69 * Math.cos(lat * Math.PI / 180));
+
+  let q = sb.from('prospects')
+    .select('id, email_address, fleetsize', {count:'exact',head:false})
+    .eq('status_code','A')
+    .eq('do_not_contact', false)
+    .gte('phy_zip', '')
+    .limit(1);
+
+  // Approximate count via state filter for preview (exact radius via SQL in build)
+  const { data: stateData } = await sb.from('us_zipcodes')
+    .select('zip')
+    .gte('latitude', (lat-latDelta).toString())
+    .lte('latitude', (lat+latDelta).toString())
+    .gte('longitude', (lng-lngDelta).toString())
+    .lte('longitude', (lng+lngDelta).toString());
+
+  const zips = (stateData||[]).map(z=>z.zip);
+
+  let countQ = sb.from('prospects').select('id, email_address', {count:'exact',head:false})
+    .eq('status_code','A').eq('do_not_contact',false).in('phy_zip',zips);
+  if (fleetsizes.length) countQ = countQ.in('fleetsize', fleetsizes);
+  if (reqEmail) countQ = countQ.not('email_address','is',null);
+  if (reqHire) countQ = countQ.eq('authorized_for_hire',true);
+  if (exclHM) countQ = countQ.eq('hm_flag',false);
+
+  const { count, data: sample } = await countQ.limit(1);
+  const emailCount = (sample||[]).filter(p=>p.email_address).length;
+
+  document.getElementById('preview-count').textContent = (count||0).toLocaleString();
+  document.getElementById('preview-email-count').textContent = `approx. bounding box — exact radius on save`;
+  document.getElementById('builder-status').textContent = `~${(count||0).toLocaleString()} carriers in range`;
+}
+
+async function buildSegment() {
+  const name = document.getElementById('b-name').value.trim();
+  const code = document.getElementById('b-code').value.trim().toUpperCase();
+  const city = document.getElementById('b-city').value.trim();
+  const state = document.getElementById('b-state').value;
+  const zip = document.getElementById('b-zip').value.trim();
+  const radius = parseInt(document.getElementById('b-radius').value)||30;
+  const fleetMin = document.getElementById('b-fleet-min').value ? parseInt(document.getElementById('b-fleet-min').value) : null;
+  const fleetMax = document.getElementById('b-fleet-max').value ? parseInt(document.getElementById('b-fleet-max').value) : null;
+  const fleetsizes = document.getElementById('b-fleet-codes').value.split(',').map(s=>s.trim()).filter(Boolean);
+
+  if (!name||!code||!city||!state||!zip) { toast('Fill all required fields'); return; }
+
+  const { data: zd } = await sb.from('us_zipcodes').select('latitude,longitude').eq('zip',zip).single();
+  if (!zd) { toast('ZIP code not found'); return; }
+
+  document.getElementById('builder-status').textContent = 'Saving segment…';
+
+  const { error } = await sb.from('cmo_segments').insert({
+    name, market_code:code, market_city:city, market_state:state,
+    center_zip:zip,
+    center_lat:parseFloat(zd.latitude),
+    center_lng:parseFloat(zd.longitude),
+    radius_miles:radius,
+    fleet_size_min:fleetMin,
+    fleet_size_max:fleetMax,
+    fleetsize_codes:fleetsizes.length ? fleetsizes : null,
+    require_email: document.getElementById('b-req-email').value==='true',
+    require_authorized_for_hire: document.getElementById('b-req-hire').value==='true',
+    exclude_hazmat: document.getElementById('b-excl-hm').value==='true',
+    built_at: new Date().toISOString()
+  });
+
+  if (error) { toast('Error: ' + error.message); document.getElementById('builder-status').textContent = error.message; return; }
+  toast('Segment ' + name + ' saved!', true);
+  document.getElementById('builder-status').textContent = 'Saved ✓';
+  switchView('markets');
+}
+
+// ── CAMPAIGN ACTIONS ──
+async function loadSegmentOptions() {
+  const { data } = await sb.from('cmo_segments').select('id,name').order('name');
+  const sel = document.getElementById('nc-segment');
+  sel.innerHTML = '<option value="">Select segment...</option>' + (data||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+function launchFromSegment(segId, segName) {
+  loadSegmentOptions().then(()=>{
+    document.getElementById('nc-segment').value = segId;
+    const type = 'mktg';
+    const variant = 1;
+    document.getElementById('nc-name').value = segName + '_' + type + '_001';
+    document.getElementById('nc-landing').value = 'https://xtxtec.com/edge?utm_campaign=' + segName + '_' + type + '_001';
+    document.getElementById('modal-campaign').classList.add('open');
+  });
+}
+
+async function saveCampaign(status) {
+  const name = document.getElementById('nc-name').value.trim();
+  const segId = document.getElementById('nc-segment').value;
+  const type = document.getElementById('nc-type').value;
+  const variant = parseInt(document.getElementById('nc-variant').value)||1;
+  const batch = parseInt(document.getElementById('nc-batch').value)||200;
+  const offset = parseInt(document.getElementById('nc-offset').value)||0;
+  const tone = document.getElementById('nc-tone').value;
+  const subject = document.getElementById('nc-subject').value;
+  const body = document.getElementById('nc-body').value;
+  const landing = document.getElementById('nc-landing').value;
+
+  if (!name||!segId) { toast('Name and segment required'); return; }
+
+  const row = {
+    name, segment_id:segId, campaign_type:type, variant_number:variant,
+    batch_size:batch, batch_offset:offset, tone_variant:tone,
+    subject_template:subject, body_template:body, landing_url:landing,
+    status,
+    launched_at: status==='active' ? new Date().toISOString() : null
+  };
+
+  const { error } = await sb.from('cmo_campaigns').insert(row);
+  if (error) { toast('Error: ' + error.message); return; }
+  closeModal('modal-campaign');
+  toast(name + ' ' + (status==='active'?'launched!':'saved as draft'), true);
+  loadCampaigns();
+}
+
+function saveCampaignDraft() { saveCampaign('draft'); }
+function saveCampaignLaunch() { saveCampaign('active'); }
+
+async function launchCampaign(id) {
+  await sb.from('cmo_campaigns').update({status:'active',launched_at:new Date().toISOString()}).eq('id',id);
+  toast('Campaign launched', true); loadCampaigns();
+}
+async function pauseCampaign(id) {
+  await sb.from('cmo_campaigns').update({status:'paused'}).eq('id',id);
+  toast('Campaign paused'); loadCampaigns();
+}
+async function resumeCampaign(id) {
+  await sb.from('cmo_campaigns').update({status:'active'}).eq('id',id);
+  toast('Campaign resumed', true); loadCampaigns();
+}
+async function cloneCampaign(id) {
+  const { data } = await sb.from('cmo_campaigns').select('*').eq('id',id).single();
+  if (!data) return;
+  const cloned = {...data};
+  delete cloned.id; delete cloned.created_at; delete cloned.launched_at; delete cloned.completed_at;
+  cloned.name = data.name + '_copy';
+  cloned.status = 'draft';
+  cloned.sent_count = cloned.opened_count = cloned.clicked_count = cloned.replied_count = cloned.converted_count = cloned.bounce_count = 0;
+  const { error } = await sb.from('cmo_campaigns').insert(cloned);
+  if (error) { toast('Clone failed: ' + error.message); return; }
+  toast('Campaign cloned as draft', true); loadCampaigns();
+}
+
+async function refreshSegment(id) {
+  toast('Refreshing segment count…');
+  // Re-trigger count — simplified here, full radius calc happens server-side via n8n
+  const { data: seg } = await sb.from('cmo_segments').select('*').eq('id',id).single();
+  if (!seg) return;
+  await sb.from('cmo_segments').update({refreshed_at:new Date().toISOString()}).eq('id',id);
+  toast('Segment refresh queued', true);
+  loadSegments();
+}
+
+// ── PROSPECT BROWSER ──
+async function searchProspects() {
+  const state = document.getElementById('pros-state-filter').value;
+  const fleet = document.getElementById('pros-fleet-filter').value;
+  const contacted = document.getElementById('pros-contacted-filter').value;
+  const q = document.getElementById('pros-search').value.trim();
+
+  let query = sb.from('prospects').select('dot_number,legal_name,dba_name,company_officer_1,phy_city,phy_state,fleetsize,email_address,status_code,contacted,campaign_id').limit(100);
+  if (state) query = query.eq('phy_state', state);
+  if (fleet) query = query.eq('fleetsize', fleet);
+  if (contacted !== '') query = query.eq('contacted', contacted==='true');
+  if (q) query = query.ilike('legal_name', '%'+q+'%');
+
+  const { data, error } = await query;
+  const tb = document.getElementById('pros-tbody');
+  if (error||!data?.length) {
+    tb.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-text">No results</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = data.map(p=>`<tr>
+    <td class="td-mono">${p.dot_number}</td>
+    <td class="td-name">${p.legal_name||'—'}</td>
+    <td>${p.dba_name||'—'}</td>
+    <td>${p.company_officer_1||'—'}</td>
+    <td>${p.phy_city||'—'}, ${p.phy_state||'—'}</td>
+    <td>${p.fleetsize||'—'}</td>
+    <td class="td-mono" style="font-size:11px">${p.email_address||'—'}</td>
+    <td><span class="badge ${p.status_code==='A'?'badge-active':'badge-draft'}">${p.status_code||'—'}</span></td>
+    <td>${p.contacted?'<span style="color:var(--text-faint)">Yes</span>':'<span style="color:var(--gold)">No</span>'}</td>
+    <td class="td-mono" style="font-size:10px">${p.campaign_id||'—'}</td>
+  </tr>`).join('');
+}
+
+// ── UTILS ──
+function populateStateFilter(id, states) {
+  const sel = document.getElementById(id);
+  const existing = sel.value;
+  const unique = [...new Set(states)].sort();
+  const opts = unique.map(s=>`<option value="${s}">${s}</option>`).join('');
+  sel.innerHTML = '<option value="">All States</option>' + opts;
+  if (existing) sel.value = existing;
+}
+
+async function refreshData() {
+  if (currentView === 'markets') loadSegments();
+  else if (currentView === 'campaigns') loadCampaigns();
+  else if (currentView === 'performance') loadPerformance();
+  else if (currentView === 'queue') loadQueue();
+  toast('Refreshed');
+}
+
+// ── INIT ──
+loadSegments();
+loadCampaigns(); // pre-load for badge count
+</script>
+</body>
+</html>
