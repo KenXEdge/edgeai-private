@@ -42,20 +42,27 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0d0d0d;color:#
   z-index:10;
 }
 .sidebar-logo{
-  padding:18px 16px 14px;
+  padding:16px 16px 0;
   border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:10px;
 }
 .sidebar-logo .logo-mark{
   font-family:'Barlow Condensed',sans-serif;
-  font-size:20px;font-weight:900;letter-spacing:1px;
+  font-size:22px;font-weight:900;letter-spacing:1px;
   color:var(--gold);
 }
-.sidebar-logo .logo-sub{
-  font-size:10px;font-weight:600;letter-spacing:2px;
-  color:var(--text-dim);text-transform:uppercase;
-  margin-top:1px;
+.console-tabs{
+  display:flex;margin-top:12px;
+  border-top:1px solid var(--border);
 }
+.console-tab{
+  flex:1;text-align:center;padding:8px 0;
+  font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--text-faint);cursor:pointer;text-decoration:none;
+  border-bottom:2px solid transparent;
+  transition:all 0.15s;
+}
+.console-tab:hover{color:var(--text-dim)}
+.console-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
 .sidebar-section-label{
   font-size:10px;font-weight:700;letter-spacing:2px;
   color:var(--text-faint);text-transform:uppercase;
@@ -346,10 +353,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark">EDGE</div>
-    <div class="logo-sub">CMO Console</div>
-    <div style="display:flex;gap:1px;margin-top:10px;background:var(--border);border-radius:4px;overflow:hidden">
-      <a href="/cmo" style="flex:1;text-align:center;padding:5px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);background:var(--gold-dim);text-decoration:none">CMO</a>
-      <a href="/cfo" style="flex:1;text-align:center;padding:5px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);background:var(--panel);text-decoration:none">CFO</a>
+    <div class="console-tabs">
+      <a class="console-tab active" href="/cmo">CMO</a>
+      <a class="console-tab" href="/cfo">CFO</a>
     </div>
   </div>
 

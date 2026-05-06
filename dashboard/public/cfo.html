@@ -33,18 +33,19 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0d0d0d;color:#
   background:#111;border-right:1px solid var(--border);
   display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;z-index:10;
 }
-.sidebar-logo{padding:14px 16px;border-bottom:1px solid var(--border)}
-.logo-mark{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:1px;color:var(--gold)}
-.logo-sub{font-size:10px;font-weight:600;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-top:1px}
+.sidebar-logo{padding:16px 16px 0;border-bottom:1px solid var(--border)}
+.logo-mark{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:1px;color:var(--gold)}
 
 /* Console switcher */
-.console-tabs{display:flex;gap:1px;margin-top:10px;background:var(--border);border-radius:4px;overflow:hidden}
+.console-tabs{display:flex;margin-top:12px;border-top:1px solid var(--border)}
 .console-tab{
-  flex:1;text-align:center;padding:5px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--text-dim);cursor:pointer;text-decoration:none;background:var(--panel);transition:all 0.15s;
+  flex:1;text-align:center;padding:8px 0;
+  font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--text-faint);cursor:pointer;text-decoration:none;
+  border-bottom:2px solid transparent;transition:all 0.15s;
 }
-.console-tab:hover{color:var(--text)}
-.console-tab.active{background:var(--gold-dim);color:var(--gold)}
+.console-tab:hover{color:var(--text-dim)}
+.console-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
 
 .sidebar-section-label{
   font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text-faint);
@@ -255,8 +256,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark">EDGE</div>
-    <div class="logo-sub">Financial Console</div>
-    <div class="console-tabs" style="margin-top:10px">
+    <div class="console-tabs">
       <a class="console-tab" href="/cmo">CMO</a>
       <a class="console-tab active" href="/cfo">CFO</a>
     </div>
