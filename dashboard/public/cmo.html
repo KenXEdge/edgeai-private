@@ -401,7 +401,11 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   </div>
 
   <div class="sidebar-footer">
+    <div id="auth-user-email" style="margin-bottom:8px;font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     <a href="/dashboard">← Carrier Dashboard</a>
+    <div style="margin-top:8px">
+      <button onclick="logout()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:11px;padding:0;font-family:'Barlow',sans-serif">Sign out</button>
+    </div>
   </div>
 </aside>
 
@@ -1522,9 +1526,39 @@ async function refreshData() {
   toast('Refreshed');
 }
 
+// ── AUTH ──
+const ADMIN_EMAILS = ['ken@xtxtec.com','kenkorbel@gmail.com','korbs827@gmail.com'];
+
+async function checkAuth() {
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = '/login'; return false; }
+  if (!ADMIN_EMAILS.includes(session.user.email.toLowerCase())) {
+    document.body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0d0d0d;color:#fff;font-family:'Barlow',sans-serif;gap:14px">
+      <div style="color:#E8A020;font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900">EDGE</div>
+      <div style="color:rgba(255,255,255,0.6);font-size:13px">Admin access only</div>
+      <button onclick="logout()" style="margin-top:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);padding:8px 20px;border-radius:4px;cursor:pointer;font-family:'Barlow',sans-serif;font-size:12px">Sign Out</button>
+    </div>`;
+    return false;
+  }
+  const el = document.getElementById('auth-user-email');
+  if (el) el.textContent = session.user.email;
+  return true;
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  window.location.href = '/login';
+}
+
 // ── INIT ──
-loadSegments();
-loadCampaigns(); // pre-load for badge count
+(async () => {
+  document.body.style.visibility = 'hidden';
+  const authed = await checkAuth();
+  if (!authed) return;
+  document.body.style.visibility = 'visible';
+  loadSegments();
+  loadCampaigns();
+})();
 </script>
 </body>
 </html>

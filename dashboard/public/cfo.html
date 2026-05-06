@@ -230,6 +230,49 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.18)}
 
+/* ── PIN OVERLAY ── */
+#pin-overlay{
+  display:none;position:fixed;inset:0;z-index:500;
+  background:rgba(10,10,10,0.97);
+  align-items:center;justify-content:center;
+  flex-direction:column;
+}
+#pin-overlay.visible{display:flex}
+#pin-box{
+  display:flex;flex-direction:column;align-items:center;gap:0;
+  width:280px;
+}
+.pin-logo{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;letter-spacing:1px;color:var(--gold);margin-bottom:4px}
+.pin-title{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);margin-bottom:24px}
+.pin-dots{display:flex;gap:14px;margin-bottom:8px}
+.pin-dot{
+  width:14px;height:14px;border-radius:50%;
+  border:2px solid rgba(255,255,255,0.2);
+  background:transparent;transition:all 0.15s;
+}
+.pin-dot.filled{background:var(--gold);border-color:var(--gold)}
+.pin-error{height:18px;font-size:11px;color:rgba(200,160,120,0.9);margin-bottom:16px;text-align:center}
+.pin-pad{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:6px;width:100%;margin-bottom:20px;
+}
+.pin-key{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
+  border-radius:5px;padding:14px 0;text-align:center;cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;color:var(--text-mid);
+  transition:all 0.12s;user-select:none;
+}
+.pin-key:hover{background:rgba(255,255,255,0.08);color:var(--text)}
+.pin-key:active{background:var(--gold-dim);border-color:var(--gold-border);color:var(--gold)}
+.pin-key.back{font-size:16px;color:var(--text-dim)}
+.pin-key.blank{opacity:0;pointer-events:none}
+.pin-timeout{font-size:10px;color:var(--text-faint);letter-spacing:1px;text-align:center;margin-bottom:16px}
+.pin-timeout span{color:var(--gold)}
+.pin-signout{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:11px;font-family:'Barlow',sans-serif;padding:0}
+.pin-signout:hover{color:var(--text-dim)}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+#pin-box.shake{animation:shake 0.4s ease}
+
 /* ── TOAST ── */
 .toast{
   position:fixed;bottom:24px;right:24px;z-index:999;
@@ -307,7 +350,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   </div>
 
   <div class="sidebar-footer">
+    <div id="auth-user-email" style="margin-bottom:8px;font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     <a href="/dashboard">← Carrier Dashboard</a>
+    <div style="margin-top:8px;display:flex;gap:12px;align-items:center">
+      <button onclick="logout()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:11px;padding:0;font-family:'Barlow',sans-serif">Sign out</button>
+      <span style="color:var(--border);font-size:10px">|</span>
+      <button onclick="showPin('Enter PIN to lock')" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:11px;padding:0;font-family:'Barlow',sans-serif">Lock CFO</button>
+    </div>
   </div>
 </aside>
 
@@ -704,6 +753,37 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   </div>
 </div>
 
+<!-- PIN OVERLAY -->
+<div id="pin-overlay">
+  <div id="pin-box">
+    <div class="pin-logo">EDGE</div>
+    <div class="pin-title">CFO Console</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="pd-0"></div>
+      <div class="pin-dot" id="pd-1"></div>
+      <div class="pin-dot" id="pd-2"></div>
+      <div class="pin-dot" id="pd-3"></div>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-pad">
+      <div class="pin-key" onclick="pinPress('1')">1</div>
+      <div class="pin-key" onclick="pinPress('2')">2</div>
+      <div class="pin-key" onclick="pinPress('3')">3</div>
+      <div class="pin-key" onclick="pinPress('4')">4</div>
+      <div class="pin-key" onclick="pinPress('5')">5</div>
+      <div class="pin-key" onclick="pinPress('6')">6</div>
+      <div class="pin-key" onclick="pinPress('7')">7</div>
+      <div class="pin-key" onclick="pinPress('8')">8</div>
+      <div class="pin-key" onclick="pinPress('9')">9</div>
+      <div class="pin-key blank"></div>
+      <div class="pin-key" onclick="pinPress('0')">0</div>
+      <div class="pin-key back" onclick="pinBack()">⌫</div>
+    </div>
+    <div class="pin-timeout">Locks after <span>120s</span> of inactivity</div>
+    <button class="pin-signout" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -875,8 +955,123 @@ function refreshCurrent() {
   toast('Refreshed');
 }
 
+// ── AUTH ──
+const ADMIN_EMAILS = ['ken@xtxtec.com','kenkorbel@gmail.com','korbs827@gmail.com'];
+
+async function checkAuth() {
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = '/login'; return false; }
+  if (!ADMIN_EMAILS.includes(session.user.email.toLowerCase())) {
+    document.body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0d0d0d;color:#fff;font-family:'Barlow',sans-serif;gap:14px">
+      <div style="color:#E8A020;font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900">EDGE</div>
+      <div style="color:rgba(255,255,255,0.55);font-size:13px">Admin access only</div>
+      <button onclick="logout()" style="margin-top:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);padding:8px 20px;border-radius:4px;cursor:pointer;font-family:'Barlow',sans-serif;font-size:12px">Sign Out</button>
+    </div>`;
+    return false;
+  }
+  const el = document.getElementById('auth-user-email');
+  if (el) el.textContent = session.user.email;
+  return true;
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  sessionStorage.removeItem('cfo_unlocked');
+  window.location.href = '/login';
+}
+
+// ── PIN ──
+const CFO_PIN = '7734'; // Change in CFO Settings → update this value
+let pinEntry = '';
+let inactivityTimer = null;
+const TIMEOUT_MS = 120000;
+
+function showPin(reason = '') {
+  sessionStorage.removeItem('cfo_unlocked');
+  clearTimeout(inactivityTimer);
+  pinEntry = '';
+  updateDots();
+  const err = document.getElementById('pin-error');
+  if (err) err.textContent = reason;
+  document.getElementById('pin-overlay').classList.add('visible');
+}
+
+function hidePin() {
+  document.getElementById('pin-overlay').classList.remove('visible');
+  sessionStorage.setItem('cfo_unlocked', '1');
+  resetTimer();
+}
+
+function pinPress(d) {
+  if (!document.getElementById('pin-overlay').classList.contains('visible')) return;
+  if (pinEntry.length >= 4) return;
+  pinEntry += d;
+  updateDots();
+  document.getElementById('pin-error').textContent = '';
+  if (pinEntry.length === 4) setTimeout(checkPin, 60);
+}
+
+function pinBack() {
+  pinEntry = pinEntry.slice(0, -1);
+  updateDots();
+}
+
+function updateDots() {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('pd-' + i);
+    if (d) d.classList.toggle('filled', i < pinEntry.length);
+  }
+}
+
+function checkPin() {
+  if (pinEntry === CFO_PIN) {
+    hidePin();
+  } else {
+    const box = document.getElementById('pin-box');
+    box.classList.add('shake');
+    setTimeout(() => {
+      box.classList.remove('shake');
+      pinEntry = '';
+      updateDots();
+      document.getElementById('pin-error').textContent = 'Incorrect PIN — try again';
+    }, 420);
+  }
+}
+
+function resetTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => showPin('Session locked — 120s inactivity'), TIMEOUT_MS);
+}
+
+// Keyboard PIN entry
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('pin-overlay').classList.contains('visible')) return;
+  if (e.key >= '0' && e.key <= '9') pinPress(e.key);
+  if (e.key === 'Backspace') pinBack();
+  if (e.key === 'Enter' && pinEntry.length === 4) checkPin();
+});
+
+// Activity resets timer (only when PIN is not showing)
+['mousemove','mousedown','keydown','scroll','touchstart'].forEach(evt =>
+  document.addEventListener(evt, () => {
+    if (!document.getElementById('pin-overlay').classList.contains('visible')) resetTimer();
+  }, { passive: true })
+);
+
 // ── INIT ──
-loadStripeOverview();
+(async () => {
+  document.body.style.visibility = 'hidden';
+  const authed = await checkAuth();
+  if (!authed) return;
+  document.body.style.visibility = 'visible';
+  // Show PIN — require entry on every fresh page load
+  if (sessionStorage.getItem('cfo_unlocked') === '1') {
+    hidePin(); // already unlocked this browser session — restart timer
+  } else {
+    showPin();
+  }
+  loadStripeOverview();
+})();
 </script>
 </body>
 </html>
