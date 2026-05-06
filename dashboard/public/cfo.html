@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE CFO — Financial Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:#0d0d0d;color:#fff;overflow:hidden}
+:root{
+  --gold:#E8A020;
+  --gold-dim:rgba(232,160,32,0.10);
+  --gold-border:rgba(232,160,32,0.25);
+  --bg:#0d0d0d;
+  --panel:#151515;
+  --panel2:#1a1a1a;
+  --panel3:#202020;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.04);
+  --text:#ffffff;
+  --text-mid:rgba(255,255,255,0.75);
+  --text-dim:rgba(255,255,255,0.45);
+  --text-faint:rgba(255,255,255,0.25);
+  --sidebar-w:230px;
+}
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:#111;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;z-index:10;
+}
+.sidebar-logo{padding:14px 16px;border-bottom:1px solid var(--border)}
+.logo-mark{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:1px;color:var(--gold)}
+.logo-sub{font-size:10px;font-weight:600;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-top:1px}
+
+/* Console switcher */
+.console-tabs{display:flex;gap:1px;margin-top:10px;background:var(--border);border-radius:4px;overflow:hidden}
+.console-tab{
+  flex:1;text-align:center;padding:5px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text-dim);cursor:pointer;text-decoration:none;background:var(--panel);transition:all 0.15s;
+}
+.console-tab:hover{color:var(--text)}
+.console-tab.active{background:var(--gold-dim);color:var(--gold)}
+
+.sidebar-section-label{
+  font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text-faint);
+  text-transform:uppercase;padding:16px 16px 5px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:9px;padding:8px 16px;
+  font-size:13px;font-weight:500;color:var(--text-dim);cursor:pointer;
+  border-left:2px solid transparent;transition:all 0.13s;white-space:nowrap;
+}
+.nav-item:hover{background:rgba(255,255,255,0.03);color:var(--text)}
+.nav-item.active{background:var(--gold-dim);color:var(--gold);border-left-color:var(--gold)}
+.nav-item svg{width:14px;height:14px;flex-shrink:0;opacity:0.65}
+.nav-item.active svg{opacity:1}
+/* sub nav */
+.nav-sub{padding-left:28px;font-size:12px;color:var(--text-faint);cursor:pointer;padding-top:6px;padding-bottom:6px;transition:all 0.13s;border-left:2px solid transparent}
+.nav-sub:hover{color:var(--text-dim);background:rgba(255,255,255,0.02)}
+.nav-sub.active{color:var(--gold);border-left-color:var(--gold);background:var(--gold-dim)}
+
+/* crypto nav dots */
+.crypto-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+.sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text-faint)}
+.sidebar-footer a{color:var(--text-dim);text-decoration:none}
+.sidebar-footer a:hover{color:var(--gold)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{
+  height:52px;min-height:52px;background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:16px;
+}
+.topbar-title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--text)}
+.topbar-breadcrumb{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px}
+.topbar-breadcrumb span{color:var(--text-faint)}
+.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.btn{font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;padding:6px 14px;border-radius:5px;border:none;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn-primary{background:var(--gold);color:#000}
+.btn-primary:hover{background:#f5a820}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}
+.btn-ghost:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto;overflow-x:hidden}
+.view{display:none}
+.view.active{display:block}
+
+/* ── KPI STRIP ── */
+.kpi-strip{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.kpi-card{flex:1;background:var(--panel);padding:14px 18px;cursor:pointer;transition:background 0.13s}
+.kpi-card:hover{background:var(--panel2)}
+.kpi-card.clickable::after{content:'›';float:right;color:var(--text-faint);font-size:16px;margin-top:4px}
+.kpi-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px}
+.kpi-value{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;color:var(--text);line-height:1}
+.kpi-sub{font-size:11px;color:var(--text-faint);margin-top:3px}
+.kpi-value.gold{color:var(--gold)}
+.kpi-delta{font-size:11px;margin-top:3px}
+.kpi-delta.up{color:#7a9e7e}
+.kpi-delta.down{color:#9e7a7a}
+
+/* ── SECTION HEADER ── */
+.section-head{
+  padding:14px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;background:#111;
+  position:sticky;top:0;z-index:5;
+}
+.section-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px}
+.section-sub{font-size:11px;color:var(--text-faint);margin-left:auto}
+.source-tag{
+  font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  padding:2px 8px;border-radius:3px;
+}
+.source-stripe{background:rgba(99,91,255,0.15);color:#9b93ff;border:1px solid rgba(99,91,255,0.3)}
+.source-coinbase{background:rgba(22,149,239,0.12);color:#4db3ff;border:1px solid rgba(22,149,239,0.25)}
+
+/* ── TABLE ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:#111}
+th{padding:9px 16px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 16px;border-bottom:1px solid var(--border2);color:var(--text-mid);vertical-align:middle;white-space:nowrap}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.td-name{font-weight:600;color:var(--text)}
+.td-mono{font-family:monospace;font-size:11px;color:var(--text-dim)}
+.td-amount{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700}
+
+/* ── BADGE ── */
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:3px}
+.badge-active{background:rgba(232,160,32,0.12);color:var(--gold);border:1px solid rgba(232,160,32,0.25)}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.badge-canceled{background:rgba(255,255,255,0.05);color:#888;border:1px solid var(--border)}
+.badge-past_due{background:rgba(158,122,122,0.15);color:#c49090;border:1px solid rgba(158,122,122,0.3)}
+.badge-trialing{background:rgba(100,140,220,0.12);color:#8aabef;border:1px solid rgba(100,140,220,0.25)}
+
+/* ── CRYPTO GRID ── */
+.crypto-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:1px;background:var(--border);
+  padding:0;
+}
+.crypto-tile{
+  background:var(--panel);padding:20px 20px 16px;cursor:pointer;
+  transition:background 0.15s;position:relative;overflow:hidden;
+  border-bottom:1px solid var(--border);
+}
+.crypto-tile:hover{background:var(--panel2)}
+.crypto-tile::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+}
+.tile-btc::before{background:#F7931A}
+.tile-eth::before{background:#627EEA}
+.tile-sol::before{background:#9945FF}
+.tile-xrp::before{background:#346AA9}
+.tile-usdt::before{background:#26A17B}
+.tile-usdc::before{background:#2775CA}
+
+.tile-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.tile-symbol{
+  font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:0.5px;
+}
+.tile-name{font-size:11px;color:var(--text-dim);font-weight:600}
+.tile-logo{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+.logo-btc{background:rgba(247,147,26,0.15);color:#F7931A}
+.logo-eth{background:rgba(98,126,234,0.15);color:#627EEA}
+.logo-sol{background:rgba(153,69,255,0.15);color:#9945FF}
+.logo-xrp{background:rgba(52,106,169,0.15);color:#346AA9}
+.logo-usdt{background:rgba(38,161,123,0.15);color:#26A17B}
+.logo-usdc{background:rgba(39,117,202,0.15);color:#2775CA}
+
+.tile-stat{margin-bottom:8px}
+.tile-stat-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:2px}
+.tile-stat-val{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;line-height:1}
+.tile-stat-sub{font-size:11px;color:var(--text-dim);margin-top:2px}
+.tile-footer{font-size:10px;color:var(--text-faint);border-top:1px solid var(--border2);padding-top:10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center}
+.tile-drill{font-size:10px;color:var(--text-faint)}
+.tile-drill-btn{font-size:10px;color:var(--text-dim);background:none;border:none;cursor:pointer;font-family:'Barlow',sans-serif;font-weight:600;padding:0}
+.tile-drill-btn:hover{color:var(--gold)}
+
+/* ── DETAIL PANEL ── */
+.detail-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;
+  align-items:flex-start;justify-content:flex-end;
+}
+.detail-overlay.open{display:flex}
+.detail-panel{
+  width:520px;height:100vh;background:#131313;
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.detail-head{
+  padding:18px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;background:#111;
+}
+.detail-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700}
+.detail-close{margin-left:auto;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;padding:2px 6px}
+.detail-close:hover{color:var(--text)}
+.detail-stats{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.detail-stat{flex:1;background:var(--panel);padding:12px 16px}
+.detail-stat-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:3px}
+.detail-stat-val{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700}
+.detail-body{flex:1;overflow-y:auto}
+
+/* ── STRIPE SECTIONS ── */
+.stripe-section{padding:0}
+.sub-section-head{
+  padding:10px 20px;background:#111;border-bottom:1px solid var(--border);
+  font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);
+  display:flex;align-items:center;gap:8px;
+}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:8px;color:var(--text-faint);text-align:center}
+.empty-icon{font-size:28px;opacity:0.3}
+.empty-text{font-size:13px}
+
+/* progress */
+.prog-bar{height:4px;background:var(--panel3);border-radius:2px;min-width:80px}
+.prog-fill{height:100%;background:var(--gold);border-radius:2px}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.18)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:24px;right:24px;z-index:999;
+  background:#1e1e1e;border:1px solid var(--border);padding:12px 18px;border-radius:5px;
+  font-size:13px;color:var(--text);transform:translateY(80px);opacity:0;transition:all 0.25s;
+  pointer-events:none;max-width:320px;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.gold{border-color:var(--gold-border);background:var(--gold-dim)}
+
+/* ── API NOTE ── */
+.api-note{
+  margin:12px 16px;padding:10px 14px;
+  background:rgba(232,160,32,0.06);border:1px solid rgba(232,160,32,0.15);
+  border-radius:4px;font-size:11px;color:var(--text-dim);
+}
+.api-note strong{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">EDGE</div>
+    <div class="logo-sub">Financial Console</div>
+    <div class="console-tabs" style="margin-top:10px">
+      <a class="console-tab" href="/cmo">CMO</a>
+      <a class="console-tab active" href="/cfo">CFO</a>
+    </div>
+  </div>
+
+  <!-- STRIPE NAV -->
+  <div class="sidebar-section-label">Stripe Payments</div>
+  <div class="nav-item active" onclick="switchView('stripe-overview')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    Overview
+  </div>
+  <div class="nav-sub" onclick="switchView('stripe-mrr')">Monthly Revenue</div>
+  <div class="nav-sub" onclick="switchView('stripe-ar')">Accounts Receivable</div>
+  <div class="nav-sub" onclick="switchView('stripe-subs')">Subscriptions</div>
+  <div class="nav-sub" onclick="switchView('stripe-churn')">Churn &amp; Cancels</div>
+  <div class="nav-sub" onclick="switchView('stripe-failed')">Failed Payments</div>
+
+  <!-- COINBASE NAV -->
+  <div class="sidebar-section-label">Coinbase Commerce</div>
+  <div class="nav-item" onclick="switchView('coinbase-overview')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Overview
+  </div>
+  <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('btc')">
+    <span class="crypto-dot" style="background:#F7931A"></span>Bitcoin (BTC)
+  </div>
+  <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('eth')">
+    <span class="crypto-dot" style="background:#627EEA"></span>Ethereum (ETH)
+  </div>
+  <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('sol')">
+    <span class="crypto-dot" style="background:#9945FF"></span>Solana (SOL)
+  </div>
+  <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('xrp')">
+    <span class="crypto-dot" style="background:#346AA9"></span>XRP
+  </div>
+  <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('usdt')">
+    <span class="crypto-dot" style="background:#26A17B"></span>Tether (USDT)
+  </div>
+  <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('usdc')">
+    <span class="crypto-dot" style="background:#2775CA"></span>USD Coin (USDC)
+  </div>
+
+  <!-- FUTURE -->
+  <div class="sidebar-section-label">Future Rails</div>
+  <div class="nav-item" style="opacity:0.4;cursor:default">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    XFactor / On-Chain
+  </div>
+
+  <div class="sidebar-footer">
+    <a href="/dashboard">← Carrier Dashboard</a>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Stripe Overview</div>
+      <div class="topbar-breadcrumb">CFO Console <span>›</span> <span id="topbar-crumb">Stripe</span></div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
+      <div style="font-size:11px;color:var(--text-faint)" id="topbar-tag"></div>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+
+    <!-- ══ STRIPE OVERVIEW ══ -->
+    <div class="view active" id="view-stripe-overview">
+      <div class="kpi-strip">
+        <div class="kpi-card clickable" onclick="switchView('stripe-mrr')">
+          <div class="kpi-label">MRR</div>
+          <div class="kpi-value gold" id="s-mrr">$—</div>
+          <div class="kpi-sub">monthly recurring</div>
+        </div>
+        <div class="kpi-card clickable" onclick="switchView('stripe-ar')">
+          <div class="kpi-label">Accounts Receivable</div>
+          <div class="kpi-value" id="s-ar">$—</div>
+          <div class="kpi-sub">open invoices</div>
+        </div>
+        <div class="kpi-card clickable" onclick="switchView('stripe-subs')">
+          <div class="kpi-label">Active Subscriptions</div>
+          <div class="kpi-value" id="s-active">—</div>
+          <div class="kpi-sub">paying carriers</div>
+        </div>
+        <div class="kpi-card clickable" onclick="switchView('stripe-churn')">
+          <div class="kpi-label">Churn Rate</div>
+          <div class="kpi-value" id="s-churn">—</div>
+          <div class="kpi-sub">last 30 days</div>
+        </div>
+        <div class="kpi-card clickable" onclick="switchView('stripe-failed')">
+          <div class="kpi-label">Failed Payments</div>
+          <div class="kpi-value" id="s-failed">—</div>
+          <div class="kpi-sub">past due</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg Sub Duration</div>
+          <div class="kpi-value" id="s-duration">—</div>
+          <div class="kpi-sub">days active</div>
+        </div>
+      </div>
+
+      <div class="api-note">
+        <strong>Stripe API</strong> — metrics below pull from your Cloud Run <code>/billing-stats</code> endpoint using the Stripe secret key server-side. Click any KPI card above to drill into that dataset.
+      </div>
+
+      <!-- Subscription breakdown by tier -->
+      <div class="sub-section-head">
+        <span class="source-tag source-stripe">Stripe</span>
+        Subscriptions by Tier
+      </div>
+      <div class="kpi-strip" style="border-bottom:none">
+        <div class="kpi-card">
+          <div class="kpi-label">Base — $47/mo</div>
+          <div class="kpi-value" id="s-tier-base">—</div>
+          <div class="kpi-sub" id="s-tier-base-rev">$— MRR</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Base Plus — $97/mo</div>
+          <div class="kpi-value" id="s-tier-plus">—</div>
+          <div class="kpi-sub" id="s-tier-plus-rev">$— MRR</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Dispatcher Pro — $297/mo</div>
+          <div class="kpi-value" id="s-tier-pro">—</div>
+          <div class="kpi-sub" id="s-tier-pro-rev">$— MRR</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">ARR (projected)</div>
+          <div class="kpi-value gold" id="s-arr">$—</div>
+          <div class="kpi-sub">MRR × 12</div>
+        </div>
+      </div>
+
+      <!-- Recent payments table -->
+      <div class="sub-section-head"><span class="source-tag source-stripe">Stripe</span>Recent Payments</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Carrier</th><th>Tier</th><th>Amount</th><th>Status</th><th>Date</th><th>Invoice</th>
+          </tr></thead>
+          <tbody id="s-recent-tbody">
+            <tr><td colspan="6"><div class="empty"><div class="empty-icon">▪</div><div class="empty-text">Connect Stripe API to load payments</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ STRIPE MRR ══ -->
+    <div class="view" id="view-stripe-mrr">
+      <div class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-label">Current MRR</div><div class="kpi-value gold" id="mrr-current">$—</div></div>
+        <div class="kpi-card"><div class="kpi-label">MRR 30d Ago</div><div class="kpi-value" id="mrr-prev">$—</div></div>
+        <div class="kpi-card"><div class="kpi-label">MRR Growth</div><div class="kpi-value" id="mrr-growth">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">ARR</div><div class="kpi-value gold" id="mrr-arr">$—</div></div>
+        <div class="kpi-card"><div class="kpi-label">New MRR This Mo.</div><div class="kpi-value" id="mrr-new">$—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Churned MRR This Mo.</div><div class="kpi-value" id="mrr-lost">$—</div></div>
+      </div>
+      <div class="sub-section-head"><span class="source-tag source-stripe">Stripe</span> Revenue by Month — wire via <code>/billing-stats?view=mrr</code></div>
+      <div class="empty" style="padding:60px"><div class="empty-icon">▪</div><div class="empty-text">MRR trend chart — connect Stripe API</div></div>
+    </div>
+
+    <!-- ══ STRIPE AR ══ -->
+    <div class="view" id="view-stripe-ar">
+      <div class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-label">Total AR</div><div class="kpi-value gold" id="ar-total">$—</div><div class="kpi-sub">open invoices</div></div>
+        <div class="kpi-card"><div class="kpi-label">Invoices Open</div><div class="kpi-value" id="ar-count">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Past Due</div><div class="kpi-value" id="ar-pastdue">$—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Days Outstanding</div><div class="kpi-value" id="ar-days">—</div></div>
+      </div>
+      <div class="sub-section-head"><span class="source-tag source-stripe">Stripe</span> Open Invoices</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Carrier</th><th>Invoice #</th><th>Amount Due</th><th>Due Date</th><th>Days Out</th><th>Status</th></tr></thead>
+          <tbody id="ar-tbody">
+            <tr><td colspan="6"><div class="empty"><div class="empty-icon">▪</div><div class="empty-text">No open invoices — or connect Stripe API</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ STRIPE SUBSCRIPTIONS ══ -->
+    <div class="view" id="view-stripe-subs">
+      <div class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-label">Active</div><div class="kpi-value gold" id="sub-active">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Trialing</div><div class="kpi-value" id="sub-trial">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Past Due</div><div class="kpi-value" id="sub-pastdue">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Canceled (30d)</div><div class="kpi-value" id="sub-canceled">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Renewal Today</div><div class="kpi-value" id="sub-renew">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Duration</div><div class="kpi-value" id="sub-duration">—</div><div class="kpi-sub">days</div></div>
+      </div>
+      <div class="sub-section-head"><span class="source-tag source-stripe">Stripe</span> All Subscriptions</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Carrier</th><th>Tier</th><th>Amount</th><th>Status</th><th>Started</th><th>Next Renewal</th><th>Days Active</th></tr></thead>
+          <tbody id="subs-tbody">
+            <tr><td colspan="7"><div class="empty"><div class="empty-icon">▪</div><div class="empty-text">Connect Stripe API via /billing-stats</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ STRIPE CHURN ══ -->
+    <div class="view" id="view-stripe-churn">
+      <div class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-label">Churn Rate (30d)</div><div class="kpi-value" id="ch-rate">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Cancels This Month</div><div class="kpi-value" id="ch-count">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Churned MRR</div><div class="kpi-value" id="ch-mrr">$—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Sub Before Cancel</div><div class="kpi-value" id="ch-duration">—</div><div class="kpi-sub">days</div></div>
+      </div>
+      <div class="sub-section-head"><span class="source-tag source-stripe">Stripe</span> Cancellation Log</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Carrier</th><th>Tier</th><th>Amount Lost</th><th>Canceled</th><th>Duration</th><th>Reason</th></tr></thead>
+          <tbody id="churn-tbody">
+            <tr><td colspan="6"><div class="empty"><div class="empty-icon">▪</div><div class="empty-text">No cancellations recorded</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ STRIPE FAILED ══ -->
+    <div class="view" id="view-stripe-failed">
+      <div class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-label">Failed This Month</div><div class="kpi-value" id="fp-count">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">At Risk MRR</div><div class="kpi-value" id="fp-mrr">$—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Retry Pending</div><div class="kpi-value" id="fp-retry">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Days Past Due</div><div class="kpi-value" id="fp-days">—</div></div>
+      </div>
+      <div class="sub-section-head"><span class="source-tag source-stripe">Stripe</span> Failed &amp; Past Due Invoices</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Carrier</th><th>Tier</th><th>Amount</th><th>Failed On</th><th>Days Past Due</th><th>Retry</th></tr></thead>
+          <tbody id="failed-tbody">
+            <tr><td colspan="6"><div class="empty"><div class="empty-icon">▪</div><div class="empty-text">No failed payments — good shape</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ COINBASE OVERVIEW ══ -->
+    <div class="view" id="view-coinbase-overview">
+      <div class="kpi-strip">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Crypto Volume</div>
+          <div class="kpi-value gold" id="cb-total-vol">$—</div>
+          <div class="kpi-sub">all tokens, USD equiv.</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Carriers Paying Crypto</div>
+          <div class="kpi-value" id="cb-carriers">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Charges This Month</div>
+          <div class="kpi-value" id="cb-charges">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Most Used Token</div>
+          <div class="kpi-value" id="cb-top-token" style="font-size:18px;margin-top:4px">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg Payment (USD)</div>
+          <div class="kpi-value" id="cb-avg">$—</div>
+        </div>
+      </div>
+
+      <div class="api-note">
+        <strong>Coinbase Commerce API</strong> — endpoint: <code>api.commerce.coinbase.com/charges</code> · Header: <code>X-CC-Api-Key</code> · Add key to Cloud Run env as <code>COINBASE_COMMERCE_KEY</code>. Tiles below show structure — wire API to populate live data.
+      </div>
+
+      <div class="sub-section-head">
+        <span class="source-tag source-coinbase">Coinbase</span>
+        Payment Volume by Token — click tile for carrier detail
+      </div>
+
+      <div class="crypto-grid">
+        <!-- BTC -->
+        <div class="crypto-tile tile-btc" onclick="showCryptoDetail('btc')">
+          <div class="tile-header">
+            <div class="tile-logo logo-btc">₿</div>
+            <div><div class="tile-symbol">BTC</div><div class="tile-name">Bitcoin</div></div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Carriers Paying</div>
+            <div class="tile-stat-val" id="cb-btc-carriers">—</div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Volume (USD equiv.)</div>
+            <div class="tile-stat-val" id="cb-btc-vol" style="font-size:18px">$—</div>
+            <div class="tile-stat-sub" id="cb-btc-count">— transactions</div>
+          </div>
+          <div class="tile-footer">
+            <span id="cb-btc-last">Last payment: —</span>
+            <button class="tile-drill-btn">View carriers →</button>
+          </div>
+        </div>
+        <!-- ETH -->
+        <div class="crypto-tile tile-eth" onclick="showCryptoDetail('eth')">
+          <div class="tile-header">
+            <div class="tile-logo logo-eth">Ξ</div>
+            <div><div class="tile-symbol">ETH</div><div class="tile-name">Ethereum</div></div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Carriers Paying</div>
+            <div class="tile-stat-val" id="cb-eth-carriers">—</div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Volume (USD equiv.)</div>
+            <div class="tile-stat-val" id="cb-eth-vol" style="font-size:18px">$—</div>
+            <div class="tile-stat-sub" id="cb-eth-count">— transactions</div>
+          </div>
+          <div class="tile-footer">
+            <span id="cb-eth-last">Last payment: —</span>
+            <button class="tile-drill-btn">View carriers →</button>
+          </div>
+        </div>
+        <!-- SOL -->
+        <div class="crypto-tile tile-sol" onclick="showCryptoDetail('sol')">
+          <div class="tile-header">
+            <div class="tile-logo logo-sol">◎</div>
+            <div><div class="tile-symbol">SOL</div><div class="tile-name">Solana</div></div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Carriers Paying</div>
+            <div class="tile-stat-val" id="cb-sol-carriers">—</div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Volume (USD equiv.)</div>
+            <div class="tile-stat-val" id="cb-sol-vol" style="font-size:18px">$—</div>
+            <div class="tile-stat-sub" id="cb-sol-count">— transactions</div>
+          </div>
+          <div class="tile-footer">
+            <span id="cb-sol-last">Last payment: —</span>
+            <button class="tile-drill-btn">View carriers →</button>
+          </div>
+        </div>
+        <!-- XRP -->
+        <div class="crypto-tile tile-xrp" onclick="showCryptoDetail('xrp')">
+          <div class="tile-header">
+            <div class="tile-logo logo-xrp">✕</div>
+            <div><div class="tile-symbol">XRP</div><div class="tile-name">Ripple</div></div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Carriers Paying</div>
+            <div class="tile-stat-val" id="cb-xrp-carriers">—</div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Volume (USD equiv.)</div>
+            <div class="tile-stat-val" id="cb-xrp-vol" style="font-size:18px">$—</div>
+            <div class="tile-stat-sub" id="cb-xrp-count">— transactions</div>
+          </div>
+          <div class="tile-footer">
+            <span id="cb-xrp-last">Last payment: —</span>
+            <button class="tile-drill-btn">View carriers →</button>
+          </div>
+        </div>
+        <!-- USDT -->
+        <div class="crypto-tile tile-usdt" onclick="showCryptoDetail('usdt')">
+          <div class="tile-header">
+            <div class="tile-logo logo-usdt">₮</div>
+            <div><div class="tile-symbol">USDT</div><div class="tile-name">Tether</div></div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Carriers Paying</div>
+            <div class="tile-stat-val" id="cb-usdt-carriers">—</div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Volume (USD equiv.)</div>
+            <div class="tile-stat-val" id="cb-usdt-vol" style="font-size:18px">$—</div>
+            <div class="tile-stat-sub" id="cb-usdt-count">— transactions</div>
+          </div>
+          <div class="tile-footer">
+            <span id="cb-usdt-last">Last payment: —</span>
+            <button class="tile-drill-btn">View carriers →</button>
+          </div>
+        </div>
+        <!-- USDC -->
+        <div class="crypto-tile tile-usdc" onclick="showCryptoDetail('usdc')">
+          <div class="tile-header">
+            <div class="tile-logo logo-usdc">$</div>
+            <div><div class="tile-symbol">USDC</div><div class="tile-name">USD Coin</div></div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Carriers Paying</div>
+            <div class="tile-stat-val" id="cb-usdc-carriers">—</div>
+          </div>
+          <div class="tile-stat">
+            <div class="tile-stat-label">Volume (USD equiv.)</div>
+            <div class="tile-stat-val" id="cb-usdc-vol" style="font-size:18px">$—</div>
+            <div class="tile-stat-sub" id="cb-usdc-count">— transactions</div>
+          </div>
+          <div class="tile-footer">
+            <span id="cb-usdc-last">Last payment: —</span>
+            <button class="tile-drill-btn">View carriers →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── CRYPTO DETAIL PANEL ── -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="detail-panel">
+    <div class="detail-head">
+      <div id="detail-logo" class="tile-logo" style="width:32px;height:32px;font-size:15px"></div>
+      <div>
+        <div class="detail-title" id="detail-title">Token</div>
+        <div style="font-size:11px;color:var(--text-dim)" id="detail-subtitle"></div>
+      </div>
+      <button class="detail-close" onclick="closeDetailBtn()">✕</button>
+    </div>
+    <div class="detail-stats">
+      <div class="detail-stat">
+        <div class="detail-stat-label">Carriers</div>
+        <div class="detail-stat-val" id="detail-stat-carriers">—</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">Total Volume</div>
+        <div class="detail-stat-val gold" id="detail-stat-vol">$—</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">Transactions</div>
+        <div class="detail-stat-val" id="detail-stat-txns">—</div>
+      </div>
+    </div>
+    <div class="api-note" style="margin:12px">
+      <strong>Coinbase Commerce</strong> — wire <code>GET /charges?payment_method={{token}}</code> to populate this panel. Each charge contains: customer email, amount, timestamp, tx hash.
+    </div>
+    <div class="detail-body">
+      <table style="width:100%">
+        <thead><tr>
+          <th>Carrier</th><th>Sub Tier</th><th>Amount</th><th>Date</th><th>Tx Hash</th>
+        </tr></thead>
+        <tbody id="detail-tbody">
+          <tr><td colspan="5"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No payments in this token yet</div><div style="font-size:11px;color:var(--text-faint)">Will populate once Coinbase Commerce is live</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://siafwhlzazefyoevslde.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYWZ3aGx6YXplZnlvZXZzbGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyNDMzNjQsImV4cCI6MjA1OTgxOTM2NH0.VlrXJeENGFmBONCtGlnGqTIEwAUlJBpYPSOtPQkQ9zY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentView = 'stripe-overview';
+
+const CRYPTO_META = {
+  btc:  { symbol:'BTC', name:'Bitcoin',   logo:'₿', cls:'logo-btc', color:'#F7931A' },
+  eth:  { symbol:'ETH', name:'Ethereum',  logo:'Ξ', cls:'logo-eth', color:'#627EEA' },
+  sol:  { symbol:'SOL', name:'Solana',    logo:'◎', cls:'logo-sol', color:'#9945FF' },
+  xrp:  { symbol:'XRP', name:'Ripple',    logo:'✕', cls:'logo-xrp', color:'#346AA9' },
+  usdt: { symbol:'USDT',name:'Tether',    logo:'₮', cls:'logo-usdt',color:'#26A17B' },
+  usdc: { symbol:'USDC',name:'USD Coin',  logo:'$', cls:'logo-usdc',color:'#2775CA' },
+};
+
+const VIEW_META = {
+  'stripe-overview': { title:'Stripe Overview',       crumb:'Stripe' },
+  'stripe-mrr':      { title:'Monthly Revenue',       crumb:'Stripe › MRR' },
+  'stripe-ar':       { title:'Accounts Receivable',   crumb:'Stripe › AR' },
+  'stripe-subs':     { title:'Subscriptions',         crumb:'Stripe › Subs' },
+  'stripe-churn':    { title:'Churn & Cancellations', crumb:'Stripe › Churn' },
+  'stripe-failed':   { title:'Failed Payments',       crumb:'Stripe › Failed' },
+  'coinbase-overview':{ title:'Coinbase Overview',    crumb:'Coinbase' },
+};
+
+// ── NAV ──
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item,.nav-sub').forEach(n => n.classList.remove('active'));
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
+  currentView = name;
+  const meta = VIEW_META[name] || { title: name, crumb: name };
+  document.getElementById('topbar-title').textContent = meta.title;
+  document.getElementById('topbar-crumb').textContent = meta.crumb;
+
+  if (name === 'stripe-overview') { loadStripeOverview(); document.getElementById('topbar-tag').textContent = 'TEST MODE'; }
+  if (name === 'coinbase-overview') loadCoinbaseOverview();
+  if (name.startsWith('stripe-')) {
+    document.querySelector('.nav-item')?.classList.add('active');
+  }
+  if (name === 'coinbase-overview') {
+    document.querySelectorAll('.nav-item')[1]?.classList.add('active');
+  }
+}
+
+// ── TOAST ──
+function toast(msg, gold=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (gold?' gold':'');
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+// ── STRIPE OVERVIEW ──
+// Reads from carriers table (subscription_status, subscription_tier)
+// Full Stripe API data loads via /billing-stats Cloud Run endpoint
+async function loadStripeOverview() {
+  const { data: carriers, error } = await sb.from('carriers')
+    .select('id,subscription_status,subscription_tier,owner_name,company_name,stripe_customer_id');
+  if (error) { toast('Error loading carrier data'); return; }
+
+  const active = carriers.filter(c => c.subscription_status === 'active');
+  const tierPrices = { base:47, 'base plus':97, 'base_plus':97, custom:97, premium:297, 'dispatcher pro':297 };
+
+  let mrr = 0;
+  let tierBase=0, tierPlus=0, tierPro=0;
+  active.forEach(c => {
+    const t = (c.subscription_tier||'').toLowerCase();
+    const price = tierPrices[t] || 47;
+    mrr += price;
+    if (t==='base') tierBase++;
+    else if (t.includes('plus')||t==='custom') tierPlus++;
+    else if (t.includes('pro')||t==='premium') tierPro++;
+    else tierBase++;
+  });
+
+  document.getElementById('s-mrr').textContent = '$'+mrr.toLocaleString();
+  document.getElementById('s-active').textContent = active.length;
+  document.getElementById('s-arr').textContent = '$'+(mrr*12).toLocaleString();
+  document.getElementById('s-tier-base').textContent = tierBase;
+  document.getElementById('s-tier-plus').textContent = tierPlus;
+  document.getElementById('s-tier-pro').textContent = tierPro;
+  document.getElementById('s-tier-base-rev').textContent = '$'+(tierBase*47).toLocaleString()+' MRR';
+  document.getElementById('s-tier-plus-rev').textContent = '$'+(tierPlus*97).toLocaleString()+' MRR';
+  document.getElementById('s-tier-pro-rev').textContent = '$'+(tierPro*297).toLocaleString()+' MRR';
+  document.getElementById('s-churn').textContent = '—';
+  document.getElementById('s-ar').textContent = '$—';
+  document.getElementById('s-failed').textContent = '—';
+  document.getElementById('s-duration').textContent = '—';
+
+  // Render carrier list in recent payments (from SB data as proxy until Stripe API wired)
+  const tbody = document.getElementById('s-recent-tbody');
+  if (!active.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">▪</div><div class="empty-text">No active subscriptions yet</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = active.map(c => {
+    const t = (c.subscription_tier||'base').toLowerCase();
+    const price = tierPrices[t]||47;
+    const name = c.company_name||c.owner_name||'—';
+    return `<tr>
+      <td class="td-name">${name}</td>
+      <td style="text-transform:capitalize">${c.subscription_tier||'Base'}</td>
+      <td class="td-amount">$${price}/mo</td>
+      <td><span class="badge badge-active"><span class="badge-dot"></span>active</span></td>
+      <td class="td-mono">—</td>
+      <td class="td-mono">—</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── COINBASE OVERVIEW ──
+// Placeholder structure — wire to CB Commerce API via Cloud Run
+function loadCoinbaseOverview() {
+  // All tiles show — until Coinbase Commerce key is configured
+  // When wired: GET https://api.commerce.coinbase.com/charges
+  // Group by charge.payments[0].value.currency
+  ['btc','eth','sol','xrp','usdt','usdc'].forEach(token => {
+    document.getElementById('cb-'+token+'-carriers').textContent = '—';
+    document.getElementById('cb-'+token+'-vol').textContent = '$—';
+    document.getElementById('cb-'+token+'-count').textContent = '— transactions';
+    document.getElementById('cb-'+token+'-last').textContent = 'Last payment: —';
+  });
+  document.getElementById('cb-total-vol').textContent = '$—';
+  document.getElementById('cb-carriers').textContent = '—';
+  document.getElementById('cb-charges').textContent = '—';
+  document.getElementById('cb-top-token').textContent = '—';
+  document.getElementById('cb-avg').textContent = '$—';
+}
+
+// ── CRYPTO DETAIL PANEL ──
+function showCryptoDetail(token) {
+  const meta = CRYPTO_META[token];
+  if (!meta) return;
+  switchView('coinbase-overview');
+  const logo = document.getElementById('detail-logo');
+  logo.textContent = meta.logo;
+  logo.className = 'tile-logo ' + meta.cls;
+  document.getElementById('detail-title').textContent = meta.symbol + ' — ' + meta.name;
+  document.getElementById('detail-subtitle').textContent = 'Coinbase Commerce · payment history by carrier';
+  document.getElementById('detail-stat-carriers').textContent = '—';
+  document.getElementById('detail-stat-vol').textContent = '$—';
+  document.getElementById('detail-stat-txns').textContent = '—';
+  document.getElementById('detail-tbody').innerHTML = `
+    <tr><td colspan="5"><div class="empty">
+      <div class="empty-icon" style="font-size:24px">${meta.logo}</div>
+      <div class="empty-text">No ${meta.symbol} payments yet</div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Wire Coinbase Commerce API key to populate</div>
+    </div></td></tr>`;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function closeDetail(e) {
+  if (e.target === document.getElementById('detail-overlay')) closeDetailBtn();
+}
+function closeDetailBtn() {
+  document.getElementById('detail-overlay').classList.remove('open');
+}
+
+function refreshCurrent() {
+  if (currentView === 'stripe-overview') loadStripeOverview();
+  else if (currentView === 'coinbase-overview') loadCoinbaseOverview();
+  toast('Refreshed');
+}
+
+// ── INIT ──
+loadStripeOverview();
+</script>
+</body>
+</html>
