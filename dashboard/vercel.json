@@ -29,6 +29,8 @@
     { "source": "/onboard/rates", "destination": "/onboard-rates.html" },
     { "source": "/onboard/gmail", "destination": "/onboard-gmail.html" },
     { "source": "/verify", "destination": "/verify.html" },
+    { "source": "/cmo", "destination": "/cmo.html" },
+    { "source": "/cfo", "destination": "/cfo.html" },
     { "source": "/", "destination": "/home.html" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ],

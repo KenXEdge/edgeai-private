@@ -324,22 +324,22 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     Overview
   </div>
   <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('btc')">
-    <span class="crypto-dot" style="background:#F7931A"></span>Bitcoin (BTC)
+    <img src="https://cryptologos.cc/logos/bitcoin-btc-logo.svg" style="width:14px;height:14px;flex-shrink:0">Bitcoin (BTC)
   </div>
   <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('eth')">
-    <span class="crypto-dot" style="background:#627EEA"></span>Ethereum (ETH)
+    <img src="https://cryptologos.cc/logos/ethereum-eth-logo.svg" style="width:14px;height:14px;flex-shrink:0;filter:brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(190deg)">Ethereum (ETH)
   </div>
   <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('sol')">
-    <span class="crypto-dot" style="background:#9945FF"></span>Solana (SOL)
+    <img src="https://cryptologos.cc/logos/solana-sol-logo.svg" style="width:14px;height:14px;flex-shrink:0">Solana (SOL)
   </div>
   <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('xrp')">
-    <span class="crypto-dot" style="background:#346AA9"></span>XRP
+    <img src="https://cryptologos.cc/logos/xrp-xrp-logo.svg" style="width:14px;height:14px;flex-shrink:0;filter:brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(350deg)">XRP
   </div>
   <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('usdt')">
-    <span class="crypto-dot" style="background:#26A17B"></span>Tether (USDT)
+    <img src="https://cryptologos.cc/logos/tether-usdt-logo.svg" style="width:14px;height:14px;flex-shrink:0">Tether (USDT)
   </div>
   <div class="nav-sub" style="display:flex;align-items:center;gap:7px" onclick="showCryptoDetail('usdc')">
-    <span class="crypto-dot" style="background:#2775CA"></span>USD Coin (USDC)
+    <img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg" style="width:14px;height:14px;flex-shrink:0">USD Coin (USDC)
   </div>
 
   <!-- FUTURE -->
@@ -351,11 +351,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
   <div class="sidebar-footer">
     <div id="auth-user-email" style="margin-bottom:8px;font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-    <a href="/dashboard">← Carrier Dashboard</a>
-    <div style="margin-top:8px;display:flex;gap:12px;align-items:center">
-      <button onclick="logout()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:11px;padding:0;font-family:'Barlow',sans-serif">Sign out</button>
-      <span style="color:var(--border);font-size:10px">|</span>
-      <button onclick="showPin('Enter PIN to lock')" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:11px;padding:0;font-family:'Barlow',sans-serif">Lock CFO</button>
+    <div style="display:flex;gap:12px;align-items:center">
+      <button onclick="logout()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:17px;padding:0;font-family:'Barlow',sans-serif">Sign out</button>
+      <span style="color:var(--border);font-size:15px">|</span>
+      <button onclick="showPin('Enter PIN to lock')" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:17px;padding:0;font-family:'Barlow',sans-serif">Lock CFO</button>
     </div>
   </div>
 </aside>
@@ -588,7 +587,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <!-- BTC -->
         <div class="crypto-tile tile-btc" onclick="showCryptoDetail('btc')">
           <div class="tile-header">
-            <div class="tile-logo logo-btc">₿</div>
+            <div class="tile-logo logo-btc"><img src="https://cryptologos.cc/logos/bitcoin-btc-logo.svg" style="width:18px;height:18px"></div>
             <div><div class="tile-symbol">BTC</div><div class="tile-name">Bitcoin</div></div>
           </div>
           <div class="tile-stat">
@@ -608,7 +607,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <!-- ETH -->
         <div class="crypto-tile tile-eth" onclick="showCryptoDetail('eth')">
           <div class="tile-header">
-            <div class="tile-logo logo-eth">Ξ</div>
+            <div class="tile-logo logo-eth"><img src="https://cryptologos.cc/logos/ethereum-eth-logo.svg" style="width:18px;height:18px;filter:brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(190deg)"></div>
             <div><div class="tile-symbol">ETH</div><div class="tile-name">Ethereum</div></div>
           </div>
           <div class="tile-stat">
@@ -628,7 +627,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <!-- SOL -->
         <div class="crypto-tile tile-sol" onclick="showCryptoDetail('sol')">
           <div class="tile-header">
-            <div class="tile-logo logo-sol">◎</div>
+            <div class="tile-logo logo-sol"><img src="https://cryptologos.cc/logos/solana-sol-logo.svg" style="width:18px;height:18px"></div>
             <div><div class="tile-symbol">SOL</div><div class="tile-name">Solana</div></div>
           </div>
           <div class="tile-stat">
@@ -648,7 +647,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <!-- XRP -->
         <div class="crypto-tile tile-xrp" onclick="showCryptoDetail('xrp')">
           <div class="tile-header">
-            <div class="tile-logo logo-xrp">✕</div>
+            <div class="tile-logo logo-xrp"><img src="https://cryptologos.cc/logos/xrp-xrp-logo.svg" style="width:18px;height:18px;filter:brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(350deg)"></div>
             <div><div class="tile-symbol">XRP</div><div class="tile-name">Ripple</div></div>
           </div>
           <div class="tile-stat">
@@ -668,7 +667,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <!-- USDT -->
         <div class="crypto-tile tile-usdt" onclick="showCryptoDetail('usdt')">
           <div class="tile-header">
-            <div class="tile-logo logo-usdt">₮</div>
+            <div class="tile-logo logo-usdt"><img src="https://cryptologos.cc/logos/tether-usdt-logo.svg" style="width:18px;height:18px"></div>
             <div><div class="tile-symbol">USDT</div><div class="tile-name">Tether</div></div>
           </div>
           <div class="tile-stat">
@@ -688,7 +687,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <!-- USDC -->
         <div class="crypto-tile tile-usdc" onclick="showCryptoDetail('usdc')">
           <div class="tile-header">
-            <div class="tile-logo logo-usdc">$</div>
+            <div class="tile-logo logo-usdc"><img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.svg" style="width:18px;height:18px"></div>
             <div><div class="tile-symbol">USDC</div><div class="tile-name">USD Coin</div></div>
           </div>
           <div class="tile-stat">
@@ -796,12 +795,12 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentView = 'stripe-overview';
 
 const CRYPTO_META = {
-  btc:  { symbol:'BTC', name:'Bitcoin',   logo:'₿', cls:'logo-btc', color:'#F7931A' },
-  eth:  { symbol:'ETH', name:'Ethereum',  logo:'Ξ', cls:'logo-eth', color:'#627EEA' },
-  sol:  { symbol:'SOL', name:'Solana',    logo:'◎', cls:'logo-sol', color:'#9945FF' },
-  xrp:  { symbol:'XRP', name:'Ripple',    logo:'✕', cls:'logo-xrp', color:'#346AA9' },
-  usdt: { symbol:'USDT',name:'Tether',    logo:'₮', cls:'logo-usdt',color:'#26A17B' },
-  usdc: { symbol:'USDC',name:'USD Coin',  logo:'$', cls:'logo-usdc',color:'#2775CA' },
+  btc:  { symbol:'BTC', name:'Bitcoin',   img:'https://cryptologos.cc/logos/bitcoin-btc-logo.svg',   cls:'logo-btc', color:'#F7931A', imgFilter:'' },
+  eth:  { symbol:'ETH', name:'Ethereum',  img:'https://cryptologos.cc/logos/ethereum-eth-logo.svg',  cls:'logo-eth', color:'#627EEA', imgFilter:'brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(190deg)' },
+  sol:  { symbol:'SOL', name:'Solana',    img:'https://cryptologos.cc/logos/solana-sol-logo.svg',    cls:'logo-sol', color:'#9945FF', imgFilter:'' },
+  xrp:  { symbol:'XRP', name:'Ripple',    img:'https://cryptologos.cc/logos/xrp-xrp-logo.svg',      cls:'logo-xrp', color:'#346AA9', imgFilter:'brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(350deg)' },
+  usdt: { symbol:'USDT',name:'Tether',    img:'https://cryptologos.cc/logos/tether-usdt-logo.svg',   cls:'logo-usdt',color:'#26A17B', imgFilter:'' },
+  usdc: { symbol:'USDC',name:'USD Coin',  img:'https://cryptologos.cc/logos/usd-coin-usdc-logo.svg', cls:'logo-usdc',color:'#2775CA', imgFilter:'' },
 };
 
 const VIEW_META = {
@@ -926,7 +925,7 @@ function showCryptoDetail(token) {
   if (!meta) return;
   switchView('coinbase-overview');
   const logo = document.getElementById('detail-logo');
-  logo.textContent = meta.logo;
+  logo.innerHTML = `<img src="${meta.img}" style="width:20px;height:20px;${meta.imgFilter?'filter:'+meta.imgFilter:''}">`;
   logo.className = 'tile-logo ' + meta.cls;
   document.getElementById('detail-title').textContent = meta.symbol + ' — ' + meta.name;
   document.getElementById('detail-subtitle').textContent = 'Coinbase Commerce · payment history by carrier';
