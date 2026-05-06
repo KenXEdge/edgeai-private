@@ -138,6 +138,8 @@ a{text-decoration:none;color:inherit}
 /* switch link */
 .switch-link{text-align:center;margin-top:1.5rem;font-size:12px;color:var(--text-dim)}
 .switch-link button{background:none;border:none;color:var(--gold);font-weight:700;cursor:pointer;font-size:12px;padding:0;letter-spacing:0.5px}
+.here-link{color:rgba(255,255,255,0.55)}
+body.light .here-link{color:#0a0a0a}
 .switch-link button:hover{text-decoration:underline}
 
 /* features list on signup */
@@ -195,21 +197,21 @@ body.light .logo-text{color:#0a0a0a}
 body.light .right{background:#fff;border-left-color:#e8e5e0}
 body.light .form-title{color:#0a0a0a}
 body.light .form-eyebrow{color:#a07010}
-body.light .form-sub{color:rgba(0,0,0,0.45)}
+body.light .form-sub{color:rgba(0,0,0,0.75)}
 body.light .auth-tab{color:rgba(0,0,0,0.35)}
 body.light .auth-tab.active{color:#a07010;border-bottom-color:#E8A020}
 body.light .auth-tabs{border-bottom-color:#eee}
-body.light .form-group label{color:rgba(0,0,0,0.45)}
+body.light .form-group label{color:rgba(0,0,0,0.75)}
 body.light .form-group input,body.light .form-group select{background:#f8f8f8;border-color:#e0e0e0;color:#0a0a0a}
 body.light .form-group input::placeholder{color:rgba(0,0,0,0.2)}
 body.light .btn-google{background:#f8f8f8;border-color:#e0e0e0;color:#444}
 body.light .btn-google:hover{background:#f0f0f0;color:#111}
 body.light .form-divider::before,body.light .form-divider::after{background:#eee}
-body.light .form-divider span{color:#ccc}
-body.light .forgot a{color:#aaa}
-body.light .form-fine{color:#bbb}
-body.light .form-fine a{color:rgba(0,0,0,0.3)}
-body.light .switch-link{color:#aaa}
+body.light .form-divider span{color:rgba(0,0,0,0.65)}
+body.light .forgot a{color:rgba(0,0,0,0.7)}
+body.light .form-fine{color:rgba(0,0,0,0.65)}
+body.light .form-fine a{color:rgba(0,0,0,0.7)}
+body.light .switch-link{color:rgba(0,0,0,0.7)}
 body.light .plan-opt{border-color:#e0e0e0;background:#f8f8f8}
 body.light .plan-opt:hover{border-color:rgba(232,160,32,0.4);background:rgba(232,160,32,0.05)}
 body.light .plan-opt.selected{border-color:#E8A020;background:rgba(232,160,32,0.08)}
@@ -320,7 +322,7 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
       <!-- Tabs -->
       <div class="auth-tabs">
         <div class="auth-tab active" id="tab-signin" onclick="switchTab('signin')">Sign In</div>
-        <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Get Started</div>
+        <div class="auth-tab" id="tab-signup" onclick="window.location.href='https://xtxtec.com'">Get Started</div>
       </div>
 
       <!-- ── SIGN IN PANEL ── -->
@@ -363,12 +365,13 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
         </div>
 
         <div class="switch-link">
-          New carrier? <button onclick="switchTab('signup')">Get started free →</button>
+          <div style="color:var(--gold);font-weight:700;font-size:12px;letter-spacing:0.5px">New Carrier? Get started today — Join the EDGE community!</div>
+          <div style="margin-top:0.4rem">Click <a href="https://xtxtec.com" class="here-link" style="font-weight:700;text-decoration:underline">HERE</a></div>
         </div>
       </div>
 
-      <!-- ── SIGN UP PANEL ── -->
-      <div class="tab-panel" id="panel-signup">
+      <!-- ── SIGN UP PANEL — hidden, preserved for future use ── -->
+      <div class="tab-panel" id="panel-signup" style="display:none!important">
 
         <!-- Plan selector -->
         <div class="form-header">
@@ -489,6 +492,15 @@ body.light .toggle-track{background:rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// Personalize welcome back greeting
+(function() {
+  const name = localStorage.getItem('edge_first_name');
+  if (name) {
+    const el = document.querySelector('#panel-signin .form-title');
+    if (el) el.textContent = 'Welcome Back, ' + name + '!';
+  }
+})();
+
 // Tab switching
 function switchTab(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
@@ -541,7 +553,12 @@ function showSignInMsg(msg) {
 async function redirectAfterAuth() {
   const { data: { session } } = await _sb.auth.getSession();
   if (!session) return;
-  const { data: carrier } = await _sb.from('carriers').select('subscription_status').eq('id', session.user.id).single();
+  const { data: carrier } = await _sb.from('carriers').select('subscription_status, owner_name, company_name').eq('id', session.user.id).single();
+  if (carrier) {
+    const fullName = carrier.owner_name || carrier.company_name || '';
+    const firstName = fullName.trim().split(' ')[0];
+    if (firstName) localStorage.setItem('edge_first_name', firstName);
+  }
   if (carrier && carrier.subscription_status === 'active') {
     window.location.href = '/dashboard';
   } else {
