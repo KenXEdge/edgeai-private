@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ACE — Load Board</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;500;600&family=Share+Tech+Mono&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#0d0d0d;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;min-height:100vh}
+
+/* HEADER */
+.board-header{
+  background:#111;
+  border-bottom:3px solid #E8A020;
+  padding:12px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  z-index:100;
+}
+.ace-logo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#E8A020;letter-spacing:2px;text-transform:uppercase}
+.board-sub{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.board-count{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;color:#E8A020;line-height:1;text-align:center}
+.board-count-label{font-size:9px;color:rgba(255,255,255,0.35);letter-spacing:1.5px;text-transform:uppercase;text-align:center}
+.header-right{display:flex;gap:10px;align-items:center}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#2ecc71;box-shadow:0 0 5px rgba(46,204,113,0.6);display:inline-block;margin-right:5px}
+.status-label{font-size:10px;color:rgba(255,255,255,0.3)}
+.view-toggle{display:flex;gap:4px}
+.view-btn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);border-radius:4px;padding:5px 10px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.view-btn.active{background:rgba(232,160,32,0.15);border-color:rgba(232,160,32,0.4);color:#E8A020}
+.btn-clear-all{background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.3);color:#e74c3c;border-radius:4px;padding:6px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.btn-clear-all:hover{background:rgba(231,76,60,0.25)}
+
+/* BODY */
+.board-body{padding:20px}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:100px 20px;display:none}
+.empty-icon{font-size:48px;margin-bottom:16px}
+.empty-title{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:8px}
+.empty-sub{font-size:12px;color:rgba(255,255,255,0.12)}
+
+/* TILE GRID */
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px}
+
+/* LIST VIEW */
+.board-body.list-view .tile-grid{grid-template-columns:1fr}
+.board-body.list-view .load-tile{display:grid;grid-template-columns:220px 1fr 1fr 220px;align-items:center;border-radius:6px}
+.board-body.list-view .tile-lane{border-bottom:none;border-right:1px solid rgba(232,160,32,0.15);padding:10px 14px}
+.board-body.list-view .tile-stats{border-bottom:none;border-right:1px solid rgba(255,255,255,0.06);padding:10px 14px;grid-template-columns:1fr 1fr 1fr}
+.board-body.list-view .tile-broker{border-bottom:none;border-right:1px solid rgba(255,255,255,0.06);padding:10px 14px}
+.board-body.list-view .tile-bid{padding:10px 14px}
+.board-body.list-view .tile-age{display:none}
+.board-body.list-view .tile-cities{font-size:16px}
+.board-body.list-view .suggested-rate{font-size:20px}
+.board-body.list-view .bid-input{font-size:18px;padding:6px 10px}
+
+/* LOAD TILE */
+.load-tile{background:#141414;border:1px solid rgba(232,160,32,0.2);border-radius:8px;overflow:hidden;transition:border-color .2s}
+.load-tile:hover{border-color:rgba(232,160,32,0.4)}
+
+.tile-lane{background:linear-gradient(135deg,#1a1200 0%,#1a1a1a 100%);padding:14px 16px;border-bottom:1px solid rgba(232,160,32,0.15)}
+.tile-cities{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#fff;display:flex;align-items:center;gap:8px;line-height:1}
+.lane-arrow{color:#E8A020;font-size:16px}
+.tile-meta{display:flex;gap:12px;margin-top:7px;flex-wrap:wrap}
+.tile-chip{font-size:10px;color:rgba(255,255,255,0.45);display:flex;align-items:center;gap:3px}
+.tile-chip strong{color:#fff;font-weight:600}
+.tile-footnote{margin-top:7px;background:rgba(232,160,32,0.08);border-left:3px solid #E8A020;border-radius:0 4px 4px 0;padding:5px 9px;font-size:11px;color:#fff;line-height:1.4}
+
+.tile-stats{padding:10px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.stat-item{background:#1a1a1a;border-radius:4px;padding:7px 9px}
+.stat-label{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+.stat-value{font-size:13px;font-weight:600;color:#fff}
+.stat-value.gold{color:#E8A020}
+
+.tile-broker{padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.broker-name{font-weight:600;font-size:13px}
+.broker-sub{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px}
+.broker-email{color:rgba(232,160,32,0.6)!important}
+
+.tile-bid{padding:12px 16px}
+.suggested-label{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
+.suggested-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.suggested-rate{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:#E8A020;line-height:1}
+.suggested-calc{font-size:10px;color:rgba(255,255,255,0.25);line-height:1.5}
+.bid-row{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.bid-prefix{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:rgba(255,255,255,0.25)}
+.bid-input{flex:1;background:#1a1a1a;border:2px solid rgba(232,160,32,0.3);border-radius:5px;padding:7px 11px;color:#E8A020;font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;outline:none;letter-spacing:1px;transition:border-color .2s}
+.bid-input:focus{border-color:#E8A020}
+.use-suggested{font-size:10px;color:#E8A020;cursor:pointer;text-decoration:underline;opacity:0.65;white-space:nowrap}
+.use-suggested:hover{opacity:1}
+
+.tile-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.btn-pass,.btn-draft,.btn-send{border-radius:4px;padding:9px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s;border:1px solid}
+.btn-pass{background:rgba(231,76,60,0.12);border-color:rgba(231,76,60,0.3);color:#e74c3c}
+.btn-pass:hover{background:rgba(231,76,60,0.25);border-color:#e74c3c}
+.btn-draft{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)}
+.btn-draft:hover{background:rgba(255,255,255,0.12);color:#fff}
+.btn-send{background:#E8A020;border-color:#E8A020;color:#000;font-weight:900}
+.btn-send:hover{background:#d4911c}
+.btn-send:disabled{background:rgba(232,160,32,0.3);color:rgba(0,0,0,0.5);cursor:not-allowed}
+
+.tile-feedback{text-align:center;padding:10px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;display:none;border-radius:4px;margin-top:8px}
+.tile-feedback.success{background:rgba(46,204,113,0.15);color:#2ecc71;border:1px solid rgba(46,204,113,0.3)}
+.tile-feedback.passed{background:rgba(231,76,60,0.1);color:#e74c3c;border:1px solid rgba(231,76,60,0.2)}
+
+.tile-age{font-size:10px;color:rgba(255,255,255,0.18);letter-spacing:.5px;padding:0 16px 8px;text-align:right}
+</style>
+</head>
+<body>
+
+<div class="board-header">
+  <div>
+    <div class="ace-logo">⚡ ACE Load Board</div>
+    <div class="board-sub">Agentic Carrier Employee · XTX Transport</div>
+  </div>
+  <div>
+    <div class="board-count" id="load-count">0</div>
+    <div class="board-count-label">Active Loads</div>
+  </div>
+  <div class="header-right">
+    <div class="status-label"><span class="status-dot"></span>ACE Watching</div>
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-tile-view">⊞ Tiles</button>
+      <button class="view-btn" id="btn-list-view">☰ List</button>
+    </div>
+    <button class="btn-clear-all" id="btn-clear-all">✕ Clear All</button>
+  </div>
+</div>
+
+<div class="board-body" id="board-body">
+  <div class="tile-grid" id="tile-grid"></div>
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">⚡</div>
+    <div class="empty-title">Watching Sylectus</div>
+    <div class="empty-sub">Qualifying loads will appear here as ACE captures them.</div>
+  </div>
+</div>
+
+<script src="ace-board.js"></script>
+</body>
+</html>

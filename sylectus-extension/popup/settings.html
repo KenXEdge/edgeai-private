@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ACE Settings</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:340px;background:#0a0a0a;color:#fff;font-family:'Barlow',sans-serif;font-size:13px}
+.header{background:#111;border-bottom:2px solid #E8A020;padding:10px 14px;display:flex;align-items:center;gap:8px}
+.title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;color:#E8A020;text-transform:uppercase;letter-spacing:1px}
+.sub{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1px;text-transform:uppercase}
+.status-bar{background:#1a1a1a;padding:7px 14px;display:flex;align-items:center;gap:7px;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.dot{width:7px;height:7px;border-radius:50%}
+.dot.green{background:#2ecc71;box-shadow:0 0 5px rgba(46,204,113,0.5)}
+.dot.amber{background:#E8A020}
+.dot.red{background:#e74c3c}
+#status-text{color:rgba(255,255,255,0.5)}
+.section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.slabel{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#E8A020;margin-bottom:9px}
+.field{margin-bottom:8px}
+.field label{display:block;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px}
+.field input{width:100%;background:#1a1a1a;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:6px 9px;color:#fff;font-size:12px;font-family:'Barlow',sans-serif;outline:none;transition:border-color .2s}
+.field input:focus{border-color:#E8A020}
+.field input::placeholder{color:rgba(255,255,255,0.2)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.rpm-preview{background:#1a1a1a;border:1px solid rgba(232,160,32,0.25);border-radius:4px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;margin-top:5px}
+.rpm-eq{font-size:10px;color:rgba(255,255,255,0.4)}
+.rpm-res{font-size:13px;font-weight:600;color:#E8A020}
+.filter-summary{background:#1a1a1a;border:1px solid rgba(46,204,113,0.2);border-radius:4px;padding:7px 10px;font-size:11px;color:rgba(255,255,255,0.5);margin-top:5px;line-height:1.6}
+.filter-summary strong{color:#2ecc71}
+.btn{width:100%;background:#E8A020;color:#000;border:none;border-radius:4px;padding:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:background .2s}
+.btn:hover{background:#d4911c}
+.btn.sec{background:transparent;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.55);margin-top:7px}
+.btn.sec:hover{border-color:rgba(255,255,255,0.3);color:#fff}
+.btn.red-btn{background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.3);color:#e74c3c;margin-top:7px}
+.saved{text-align:center;font-size:10px;color:#2ecc71;margin-top:6px;opacity:0;transition:opacity .3s}
+.saved.show{opacity:1}
+.search-preview{background:#1a1a1a;border-radius:4px;padding:8px 10px;font-size:11px;color:rgba(255,255,255,0.5);line-height:1.6;margin-top:6px}
+.search-preview strong{color:#fff}
+.footer{padding:9px 14px;text-align:center;font-size:9px;color:rgba(255,255,255,0.15);letter-spacing:.5px}
+.cb-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.cb-row{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,0.6);cursor:pointer;padding:3px 4px;border-radius:3px;transition:background .15s}
+.cb-row:hover{background:rgba(255,255,255,0.05);color:#fff}
+.cb-row input[type="checkbox"]{accent-color:#E8A020;width:13px;height:13px;cursor:pointer;flex-shrink:0}
+.lt-summary{margin-top:7px;font-size:10px;color:rgba(255,255,255,0.35);line-height:1.6}
+.lt-summary strong{color:#E8A020}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>⚡</div>
+  <div>
+    <div class="title">ACE Settings</div>
+    <div class="sub">Sylectus Load Capture · XTX Transport</div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="dot amber" id="status-dot"></div>
+  <span id="status-text">Checking...</span>
+</div>
+
+<!-- Sylectus Login -->
+<div class="section">
+  <div class="slabel">Sylectus Login</div>
+  <div class="field">
+    <label>Corporate Password (Corp ID: 2325803)</label>
+    <input type="password" id="corp-password" placeholder="Update when notified">
+  </div>
+  <div class="field">
+    <label>User Password — sni (update weekly)</label>
+    <input type="password" id="user-password" placeholder="Update when notified">
+  </div>
+</div>
+
+<!-- Search Parameters -->
+<div class="section">
+  <div class="slabel">Search Parameters</div>
+  <div class="row">
+    <div class="field">
+      <label>From City</label>
+      <input type="text" id="from-city" placeholder="Dallas">
+    </div>
+    <div class="field">
+      <label>From State</label>
+      <input type="text" id="from-state" placeholder="TX" maxlength="2">
+    </div>
+  </div>
+  <div class="field">
+    <label>To States (comma separated)</label>
+    <input type="text" id="to-states" placeholder="TX, OK">
+  </div>
+  <div class="search-preview" id="search-preview">
+    Search: <strong>Dallas, TX</strong> → <strong>TX, OK</strong> | 50mi | Expedited + Large + Small Straight
+  </div>
+</div>
+
+<!-- Bid Filters -->
+<div class="section">
+  <div class="slabel">Bid Filters</div>
+  <div class="row">
+    <div class="field">
+      <label>Bid Radius (max miles)</label>
+      <input type="number" id="bid-radius" placeholder="300" min="1" max="9999" step="25">
+    </div>
+    <div class="field">
+      <label>Max Weight (lbs)</label>
+      <input type="number" id="max-weight" placeholder="9000" min="1" max="99999" step="500">
+    </div>
+  </div>
+  <div class="filter-summary" id="filter-summary">
+    Alert when: <strong>≤ 300 mi</strong> · <strong>≤ 9,000 lbs</strong> · TO state matched
+  </div>
+</div>
+
+<!-- Load Types -->
+<div class="section">
+  <div class="slabel">Load Types to Monitor</div>
+  <div class="cb-grid">
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="expedited load"> Expedited Load</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="expedited truck load"> Expedited Truck Load</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="small straight"> Small Straight</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="large straight"> Large Straight</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="cargo van"> Cargo Van</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="sprinter"> Sprinter</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="truckload"> Truckload</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="less than truckload"> Less Than Truckload</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="truckload/ltl"> Truckload/LTL</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="courier type work"> Courier</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="flatbed"> Flatbed</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="reefer"> Reefer</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="climate control"> Climate Control</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="air freight"> Air Freight</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="air charter"> Air Charter</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="dump trailer"> Dump Trailer</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="lane/project rfq"> Lane/Project RFQ</label>
+    <label class="cb-row"><input type="checkbox" class="lt-cb" value="other"> Other</label>
+  </div>
+  <div class="lt-summary" id="lt-summary">Monitoring: none selected</div>
+</div>
+
+<!-- Rate Calculator -->
+<div class="section">
+  <div class="slabel">Rate Calculator</div>
+  <div class="row">
+    <div class="field">
+      <label>RPM ($)</label>
+      <input type="number" id="rpm" placeholder="2.75" step="0.05" min="1" max="10">
+    </div>
+    <div class="field">
+      <label>Example Miles</label>
+      <input type="number" id="ex-miles" placeholder="250">
+    </div>
+  </div>
+  <div class="rpm-preview">
+    <span class="rpm-eq" id="rpm-eq">250 mi × $2.75</span>
+    <span class="rpm-res" id="rpm-res">= $688</span>
+  </div>
+</div>
+
+<!-- Actions -->
+<div class="section">
+  <button class="btn" id="save-btn">Save All Settings</button>
+  <button class="btn sec" id="board-btn">⊞ Open Load Board</button>
+  <button class="btn sec" id="gmail-btn">Connect Gmail OAuth</button>
+  <button class="btn red-btn" id="pause-btn">⏸ Pause ACE</button>
+  <div class="saved" id="saved-msg">✓ Saved</div>
+</div>
+
+<div class="footer">ACE Load Capture v2.0 · EDGEai · XTX LLC</div>
+
+<script src="settings.js"></script>
+</body>
+</html>
