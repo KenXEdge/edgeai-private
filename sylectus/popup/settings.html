@@ -89,9 +89,15 @@ body{width:340px;background:#0a0a0a;color:#fff;font-family:'Barlow',sans-serif;f
       <input type="text" id="from-state" placeholder="TX" maxlength="2">
     </div>
   </div>
-  <div class="field">
-    <label>To States (comma separated)</label>
-    <input type="text" id="to-states" placeholder="TX, OK">
+  <div class="row">
+    <div class="field">
+      <label>To States (comma separated)</label>
+      <input type="text" id="to-states" placeholder="TX, OK">
+    </div>
+    <div class="field">
+      <label>Pickup Within (miles)</label>
+      <input type="number" id="pickup-radius" placeholder="50" min="1" max="500" step="5">
+    </div>
   </div>
   <div class="search-preview" id="search-preview">
     Search: <strong>Dallas, TX</strong> → <strong>TX, OK</strong> | 50mi | Expedited + Large + Small Straight

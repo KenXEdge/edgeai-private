@@ -21,7 +21,7 @@
       chrome.storage.local.get([
         'sylectus_corp_password', 'sylectus_password', 'rpm',
         'search_from_city', 'search_from_state', 'search_to_states',
-        'bid_radius', 'max_weight', 'ace_paused'
+        'pickup_radius', 'bid_radius', 'max_weight', 'ace_paused'
       ], resolve);
     });
   }
@@ -343,10 +343,11 @@
     for (const inp of inputs) {
       const n = (inp.name || inp.id || '').toLowerCase();
       if (n.includes('within') || n.includes('miles') || n.includes('radius')) {
-        inp.value = '50';
+        const pickupMiles = String(settings.pickup_radius || 50);
+        inp.value = pickupMiles;
         inp.dispatchEvent(new Event('change', { bubbles: true }));
         milesSet = true;
-        console.log('[ACE] ✓ Pickup radius set: 50 miles');
+        console.log(`[ACE] ✓ Pickup radius set: ${pickupMiles} miles`);
         break;
       }
     }
