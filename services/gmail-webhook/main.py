@@ -6,7 +6,6 @@ classifies broker replies using Claude, and triggers carrier actions.
 
 import os
 import json
-import re
 import base64
 import logging
 import sys
@@ -1117,32 +1116,6 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         if not refresh_token:
             log.error('[extract-brokers] no gmail_token carrier_id=%s', carrier_id)
             return
-        # Carrier identity — used to filter own info out of broker enrichment.
-        # Primary: pulled from carriers table (populated after onboarding).
-        # Fallback: derive company tokens from carrier email domain so the filter
-        # works even before onboarding data is filled in.
-        carrier_name    = (carrier.get("owner_name") or carrier.get("name") or "").strip()
-        carrier_phone   = (carrier.get("phone") or "").strip()
-        carrier_company = (carrier.get("company_name") or carrier.get("name") or "").strip().lower()
-        _carrier_suffix_re = re.compile(
-            r'(transport(ation)?|trucking?|freight|logistics|express|llc|inc|corp|co|group|services?)$',
-            re.IGNORECASE,
-        )
-        if not carrier_company:
-            # Derive unique identifier from email domain.
-            # Strip common freight/legal suffixes to isolate the carrier's brand token.
-            # e.g. contact@xtxtransport.com → "xtxtransport" → strip "transport" → "xtx"
-            _domain = (carrier.get("email") or "").split("@")[-1].split(".")[0].lower()
-            _unique = _carrier_suffix_re.sub("", _domain).strip()
-            carrier_company = _unique if len(_unique) >= 2 else _domain
-        else:
-            # Strip suffixes from company_name to isolate brand token for matching.
-            # e.g. "XTX LLC" → "xtx", "XTX Transport LLC" → "xtx"
-            _unique = _carrier_suffix_re.sub("", carrier_company).strip()
-            if len(_unique) >= 2:
-                carrier_company = _unique
-        log.info('[extract-brokers] carrier identity name=%r company=%r phone=****%s',
-                 carrier_name, carrier_company, carrier_phone[-4:] if carrier_phone else "")
 
         import google.auth.transport.requests as google_requests
         import requests as requests_lib
@@ -1235,7 +1208,6 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         email_names: dict[str, str] = {}
         email_message_ids: dict[str, str] = {}
         email_sent_dates: dict[str, str] = {}  # most recent SENT timestamp per recipient
-        email_touch_counts: dict[str, int] = {}  # total SENT messages to this broker
         personal_domain_contacts: dict[str, str] = {}  # email -> display name (for unknown review)
 
         def _is_hard_noise(email: str) -> bool:
@@ -1307,8 +1279,6 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 email_subjects[to_email] = []
             if subject_val and subject_val not in email_subjects[to_email]:
                 email_subjects[to_email].append(subject_val)
-            # Count every SENT message to this broker — touch count indicator
-            email_touch_counts[to_email] = email_touch_counts.get(to_email, 0) + 1
 
         chunks = [message_ids[i:i + 100] for i in range(0, len(message_ids), 100)]
         for chunk_idx, chunk in enumerate(chunks):
@@ -1361,7 +1331,7 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
         known_resp = (
             supabase_client()
             .table("brokers")
-            .select("email,phone,company,title,last_load_origin,last_load_destination,touch_count")
+            .select("email,phone,company,title")
             .eq("carrier_id", carrier_id)
             .execute()
         )
@@ -1394,56 +1364,16 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 return ""
             return _get_text(msg.get("payload", {}))
 
-        def _strip_reply_quotes(text: str) -> str:
-            """Remove quoted reply chains — only cut on unambiguous separators."""
-            import re
-            # Only split on patterns that definitively mark a quoted block,
-            # NOT on bare "From:" which commonly appears in signatures/addresses.
-            pattern = re.compile(
-                r'\n(?:'
-                r'-{3,}\s*(?:Original Message|Forwarded Message)\s*-{3,}'  # --- Original Message ---
-                r'|On\s.{10,80}?wrote:\s*$'      # On Mon Jan 1, Joe Smith wrote:  (end of line)
-                r'|_{10,}'                        # ___________ (long underscores only)
-                r')',
-                re.IGNORECASE | re.MULTILINE,
-            )
-            match = pattern.search(text)
-            if match:
-                text = text[:match.start()]
-            # Strip lines that are pure inline quotes (start with >)
-            lines = [l for l in text.splitlines() if not l.strip().startswith(">")]
-            return "\n".join(lines).strip()
-
         imported = 0
         enhanced = 0
 
-        # ── Carrier identity filter helpers ──────────────────────────────────────
-        _carr_name_lower = (carrier_name or "").lower()
-        _carr_phone_digits = "".join(c for c in (carrier_phone or "") if c.isdigit())
-        def _is_carrier_field(val, field):
-            if not val:
-                return False
-            v = val.lower().strip()
-            if field == "name":
-                carr_tokens = set(_carr_name_lower.split())
-                return bool(carr_tokens & set(v.split()))
-            if field == "phone":
-                digits = "".join(c for c in v if c.isdigit())
-                return bool(_carr_phone_digits and digits.endswith(_carr_phone_digits[-7:]))
-            if field == "company":
-                return bool(carrier_company and len(carrier_company) >= 2 and carrier_company in v)
-            return False
-
-        if not process_emails:
-            log.info('[extract-brokers] nothing to process carrier_id=%s', carrier_id)
-            return
-
-        # ── Stage 1: Gmail data collection (parallel) ────────────────────────────
-        def _fetch_gmail_data(email):
+        def _process_broker(email):
+            nonlocal imported, enhanced
             import google.auth.transport.requests as _greq
             import requests as _rlib
+
+            # ── 4a: Build thread-local Gmail service (httplib2 not thread-safe) ──
             signature = ""
-            sent_context = ""
             try:
                 _creds = OAuthCredentials(
                     token=None,
@@ -1455,151 +1385,70 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                 )
                 _creds.refresh(_greq.Request(session=_rlib.Session()))
                 _svc = build("gmail", "v1", credentials=_creds, cache_discovery=False)
-
-                inbox_resp = _svc.users().messages().list(
+                resp = _svc.users().messages().list(
                     userId="me",
                     q=f'from:"{email}"',
                     maxResults=1,
                 ).execute()
-                inbox_msgs = inbox_resp.get("messages", [])
-                if inbox_msgs:
-                    inbox_msg = _svc.users().messages().get(
-                        userId="me", id=inbox_msgs[0]["id"], format="full"
+                msgs = resp.get("messages", [])
+                if msgs:
+                    msg = _svc.users().messages().get(
+                        userId="me", id=msgs[0]["id"], format="full"
                     ).execute()
-                    body = _extract_body_text(inbox_msg)
-                    body = _strip_reply_quotes(body)
+                    body = _extract_body_text(msg)
                     lines = [l.strip() for l in body.splitlines() if l.strip()]
-                    signature = "\n".join(lines[-20:])
-
-                sent_msg_id = email_message_ids.get(email)
-                if sent_msg_id:
-                    try:
-                        sent_msg = _svc.users().messages().get(
-                            userId="me", id=sent_msg_id, format="full"
-                        ).execute()
-                        sent_body = _extract_body_text(sent_msg)
-                        sent_lines = [l.strip() for l in sent_body.splitlines() if l.strip()]
-                        sent_context = "\n".join(sent_lines[:30])
-                    except Exception as exc:
-                        log.warning('[extract-brokers] sent body fetch failed email=%s: %s', email, exc)
+                    signature = "\n".join(lines[-10:])
             except Exception as exc:
                 log.error('[extract-brokers] sig fetch failed email=%s: %s', email, exc)
-            return signature, sent_context
 
-        gmail_data = {}
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            futures = {pool.submit(_fetch_gmail_data, e): e for e in process_emails}
-            for future in as_completed(futures):
-                gmail_data[futures[future]] = future.result()
-
-        # ── Stage 2: Submit Anthropic batch ──────────────────────────────────────
-        idx_to_email = {str(i): e for i, e in enumerate(process_emails)}
-        batch_requests = []
-        for i, email in enumerate(process_emails):
-            signature, sent_context = gmail_data.get(email, ("", ""))
+            # ── 4b: Claude enrich ─────────────────────────────────────────────────
             to_name = email_names.get(email, "")
             prompt_text = (
-                "Extract freight broker contact details from the email content below.\n\n"
+                "Extract contact details from the email signature block below.\n\n"
                 "Return a JSON object with exactly these fields:\n"
-                "{\"name\": \"broker first last or null\", "
+                "{\"name\": \"first last or null\", "
                 "\"title\": \"job title max 25 chars or null\", "
                 "\"company\": \"brokerage or company name or null\", "
-                "\"phone\": \"mobile number only or null\", "
-                "\"origin\": \"pickup city ST or null\", "
-                "\"destination\": \"delivery city ST or null\"}\n\n"
-                "Rules:\n"
-                "- name/title/company/phone: extract from the broker's signature block\n"
-                "- origin/destination: extract the freight lane (pickup → delivery city/state) "
-                "from either the broker signature or the lane context — format 'City ST'\n"
-                "- Phone: ONLY return a number labeled Mobile, Cell, or M. "
-                "Return null for Office, Afterhours, Direct, Desk, Ext, or 800 numbers.\n"
-                "- Title: max 25 characters — truncate if longer\n"
-                "- Return ONLY valid JSON, no other text\n\n"
-                f"Broker name hint (from To: header): {to_name or 'unknown'}\n\n"
-                f"Broker signature (from their reply):\n{signature or 'not available'}\n\n"
-                f"Lane context (outbound bid email):\n{sent_context or 'not available'}"
+                "\"phone\": \"mobile number only or null\"}\n\n"
+                "Phone rules — ONLY return a number explicitly labeled Mobile, Cell, or M. "
+                "Return null if the only numbers present are labeled Office, Afterhours, "
+                "After Hours, Direct, Desk, Ext, or are 800/toll-free numbers. "
+                "Never return an office number or afterhours number.\n\n"
+                "Title rule: max 25 characters — truncate if longer.\n\n"
+                "Return ONLY valid JSON, no other text.\n\n"
+                f"Sender name hint: {to_name or 'unknown'}\n"
+                f"Signature:\n{signature or 'not available'}"
             )
-            batch_requests.append({
-                "custom_id": str(i),
-                "params": {
-                    "model": "claude-haiku-4-5-20251001",
-                    "max_tokens": 250,
-                    "messages": [{"role": "user", "content": prompt_text}],
-                },
-            })
-
-        _anth = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-        batch = _anth.messages.batches.create(requests=batch_requests)
-        log.info('[extract-brokers] batch submitted id=%s count=%d', batch.id, len(batch_requests))
-
-        # ── Stage 3: Poll for batch completion ───────────────────────────────────
-        import time as _time
-        while True:
-            batch_status = _anth.messages.batches.retrieve(batch.id)
-            if batch_status.processing_status == "ended":
-                break
-            log.info('[extract-brokers] batch polling id=%s counts=%s', batch.id, batch_status.request_counts)
-            _time.sleep(15)
-
-        log.info('[extract-brokers] batch complete id=%s', batch.id)
-
-        # ── Stage 4a: Collect + parse all batch results, apply identity filter ────
-        write_queue = []
-        for result in _anth.messages.batches.results(batch.id):
-            email = idx_to_email.get(result.custom_id)
-            if not email:
-                continue
-            if result.result.type != "succeeded":
-                log.error('[extract-brokers] batch result failed email=%s type=%s', email, result.result.type)
-                continue
-            raw_text = result.result.message.content[0].text.strip() if result.result.message.content else ""
-            log.info('[extract-brokers] batch result email=%s text=%r', email, raw_text[:300])
-            if raw_text.startswith("```"):
-                raw_text = raw_text.split("```", 2)[1]
-                if raw_text.startswith("json"):
-                    raw_text = raw_text[4:]
-                raw_text = raw_text.rsplit("```", 1)[0].strip()
             try:
-                enriched = json.loads(raw_text)
+                claude_msg = anthropic_client().messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=200,
+                    messages=[{"role": "user", "content": prompt_text}],
+                )
+                enriched = json.loads(claude_msg.content[0].text.strip())
             except Exception as exc:
-                log.error('[extract-brokers] enrich parse failed email=%s: %s', email, exc)
+                log.error('[extract-brokers] enrich failed email=%s: %s', email, exc)
                 enriched = {}
-            if _is_carrier_field(enriched.get("name"), "name"):
-                enriched["name"] = None
-            if _is_carrier_field(enriched.get("phone"), "phone"):
-                enriched["phone"] = None
-            if _is_carrier_field(enriched.get("company"), "company"):
-                enriched["company"] = None
-            write_queue.append((email, enriched))
 
-        # ── Stage 4b: Write to Supabase in parallel (5 workers) ─────────────────
-        def _write_broker(item):
-            nonlocal imported, enhanced
-            email, enriched = item
+            # ── 4c: Write to SB immediately ───────────────────────────────────────
             last_contacted = email_sent_dates.get(email)
-            to_name = email_names.get(email, "")
             is_new = email not in known_map
             try:
                 if is_new:
-                    broker_name = enriched.get("name") or to_name or None
-                    touch = email_touch_counts.get(email, 0)
                     supabase_client().table("brokers").insert({
                         "carrier_id": carrier_id,
                         "email": email,
-                        "name": broker_name,
+                        "name": enriched.get("name") or to_name or None,
                         "title": (enriched.get("title") or "")[:25] or None,
                         "company": enriched.get("company"),
                         "phone": enriched.get("phone"),
                         "last_contacted": last_contacted,
-                        "last_load_origin": enriched.get("origin"),
-                        "last_load_destination": enriched.get("destination"),
-                        "touch_count": touch,
                         "status": "warm",
                         "priority": "medium",
                         "days_cadence": 3,
                     }).execute()
                     imported += 1
-                    log.info('[extract-brokers] inserted email=%s touches=%d', email, touch)
+                    log.info('[extract-brokers] inserted email=%s', email)
                 else:
                     existing = known_map[email]
                     patch = {}
@@ -1609,23 +1458,20 @@ def _scan_sent_and_enrich(carrier_id: str, days: int = 180) -> None:
                         patch["company"] = enriched["company"]
                     if not existing.get("title") and enriched.get("title"):
                         patch["title"] = (enriched["title"])[:25]
-                    if not existing.get("last_load_origin") and enriched.get("origin"):
-                        patch["last_load_origin"] = enriched["origin"]
-                    if not existing.get("last_load_destination") and enriched.get("destination"):
-                        patch["last_load_destination"] = enriched["destination"]
                     if last_contacted:
                         patch["last_contacted"] = last_contacted
-                    patch["touch_count"] = email_touch_counts.get(email, 0)
                     if patch:
                         supabase_client().table("brokers").update(patch).eq(
                             "carrier_id", carrier_id).eq("email", email).execute()
                         enhanced += 1
-                        log.info('[extract-brokers] enhanced email=%s fields=%s', email, list(patch.keys()))
+                        log.info('[extract-brokers] enhanced email=%s', email)
+                return True
             except Exception as exc:
                 log.error('[extract-brokers] write failed email=%s: %s', email, exc)
+                return False
 
-        with ThreadPoolExecutor(max_workers=5) as pool:
-            futures = [pool.submit(_write_broker, item) for item in write_queue]
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            futures = {pool.submit(_process_broker, e): e for e in process_emails}
             for future in as_completed(futures):
                 future.result()
 
