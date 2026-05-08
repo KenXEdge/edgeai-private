@@ -75,6 +75,9 @@
         if (scanDoc(fdoc)) return true;
       } catch (e) { /* cross-origin */ }
     }
+    // Modal lives in Main.aspx parent frame — scan up the frame tree
+    try { if (window.parent && window.parent !== window && scanDoc(window.parent.document)) return true; } catch(e) {}
+    try { if (window.top && window.top !== window && window.top !== window.parent && scanDoc(window.top.document)) return true; } catch(e) {}
     return false;
   }
   function simulateActivity() {
@@ -303,12 +306,15 @@
     for (const sel of selects) {
       const n = (sel.name || sel.id || '').toLowerCase();
       if (n.includes('from') && n.includes('state')) {
+        const stateUpper = (fromState || '').trim().toUpperCase();
         for (const opt of sel.options) {
-          if ((opt.value || opt.text || '').includes(fromState)) {
+          const v = (opt.value || '').trim().toUpperCase();
+          const t = (opt.text  || '').trim().toUpperCase();
+          if (v === stateUpper || t === stateUpper || t.startsWith(stateUpper)) {
             sel.value = opt.value;
             sel.dispatchEvent(new Event('change', { bubbles: true }));
             fromStateSet = true;
-            console.log(`[ACE] ✓ FROM state set: ${fromState}`);
+            console.log(`[ACE] ✓ FROM state set: ${fromState} → option value="${opt.value}"`);
             break;
           }
         }
@@ -447,7 +453,7 @@
   }
   function extractRowData(row, cells, orderNo, orderLink) {
     const companyLink = cells[0]?.querySelector('a');
-    const profileLink = companyLink || orderLink;
+    const profileLink = orderLink || companyLink;
     const load = {
       order_no: orderNo,
       raw_row_text: row.innerText.trim(),

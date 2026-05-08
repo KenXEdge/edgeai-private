@@ -45,9 +45,6 @@ function renderLoad(load, rpm, suggested) {
   el('broker-phone').textContent = load.broker_phone || '—';
   el('broker-email').textContent = load.broker_email || '—';
 
-  // Raw block
-  el('raw-block').textContent = load.raw_row_text || '—';
-
   // Notes
   if (load.notes) el('notes-text').textContent = load.notes;
 

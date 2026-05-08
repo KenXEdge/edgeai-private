@@ -83,8 +83,13 @@ function updateSearchPreview() {
   const city  = el('from-city')?.value  || 'Dallas';
   const state = el('from-state')?.value || 'TX';
   const to    = el('to-states')?.value  || 'TX, OK';
+  const checked = [...document.querySelectorAll('.lt-cb:checked')].map(cb =>
+    cb.parentElement.textContent.trim()
+  );
+  const typesStr = checked.length ? checked.join(', ') : '<em style="color:#e74c3c">none selected</em>';
   el('search-preview').innerHTML =
-    `Search: <strong>${city}, ${state}</strong> → <strong>${to}</strong> | 50mi radius`;
+    `Search: <strong>${city}, ${state}</strong> → <strong>${to}</strong> | 50mi radius<br>` +
+    `<span style="color:rgba(255,255,255,0.35);font-size:10px;">Types: ${typesStr}</span>`;
 }
 
 function updateFilterSummary() {
@@ -172,4 +177,7 @@ el('from-state')?.addEventListener('input', updateSearchPreview);
 el('to-states')?.addEventListener('input', updateSearchPreview);
 el('bid-radius')?.addEventListener('input', updateFilterSummary);
 el('max-weight')?.addEventListener('input', updateFilterSummary);
-document.querySelectorAll('.lt-cb').forEach(cb => cb.addEventListener('change', updateLoadTypeSummary));
+document.querySelectorAll('.lt-cb').forEach(cb => cb.addEventListener('change', () => {
+  updateLoadTypeSummary();
+  updateSearchPreview();
+}));
