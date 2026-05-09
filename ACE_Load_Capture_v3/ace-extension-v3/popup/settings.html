@@ -93,6 +93,9 @@ body{width:340px;background:#0a0a0a;color:#fff;font-family:'Barlow',sans-serif;f
     <div class="field">
       <label>To States (comma separated)</label>
       <input type="text" id="to-states" placeholder="TX, OK">
+      <div style="font-size:9px;color:rgba(255,255,255,0.25);margin-top:3px;letter-spacing:0.5px">
+        Type ANY to select all states in Sylectus
+      </div>
     </div>
     <div class="field">
       <label>Pickup Within (miles)</label>
@@ -109,16 +112,12 @@ body{width:340px;background:#0a0a0a;color:#fff;font-family:'Barlow',sans-serif;f
   <div class="slabel">Bid Filters</div>
   <div class="row">
     <div class="field">
-      <label>Bid Radius (max miles)</label>
-      <input type="number" id="bid-radius" placeholder="300" min="1" max="9999" step="25">
-    </div>
-    <div class="field">
       <label>Max Weight (lbs)</label>
       <input type="number" id="max-weight" placeholder="9000" min="1" max="99999" step="500">
     </div>
   </div>
   <div class="filter-summary" id="filter-summary">
-    Alert when: <strong>≤ 300 mi</strong> · <strong>≤ 9,000 lbs</strong> · TO state matched
+    Alert when: <strong>≤ 9,000 lbs</strong> · TO state matched
   </div>
 
   <div class="field" style="margin-top:8px">

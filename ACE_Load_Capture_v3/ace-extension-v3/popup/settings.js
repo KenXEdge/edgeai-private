@@ -7,7 +7,6 @@ const KEYS = {
   'from-state':     'search_from_state',
   'to-states':      'search_to_states_raw',
   'pickup-radius':  'pickup_radius',
-  'bid-radius':     'bid_radius',
   'max-weight':     'max_weight',
   'rpm':            'rpm',
   'ex-miles':       'example_miles'
@@ -114,12 +113,11 @@ function updateSearchPreview() {
 }
 
 function updateFilterSummary() {
-  const radius = el('bid-radius')?.value  || '300';
   const weight = el('max-weight')?.value  || '9,000';
   const to     = el('to-states')?.value   || 'TX, OK';
   const wFmt   = Number(weight).toLocaleString();
   el('filter-summary').innerHTML =
-    `Alert when: <strong>≤ ${radius} mi</strong> · <strong>≤ ${wFmt} lbs</strong> · delivery in <strong>${to}</strong>`;
+    `Alert when: <strong>≤ ${wFmt} lbs</strong> · delivery in <strong>${to}</strong>`;
 }
 
 function updateLoadTypeSummary() {
@@ -202,7 +200,6 @@ el('from-city')?.addEventListener('input', updateSearchPreview);
 el('from-state')?.addEventListener('input', updateSearchPreview);
 el('to-states')?.addEventListener('input', updateSearchPreview);
 el('pickup-radius')?.addEventListener('input', updateSearchPreview);
-el('bid-radius')?.addEventListener('input', updateFilterSummary);
 el('max-weight')?.addEventListener('input', updateFilterSummary);
 document.querySelectorAll('.lt-cb').forEach(cb => cb.addEventListener('change', () => {
   updateLoadTypeSummary();
