@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ACE — Bid</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;max-width:480px;margin:0 auto}
+.header{background:#111;border-bottom:3px solid #E8A020;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.logo{font-size:20px;font-weight:900;color:#E8A020;letter-spacing:2px;font-family:'Arial Black',sans-serif}
+.badge{font-size:10px;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase}
+.new-pill{background:#E8A020;color:#000;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.card{background:#141414;border:1px solid rgba(232,160,32,0.2);border-radius:10px;margin:12px;overflow:hidden}
+.lane{background:linear-gradient(135deg,#1a1200,#181818);padding:16px}
+.lane-cities{font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;line-height:1.1}
+.arrow{color:#E8A020;margin:0 6px}
+.lane-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.chip{font-size:12px;color:rgba(255,255,255,0.45)}
+.chip strong{color:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.05)}
+.cell{background:#1a1a1a;border-radius:6px;padding:10px 12px}
+.cell-label{font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.cell-val{font-size:14px;font-weight:600;color:#fff}
+.cell-val.gold{color:#E8A020;font-size:18px;font-weight:700}
+.broker-section{padding:12px 14px;border-top:1px solid rgba(255,255,255,0.05)}
+.b-name{font-weight:700;font-size:15px}
+.b-email{font-size:12px;color:rgba(232,160,32,0.7);margin-top:3px}
+.b-meta{font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px}
+.credit-row{display:flex;gap:8px;margin-top:6px}
+.credit{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(46,204,113,0.12);color:#2ecc71;border:1px solid rgba(46,204,113,0.2)}
+.days{font-size:12px;color:rgba(255,255,255,0.3);padding:3px 10px;border:1px solid rgba(255,255,255,0.08);border-radius:20px}
+.bid-section{padding:16px}
+.bid-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:12px}
+.suggested{display:flex;align-items:center;gap:10px;margin-bottom:14px;background:#1a1a1a;border-radius:8px;padding:12px 14px}
+.sug-amt{font-size:36px;font-weight:900;color:#E8A020;line-height:1;font-family:'Arial Black',sans-serif}
+.sug-info{font-size:12px;color:rgba(255,255,255,0.3);line-height:1.5}
+.input-row{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.dollar{font-size:28px;font-weight:700;color:rgba(255,255,255,0.25)}
+.bid-input{flex:1;background:#1a1a1a;border:2px solid rgba(232,160,32,0.35);border-radius:8px;padding:12px 14px;color:#E8A020;font-size:28px;font-weight:700;outline:none;-webkit-appearance:none;width:100%}
+.bid-input:focus{border-color:#E8A020}
+.use-sug{font-size:12px;color:#E8A020;text-decoration:underline;cursor:pointer;padding:4px 0;display:inline-block}
+.action-btns{display:flex;flex-direction:column;gap:10px}
+.btn{width:100%;padding:16px;border-radius:10px;font-size:16px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:none;-webkit-appearance:none}
+.btn-send{background:#E8A020;color:#000}
+.btn-send:active{background:#d4911c}
+.btn-draft{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.12)}
+.btn-draft:active{background:rgba(255,255,255,0.12)}
+.btn-pass{background:rgba(231,76,60,0.1);color:#e74c3c;border:1px solid rgba(231,76,60,0.25)}
+.btn-pass:active{background:rgba(231,76,60,0.2)}
+.feedback{text-align:center;padding:16px;font-size:16px;font-weight:700;border-radius:8px;margin:0 16px 16px;display:none}
+.feedback.ok{background:rgba(46,204,113,0.12);color:#2ecc71;border:1px solid rgba(46,204,113,0.25)}
+.feedback.pass{background:rgba(231,76,60,0.08);color:#e74c3c;border:1px solid rgba(231,76,60,0.2)}
+.no-load{text-align:center;padding:60px 20px;color:rgba(255,255,255,0.25)}
+.no-load .icon{font-size:48px;margin-bottom:16px}
+.footer{text-align:center;padding:16px;font-size:10px;color:rgba(255,255,255,0.15);letter-spacing:1px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">⚡ ACE</div>
+    <div class="badge">Load Alert · EDGEai</div>
+  </div>
+  <div class="new-pill" id="status-pill">LIVE</div>
+</div>
+
+<div id="load-view" style="display:none">
+  <div class="card">
+    <div class="lane">
+      <div class="lane-cities">
+        <span id="pickup-city">—</span>
+        <span class="arrow">→</span>
+        <span id="delivery-city">—</span>
+      </div>
+      <div class="lane-meta">
+        <div class="chip">PU: <strong id="pickup-date">—</strong></div>
+        <div class="chip">DEL: <strong id="delivery-date">—</strong></div>
+        <div class="chip"><strong id="load-type">—</strong></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="cell"><div class="cell-label">Miles</div><div class="cell-val gold" id="miles">—</div></div>
+      <div class="cell"><div class="cell-label">Vehicle</div><div class="cell-val" id="vehicle">—</div></div>
+      <div class="cell"><div class="cell-label">Weight</div><div class="cell-val" id="weight">—</div></div>
+      <div class="cell"><div class="cell-label">Order #</div><div class="cell-val" id="order-no">—</div></div>
+    </div>
+
+    <div class="broker-section">
+      <div class="b-name" id="broker-name">—</div>
+      <div class="b-email" id="broker-email">—</div>
+      <div class="b-meta" id="broker-contact">—</div>
+      <div class="credit-row">
+        <div class="credit" id="credit-score">—</div>
+        <div class="days" id="days-to-pay">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bid-section">
+    <div class="bid-label">Your Bid</div>
+    <div class="suggested">
+      <div class="sug-amt" id="sug-amt">$—</div>
+      <div class="sug-info" id="sug-info">— mi × $2.75<br>suggested rate</div>
+    </div>
+    <div class="input-row">
+      <div class="dollar">$</div>
+      <input type="number" class="bid-input" id="bid-amount" placeholder="0" inputmode="numeric" min="100" max="9999" step="25">
+    </div>
+    <div style="margin-bottom:14px">
+      <span class="use-sug" id="use-sug">Use suggested rate</span>
+    </div>
+    <div class="action-btns">
+      <button class="btn btn-send" id="btn-send">⚡ Send Bid Now</button>
+      <button class="btn btn-draft" id="btn-draft">📋 Save as Draft</button>
+      <button class="btn btn-pass" id="btn-pass">✕ Pass on This Load</button>
+    </div>
+  </div>
+</div>
+
+<div id="no-load-view">
+  <div class="no-load">
+    <div class="icon">📋</div>
+    <div>No active load alert</div>
+    <div style="margin-top:8px;font-size:12px">ACE will alert you when a qualifying load is found</div>
+  </div>
+</div>
+
+<div class="feedback" id="feedback"></div>
+<div class="footer">ACE Load Capture · EDGEai · XTX LLC</div>
+
+<script src="ace.js"></script>
+</body>
+</html>
