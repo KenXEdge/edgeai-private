@@ -18,7 +18,7 @@ function el(id) { return document.getElementById(id); }
 const DEFAULT_LOAD_TYPES = ['expedited load', 'large straight', 'small straight'];
 
 function loadSettings() {
-  chrome.storage.local.get([...Object.values(KEYS), 'ace_paused', 'gmail_token', 'target_load_types'], (r) => {
+  chrome.storage.local.get([...Object.values(KEYS), 'ace_paused', 'gmail_token', 'target_load_types', 'max_load_age'], (r) => {
     Object.entries(KEYS).forEach(([fieldId, key]) => {
       const input = el(fieldId);
       if (input && r[key] !== undefined) input.value = r[key];
@@ -36,6 +36,9 @@ function loadSettings() {
     updateFilterSummary();
     updateStatus(r.ace_paused ? 'paused' : (r.gmail_token ? 'active' : 'nogmail'));
     el('pause-btn').textContent = r.ace_paused ? '▶ Resume ACE' : '⏸ Pause ACE';
+    const savedAge = String(r.max_load_age || '0');
+    const ageRadio = document.querySelector(`input[name="max-age"][value="${savedAge}"]`);
+    if (ageRadio) ageRadio.checked = true;
   });
 }
 
@@ -56,6 +59,8 @@ function saveSettings() {
 
   // Save selected load types
   toSave.target_load_types = [...document.querySelectorAll('.lt-cb:checked')].map(cb => cb.value);
+  const selectedAge = document.querySelector('input[name="max-age"]:checked');
+  if (selectedAge) toSave.max_load_age = parseInt(selectedAge.value);
 
   chrome.storage.local.set(toSave, () => {
     const btn = el('save-btn');

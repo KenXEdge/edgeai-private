@@ -38,20 +38,50 @@ const ACEScanner = (() => {
       load.t2_detected_at = ACEUtils.now();
 
       // Apply filters
-      const bidRadius = parseFloat(settings.bid_radius) || 0;
       const maxWeight = parseFloat(settings.max_weight) || 0;
       const loadMiles  = parseFloat(load.miles)  || 0;
       const loadWeight = parseFloat(load.weight) || 0;
 
-      if (bidRadius > 0 && loadMiles > 0 && loadMiles > bidRadius) {
-        console.log(`[ACE:scanner] skip #${orderNo} — ${loadMiles}mi > ${bidRadius}mi`);
-        processedLoads.add(orderNo);
-        continue;
-      }
       if (maxWeight > 0 && loadWeight > 0 && loadWeight > maxWeight) {
         console.log(`[ACE:scanner] skip #${orderNo} — ${loadWeight}lbs > ${maxWeight}lbs`);
         processedLoads.add(orderNo);
         continue;
+      }
+
+      // Max load age filter — carrier configurable 10/30/60 min or off
+      const maxAge = parseInt(settings.max_load_age) || 0;
+      if (maxAge > 0 && load.post_date) {
+        try {
+          const posted = new Date(load.post_date);
+          const ageMin = (Date.now() - posted.getTime()) / 60000;
+          if (ageMin > maxAge) {
+            console.log(`[ACE:scanner] skip #${orderNo} — ${Math.round(ageMin)}min old > ${maxAge}min limit`);
+            processedLoads.add(orderNo);
+            skipped++;
+            continue;
+          }
+        } catch(e) {}
+      }
+
+      // Load type filter — match cells[1] load type OR cells[6] vehicle size
+      // against carrier's selected load types in ACE settings
+      const targetTypes = (settings.target_load_types && settings.target_load_types.length > 0)
+        ? settings.target_load_types.map(t => t.toLowerCase().trim())
+        : [];
+
+      if (targetTypes.length > 0) {
+        const loadType    = (load.load_type    || '').toLowerCase().trim();
+        const vehicleSize = (load.vehicle_size || '').toLowerCase().trim();
+        const matched = targetTypes.some(t =>
+          loadType.includes(t) || t.includes(loadType) ||
+          vehicleSize.includes(t) || t.includes(vehicleSize)
+        );
+        if (!matched) {
+          console.log(`[ACE:scanner] skip #${orderNo} — type "${load.load_type}" / vehicle "${load.vehicle_size}" not in carrier selections`);
+          processedLoads.add(orderNo);
+          skipped++;
+          continue;
+        }
       }
 
       processedLoads.add(orderNo);

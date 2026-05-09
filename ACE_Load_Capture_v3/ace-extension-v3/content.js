@@ -25,7 +25,8 @@
         'search_from_city', 'search_from_state', 'search_to_states',
         'search_to_city', 'pickup_radius', 'bid_radius', 'max_weight',
         'target_load_types', 'ace_paused', 'ace_locked',
-        'operating_start', 'operating_end', 'carrier_uuid', 'gmail_address'
+        'operating_start', 'operating_end', 'carrier_uuid', 'gmail_address',
+        'max_load_age'
       ], resolve);
     });
   }

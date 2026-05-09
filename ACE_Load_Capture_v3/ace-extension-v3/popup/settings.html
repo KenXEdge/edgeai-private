@@ -120,6 +120,24 @@ body{width:340px;background:#0a0a0a;color:#fff;font-family:'Barlow',sans-serif;f
   <div class="filter-summary" id="filter-summary">
     Alert when: <strong>≤ 300 mi</strong> · <strong>≤ 9,000 lbs</strong> · TO state matched
   </div>
+
+  <div class="field" style="margin-top:8px">
+    <label>Max Load Age (skip loads older than)</label>
+    <div style="display:flex;gap:8px;margin-top:5px;align-items:center">
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,0.5);cursor:pointer">
+        <input type="radio" name="max-age" id="age-off" value="0" style="accent-color:#E8A020"> Off
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,0.5);cursor:pointer">
+        <input type="radio" name="max-age" id="age-10" value="10" style="accent-color:#E8A020"> 10 min
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,0.5);cursor:pointer">
+        <input type="radio" name="max-age" id="age-30" value="30" style="accent-color:#E8A020"> 30 min
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,0.5);cursor:pointer">
+        <input type="radio" name="max-age" id="age-60" value="60" style="accent-color:#E8A020"> 60 min
+      </label>
+    </div>
+  </div>
 </div>
 
 <!-- Load Types -->
