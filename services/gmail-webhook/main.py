@@ -1811,6 +1811,50 @@ def log_sylectus_activity():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/update-broker-win', methods=['POST'])
+def update_broker_win():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data'}), 400
+
+        carrier_id  = data.get('carrier_id')
+        email       = data.get('email')
+        if not carrier_id or not email:
+            return jsonify({'error': 'Missing carrier_id or email'}), 400
+
+        now = datetime.utcnow().isoformat()
+
+        # Find existing broker row for this carrier + email
+        existing = supabase_client().table('brokers') \
+            .select('id, load_count') \
+            .eq('carrier_id', carrier_id) \
+            .eq('email', email) \
+            .execute()
+
+        if existing.data:
+            row = existing.data[0]
+            new_count = (row.get('load_count') or 0) + 1
+            supabase_client().table('brokers') \
+                .update({
+                    'load_count':            new_count,
+                    'last_load_date':        data.get('last_load_date', now),
+                    'last_load_origin':      data.get('last_load_origin'),
+                    'last_load_destination': data.get('last_load_destination')
+                }) \
+                .eq('id', row['id']) \
+                .execute()
+            logging.info(f'[update-broker-win] Updated broker {email} — load_count: {new_count}')
+        else:
+            logging.warning(f'[update-broker-win] Broker not found: {email} for carrier {carrier_id}')
+
+        return jsonify({'status': 'ok'}), 200
+
+    except Exception as e:
+        logging.error(f'[update-broker-win] Error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)

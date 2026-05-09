@@ -82,6 +82,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  if (message.action === 'log_win') {
+    _getSettings().then(settings => {
+      const load = message.load || {};
+      const payload = _buildMetricsPayload(load, 'win', load.bid_amount, {
+        t1: load.t1_posted_at,  t2: load.t2_detected_at,
+        t3: load.t3_alerted_at, t4: load.t4_reviewed_at,
+        t5: load.t5_decision_at, t6: load.t6_sent_at
+      });
+      payload.won_at = load.won_at || new Date().toISOString();
+      _logMetrics(payload, settings);
+      _updateBrokerOnWin(load, settings);
+    });
+    sendResponse({ status: 'ok' });
+    return false;
+  }
+
+  if (message.action === 'log_delete') {
+    _getSettings().then(settings => {
+      const load = message.load || {};
+      const payload = _buildMetricsPayload(load, 'deleted', load.bid_amount, {
+        t1: load.t1_posted_at,  t2: load.t2_detected_at,
+        t3: load.t3_alerted_at, t4: load.t4_reviewed_at,
+        t5: load.t5_decision_at, t6: load.t6_sent_at
+      });
+      _logMetrics(payload, settings);
+    });
+    sendResponse({ status: 'ok' });
+    return false;
+  }
+
   // Pass on load — log metrics
   if (message.action === 'pass_load') {
     _getSettings().then(settings => {
@@ -459,6 +489,30 @@ async function _upsertBroker(load, settings) {
     console.log(`[ACE] ✓ Broker upserted — ${load.broker_email}`);
   } catch(e) {
     console.warn('[ACE] Broker upsert failed:', e.message);
+  }
+}
+
+async function _updateBrokerOnWin(load, settings) {
+  const uuid = settings.carrier_uuid;
+  if (!uuid || !load.broker_email) return;
+  const now = new Date().toISOString();
+  const payload = {
+    carrier_id:            uuid,
+    email:                 load.broker_email,
+    load_count:            1,
+    last_load_date:        now,
+    last_load_origin:      `${load.pickup_city||''} ${load.pickup_state||''}`.trim(),
+    last_load_destination: `${load.delivery_city||''} ${load.delivery_state||''}`.trim()
+  };
+  try {
+    await fetch('https://edgeai-gmail-webhook-417422203146.us-central1.run.app/update-broker-win', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    console.log(`[ACE] ✓ Broker win logged — ${load.broker_email}`);
+  } catch(e) {
+    console.warn('[ACE] Broker win update failed:', e.message);
   }
 }
 
