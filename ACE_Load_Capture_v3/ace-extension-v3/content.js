@@ -5,6 +5,7 @@
 
 (function() {
   'use strict';
+  let _stopped = false;
 
   let _activityPollerStarted = false;
   let _rescheduleSettings = null;
@@ -75,6 +76,7 @@
     const delay = Math.floor(Math.random() * (45000 - 10000 + 1)) + 10000;
     console.log(`[ACE] Next scan in ${Math.round(delay / 1000)}s`);
     setTimeout(async () => {
+      if (_stopped) return;
       if (!isLoadBoardPage()) return;
       const s = await getSettings();
       if (s.ace_paused) return;
@@ -178,6 +180,13 @@
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
+    if (message.action === 'ace_stop') {
+      _stopped = true;
+      console.log('[ACE] ⏸ Stopped by Pause command');
+      sendResponse({ status: 'stopped' });
+      return false;
+    }
+
     if (message.action === 'keepalive') {
       ACEModal.simulateActivity();
       ACEModal.dismiss();
@@ -198,8 +207,12 @@
     }
 
     if (message.action === 'update_search' || message.action === 'run_search') {
+      _stopped = false;
       ACESearch.reset();
-      getSettings().then(s => ACESearch.setup(s));
+      getSettings().then(s => {
+        console.log('[ACE] update_search — rerunning setup with new params');
+        ACESearch.setup(s);
+      });
       sendResponse({ status: 'ok' });
       return false;
     }

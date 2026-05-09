@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACE Load Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;900&family=Barlow:wght@400;500;600&family=Share+Tech+Mono&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0a0a0a;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;overflow:hidden}
+
+:root{
+  --gold:#E8A020;
+  --gold-dim:rgba(232,160,32,0.12);
+  --border:rgba(255,255,255,0.07);
+  --green:#2ecc71;
+  --red:#e74c3c;
+  --blue:#5ba3e0;
+}
+
+/* HEADER */
+.header{
+  background:#111;
+  border-bottom:2px solid var(--gold);
+  padding:10px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-shrink:0;
+}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--gold);letter-spacing:2px;text-transform:uppercase}
+.status-pill{display:flex;align-items:center;gap:6px;background:#1a1a1a;border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;color:rgba(255,255,255,0.5)}
+.status-dot{width:7px;height:7px;border-radius:50%}
+.status-dot.green{background:var(--green);box-shadow:0 0 5px rgba(46,204,113,0.6)}
+.status-dot.amber{background:var(--gold)}
+.status-dot.red{background:var(--red)}
+
+/* METRICS BAR */
+.metrics-bar{
+  background:#111;
+  border-bottom:1px solid var(--border);
+  padding:10px 20px;
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  gap:8px;
+  flex-shrink:0;
+}
+.metric{
+  background:#1a1a1a;
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:8px 10px;
+  text-align:center;
+}
+.metric-val{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:#fff;line-height:1}
+.metric-val.gold{color:var(--gold)}
+.metric-val.green{color:var(--green)}
+.metric-val.red{color:var(--red)}
+.metric-label{font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;margin-top:3px}
+
+/* LOAD TABLE */
+.table-wrap{flex:1;overflow-y:auto;padding:0}
+.load-table{width:100%;border-collapse:collapse}
+.load-table thead{position:sticky;top:0;z-index:10}
+.load-table th{
+  background:#111;
+  padding:8px 12px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.4);
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+  text-align:left;
+}
+.load-table td{
+  padding:9px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  vertical-align:middle;
+  white-space:nowrap;
+}
+.load-table tr:hover td{background:rgba(255,255,255,0.03)}
+.load-table tr.new-load td{animation:flashRow 1s ease-out}
+@keyframes flashRow{
+  0%{background:rgba(232,160,32,0.2)}
+  100%{background:transparent}
+}
+
+.lane{font-weight:600;font-size:13px}
+.sub{font-size:11px;color:rgba(255,255,255,0.4);margin-top:1px}
+.broker-name{font-weight:600}
+.broker-email{font-size:11px;color:rgba(232,160,32,0.7)}
+.miles-val{font-family:'Share Tech Mono',monospace;color:var(--gold)}
+.rate-val{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--gold)}
+.time-val{font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(255,255,255,0.4)}
+
+/* TIER BADGE */
+.tier{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:3px;display:inline-block}
+.tier.elite{background:rgba(46,204,113,0.15);color:var(--green);border:1px solid rgba(46,204,113,0.3)}
+.tier.good{background:rgba(232,160,32,0.15);color:var(--gold);border:1px solid rgba(232,160,32,0.3)}
+.tier.coaching{background:rgba(231,76,60,0.15);color:var(--red);border:1px solid rgba(231,76,60,0.3)}
+.tier.pending{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3);border:1px solid var(--border)}
+
+/* ACTION BUTTONS */
+.actions{display:flex;gap:6px;align-items:center}
+.btn-pass{background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.3);color:var(--red);border-radius:4px;padding:5px 10px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;white-space:nowrap}
+.btn-pass:hover{background:rgba(231,76,60,0.25)}
+.btn-draft{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:rgba(255,255,255,0.6);border-radius:4px;padding:5px 10px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer}
+.btn-draft:hover{background:rgba(255,255,255,0.1);color:#fff}
+.btn-send{background:var(--gold);border:none;color:#000;border-radius:4px;padding:5px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;cursor:pointer}
+.btn-send:hover{background:#d4911c}
+.rate-input{background:#1a1a1a;border:1px solid rgba(232,160,32,0.3);border-radius:4px;padding:4px 8px;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;width:70px;outline:none}
+.rate-input:focus{border-color:var(--gold)}
+
+/* EMPTY STATE */
+.empty{display:flex;align-items:center;justify-content:center;height:300px;flex-direction:column;gap:12px;color:rgba(255,255,255,0.2)}
+.empty-icon{font-size:48px;opacity:0.3}
+.empty-text{font-family:'Barlow Condensed',sans-serif;font-size:18px;letter-spacing:2px;text-transform:uppercase}
+
+.page{display:flex;flex-direction:column;height:100vh}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">⚡ ACE Dashboard</div>
+      <div class="status-pill">
+        <div class="status-dot green" id="status-dot"></div>
+        <span id="status-text">Watching Sylectus</span>
+      </div>
+    </div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.3)" id="last-scan">Last scan: —</div>
+  </div>
+
+  <!-- METRICS BAR -->
+  <div class="metrics-bar">
+    <div class="metric">
+      <div class="metric-val" id="m-scanned">0</div>
+      <div class="metric-label">Scanned</div>
+    </div>
+    <div class="metric">
+      <div class="metric-val gold" id="m-qualified">0</div>
+      <div class="metric-label">Qualified</div>
+    </div>
+    <div class="metric">
+      <div class="metric-val green" id="m-bids">0</div>
+      <div class="metric-label">Bids Sent</div>
+    </div>
+    <div class="metric">
+      <div class="metric-val" id="m-passes">0</div>
+      <div class="metric-label">Passed</div>
+    </div>
+    <div class="metric">
+      <div class="metric-val gold" id="m-detect">—</div>
+      <div class="metric-label">Avg Detect</div>
+    </div>
+    <div class="metric">
+      <div class="metric-val gold" id="m-alert">—</div>
+      <div class="metric-label">Avg Alert</div>
+    </div>
+    <div class="metric">
+      <div class="metric-val green" id="m-bid-speed">—</div>
+      <div class="metric-label">Avg Bid Speed</div>
+    </div>
+    <div class="metric">
+      <div class="metric-val green" id="m-ftb-rate">—</div>
+      <div class="metric-label">First to Bid</div>
+    </div>
+  </div>
+
+  <!-- LOAD TABLE -->
+  <div class="table-wrap">
+    <div class="empty" id="empty-state">
+      <div class="empty-icon">📋</div>
+      <div class="empty-text">ACE is watching — loads appear here</div>
+    </div>
+    <table class="load-table" id="load-table" style="display:none">
+      <thead>
+        <tr>
+          <th>Lane</th>
+          <th>Broker</th>
+          <th>Order</th>
+          <th>Miles</th>
+          <th>Type</th>
+          <th>Wt</th>
+          <th>Credit</th>
+          <th>Suggested</th>
+          <th>Bid Speed</th>
+          <th>Tier</th>
+          <th>Your Bid</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="load-tbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>

@@ -43,7 +43,9 @@ function saveSettings() {
   const toSave = {};
   Object.entries(KEYS).forEach(([fieldId, key]) => {
     const input = el(fieldId);
-    if (input && input.value.trim()) toSave[key] = input.value.trim();
+    if (input) {
+      toSave[key] = input.value.trim();
+    }
   });
 
   // Parse to-states into array
@@ -56,9 +58,19 @@ function saveSettings() {
   toSave.target_load_types = [...document.querySelectorAll('.lt-cb:checked')].map(cb => cb.value);
 
   chrome.storage.local.set(toSave, () => {
+    const btn = el('save-btn');
+    const original = btn.textContent;
+    btn.textContent = '✓ Settings Saved';
+    btn.style.background = '#2ecc71';
+    btn.style.color = '#000';
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.background = '';
+      btn.style.color = '';
+    }, 2500);
     const msg = el('saved-msg');
     msg.classList.add('show');
-    setTimeout(() => msg.classList.remove('show'), 2000);
+    setTimeout(() => msg.classList.remove('show'), 2500);
     updateSearchPreview();
     updateFilterSummary();
     updateLoadTypeSummary();
@@ -81,16 +93,18 @@ function updateRPM() {
 }
 
 function updateSearchPreview() {
-  const city   = el('from-city')?.value     || 'Dallas';
-  const state  = el('from-state')?.value    || 'TX';
-  const to     = el('to-states')?.value     || 'TX, OK';
-  const radius = el('pickup-radius')?.value || '50';
+  const city   = el('from-city')?.value.trim()     || '';
+  const state  = el('from-state')?.value.trim()    || '';
+  const to     = el('to-states')?.value.trim()     || '';
+  const radius = el('pickup-radius')?.value.trim() || '';
   const checked = [...document.querySelectorAll('.lt-cb:checked')].map(cb =>
     cb.parentElement.textContent.trim()
   );
   const typesStr = checked.length ? checked.join(', ') : '<em style="color:#e74c3c">none selected</em>';
+  const fromPart = [city, state].filter(Boolean).join(', ');
+  const radiusPart = radius ? `${radius}mi radius` : '';
   el('search-preview').innerHTML =
-    `Search: <strong>${city}, ${state}</strong> → <strong>${to}</strong> | <strong>${radius}mi</strong> radius<br>` +
+    `Search: <strong>${fromPart || 'any'}</strong> → <strong>${to || 'any'}</strong>${radiusPart ? ' | <strong>' + radiusPart + '</strong>' : ''}<br>` +
     `<span style="color:rgba(255,255,255,0.35);font-size:10px;">Types: ${typesStr}</span>`;
 }
 
@@ -148,6 +162,11 @@ function togglePause() {
     const newState = !r.ace_paused;
     chrome.storage.local.set({ ace_paused: newState }, () => {
       el('pause-btn').textContent = newState ? '▶ Resume ACE' : '⏸ Pause ACE';
+      if (newState) {
+        chrome.tabs.query({ url: 'https://www6.sylectus.com/*' }, (tabs) => {
+          tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, { action: 'ace_stop' }).catch(() => {}));
+        });
+      }
       updateStatus(newState ? 'paused' : 'active');
 
       if (!newState) {

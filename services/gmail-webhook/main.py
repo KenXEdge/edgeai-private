@@ -1762,6 +1762,55 @@ def stripe_webhook():
 
     return jsonify({"status": "ok"})
 
+
+@app.route('/log-sylectus-activity', methods=['POST'])
+def log_sylectus_activity():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data'}), 400
+        carrier_id = data.get('carrier_id')
+        if not carrier_id:
+            return jsonify({'error': 'Missing carrier_id'}), 400
+        payload = {
+            'carrier_id':           carrier_id,
+            'order_no':             data.get('order_no'),
+            'broker_name':          data.get('broker_name'),
+            'broker_email':         data.get('broker_email'),
+            'pickup_city':          data.get('pickup_city'),
+            'pickup_state':         data.get('pickup_state'),
+            'delivery_city':        data.get('delivery_city'),
+            'delivery_state':       data.get('delivery_state'),
+            'miles':                data.get('miles'),
+            'load_type':            data.get('load_type'),
+            'suggested_rate':       data.get('suggested_rate'),
+            'bid_amount':           data.get('bid_amount'),
+            'decision':             data.get('decision'),
+            'pass_count':           data.get('pass_count', 0),
+            't1_posted_at':         data.get('t1_posted_at'),
+            't2_detected_at':       data.get('t2_detected_at'),
+            't3_alerted_at':        data.get('t3_alerted_at'),
+            't4_reviewed_at':       data.get('t4_reviewed_at'),
+            't5_decision_at':       data.get('t5_decision_at'),
+            't6_sent_at':           data.get('t6_sent_at'),
+            'detection_speed_sec':  data.get('detection_speed_sec'),
+            'alert_speed_sec':      data.get('alert_speed_sec'),
+            'response_time_sec':    data.get('response_time_sec'),
+            'bid_speed_sec':        data.get('bid_speed_sec'),
+            'performance_tier':     data.get('performance_tier')
+        }
+        payload = {k: v for k, v in payload.items() if v is not None}
+        sb = supabase_client()
+        result = sb.table('ace_sylectus_activity').upsert(
+            payload,
+            on_conflict='carrier_id,order_no'
+        ).execute()
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        logging.error(f'[log-sylectus-activity] Error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)

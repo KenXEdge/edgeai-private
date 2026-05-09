@@ -66,9 +66,7 @@ const ACESearch = (() => {
     const fromCityInput = doc.getElementById('fromCity') ||
                           doc.querySelector('input[name="fromcity"]');
     if (fromCityInput) {
-      const val = (settings.search_from_city && settings.search_from_city.trim() !== '')
-        ? settings.search_from_city.trim()
-        : '';
+      const val = settings.search_from_city || '';
       fromCityInput.value = val;
       fromCityInput.dispatchEvent(new Event('change', { bubbles: true }));
       console.log(`[ACE:search] ✓ FROM city: "${val}"`);
@@ -125,9 +123,7 @@ const ACESearch = (() => {
     const milesInput = doc.getElementById('milesPickUp') ||
                        doc.querySelector('input[name="miles"]');
     if (milesInput) {
-      const val = (settings.pickup_radius && String(settings.pickup_radius).trim() !== '' && settings.pickup_radius !== '0')
-        ? String(settings.pickup_radius)
-        : '';
+      const val = settings.pickup_radius ? String(settings.pickup_radius) : '';
       milesInput.value = val;
       milesInput.dispatchEvent(new Event('change', { bubbles: true }));
       console.log(`[ACE:search] ✓ Pickup radius: "${val || 'cleared'}"`);

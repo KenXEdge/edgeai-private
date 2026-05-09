@@ -4,7 +4,7 @@
 
 const KEEPALIVE_MINUTES = 3;
 const SYLECTUS_URL = 'https://www6.sylectus.com/Main.aspx?page=II14_managepostedloads.asp?loadboard=True';
-const POPUP_DEDUP_MS = 60 * 60 * 1000; // 1 hour — reduced from 4 hours
+const POPUP_DEDUP_MS = 15 * 60 * 1000; // 15 minutes
 let _popupOffsetCount = 0;
 
 // ─── STARTUP ─────────────────────────────────────────────────────────────────
@@ -392,7 +392,8 @@ function _buildMetricsPayload(load, decision, bidAmount, timestamps) {
     response_time_sec:   diff(t3, t5),
     bid_speed_sec:       bidSpeedSec,
     performance_tier:    tier,
-    meets_target:        bidSpeedSec !== null && bidSpeedSec <= 45
+    meets_target:        bidSpeedSec !== null && bidSpeedSec <= 45,
+    pass_count:          load.pass_count || 0
   };
 }
 
@@ -409,7 +410,7 @@ async function _logMetrics(payload, settings) {
   });
   // Send to Cloud Run
   try {
-    await fetch('https://edgeai-gmail-webhook-417422203146.us-central1.run.app/log-load-activity', {
+    await fetch('https://edgeai-gmail-webhook-417422203146.us-central1.run.app/log-sylectus-activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
