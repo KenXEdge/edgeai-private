@@ -9,6 +9,10 @@ __pycache__/
 *.pyc
 .venv/
 
+# Chrome extension build artifacts
+*.crx
+*.pem
+
 # OS
 .DS_Store
 Thumbs.db
