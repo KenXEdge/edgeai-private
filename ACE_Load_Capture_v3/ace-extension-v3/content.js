@@ -6,6 +6,7 @@
 (function() {
   'use strict';
   let _stopped = false;
+  let _initialized = false;
 
   let _activityPollerStarted = false;
   let _rescheduleSettings = null;
@@ -99,6 +100,8 @@
   // ─── MAIN INIT ─────────────────────────────────────────────────────────────
 
   async function init() {
+    if (_initialized) return;
+    _initialized = true;
     console.log(`[ACE] init — ${window.location.href.slice(-60)}`);
     await ACEUtils.sleep(4000);
 
@@ -227,7 +230,10 @@
     for (const m of mutations) {
       if (m.addedNodes.length > 0) {
         if (ACEModal.dismiss() && isLoadBoardPage()) {
-          ACEUtils.randomDelay(1500, 2500).then(() => init());
+          ACEUtils.randomDelay(1500, 2500).then(() => {
+            _initialized = false; // allow re-init after modal cleared
+            init();
+          });
         }
         break;
       }

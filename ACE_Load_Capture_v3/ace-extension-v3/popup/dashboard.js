@@ -6,6 +6,7 @@ const PASS_BYPASS_COUNT = 2;
 const PASS_BYPASS_MS    = 72 * 60 * 60 * 1000;
 const DEDUP_MS          = 15 * 60 * 1000;
 let sortAsc = false;
+let passCount = 0; // authoritative in-memory pass tally for this session
 
 function el(id) { return document.getElementById(id); }
 function fmt(ts) { return ts ? new Date(ts).toLocaleTimeString() : '—'; }
@@ -27,6 +28,8 @@ function loadState() {
     bidLoads    = r.ace_bid_loads    || [];
     winLoads    = r.ace_win_loads    || [];
     passTracker = r.ace_pass_tracker || {};
+    passCount = Object.values(passTracker).reduce((sum, t) => sum + (t.count || 0), 0);
+    expireOldLoads();
     renderAll();
     updateMetrics(r.ace_metrics_log || []);
   });
@@ -76,9 +79,9 @@ function renderQueue() {
       <td>
         <div class="actions">
           ${load._draft ? '<span class="draft-badge">DRAFT</span>' : ''}
-          <button class="btn-p" onclick="doPass('${load.order_no}')">✕ Pass</button>
-          <button class="btn-d" onclick="doDraft('${load.order_no}')">Draft</button>
-          <button class="btn-s" onclick="doSend('${load.order_no}')">⚡ Send</button>
+          <button class="btn-p" data-action="pass" data-order="${load.order_no}">✕ Pass</button>
+          <button class="btn-d" data-action="draft" data-order="${load.order_no}">Draft Bid</button>
+          <button class="btn-s" data-action="send" data-order="${load.order_no}">⚡ Send Bid</button>
         </div>
       </td>
     </tr>
@@ -102,8 +105,8 @@ function renderBids() {
       <td style="font-size:11px;color:rgba(255,255,255,0.35)">${fmt(load.bid_sent_at)}</td>
       <td>
         <div class="actions">
-          <button class="btn-w" onclick="doWin('${load.order_no}')">✓ WIN</button>
-          <button class="btn-x" onclick="doDelete('${load.order_no}')">DELETE</button>
+          <button class="btn-w" data-action="win" data-order="${load.order_no}">✓ WIN</button>
+          <button class="btn-x" data-action="pass" data-order="${load.order_no}">✕ PASS</button>
         </div>
       </td>
     </tr>
@@ -135,13 +138,57 @@ function updateCounts() {
   el('wins-count').textContent  = winLoads.length;
 }
 
+// ─── EXPIRY ───────────────────────────────────────────────────────────────────
+
+const EXPIRY_MS = 2 * 60 * 60 * 1000; // 2 hours from T2 detection
+
+function expireOldLoads() {
+  const now = Date.now();
+  const expired = queueLoads.filter(l => {
+    const detected = l.t2_detected_at ? new Date(l.t2_detected_at).getTime() : (l.captured_at || 0);
+    return (now - detected) >= EXPIRY_MS;
+  });
+  if (expired.length === 0) return;
+
+  // Remove expired from queue
+  queueLoads = queueLoads.filter(l => {
+    const detected = l.t2_detected_at ? new Date(l.t2_detected_at).getTime() : (l.captured_at || 0);
+    return (now - detected) < EXPIRY_MS;
+  });
+
+  // Log each as a pass — background guards against duplicate order entries
+  expired.forEach(load => {
+    // passCount incremented by pass_load message listener — do not increment here
+    if (!passTracker[load.order_no]) passTracker[load.order_no] = { count: 0, lastPassAt: null };
+    passTracker[load.order_no].count++;
+    passTracker[load.order_no].lastPassAt = now;
+    chrome.runtime.sendMessage({
+      action: 'pass_load',
+      source: 'expiry',
+      load: { ...load, t5_decision_at: new Date().toISOString() }
+    });
+  });
+
+  saveState();
+  console.log(`[ACE Dashboard] Expired ${expired.length} unactioned loads — logged as passes`);
+}
+
 // ─── ACTIONS ──────────────────────────────────────────────────────────────────
 
 function doPass(orderNo) {
   const load = queueLoads.find(l => String(l.order_no) === String(orderNo));
   if (!load) return;
 
-  // Flash orange
+  // Immediate visual feedback on the button
+  const btn = document.querySelector(`button[data-action="pass"][data-order="${orderNo}"]`);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '✕ Passed';
+    btn.style.background = 'rgba(231,76,60,0.35)';
+    btn.style.color = '#fff';
+  }
+
+  // Flash orange then remove — passCount incremented by message listener only
   const row = el(`qrow-${orderNo}`);
   if (row) {
     row.classList.add('flash-pass');
@@ -153,14 +200,11 @@ function doPass(orderNo) {
     }, 2000);
   }
 
-  // Track pass count
-  if (!passTracker[orderNo]) passTracker[orderNo] = { count: 0, lastPassAt: null };
-  passTracker[orderNo].count++;
-  passTracker[orderNo].lastPassAt = Date.now();
-
-  // Send to background
+  // Send to background — background broadcasts pass_load back to dashboard listener
+  // which is the single place passCount is incremented
   chrome.runtime.sendMessage({
     action: 'pass_load',
+    source: 'dashboard',
     load: { ...load, t5_decision_at: new Date().toISOString() }
   });
 }
@@ -172,11 +216,12 @@ function doDraft(orderNo) {
   if (!load) return;
   const t5 = new Date().toISOString();
 
-  // Mark as draft in queue
-  const idx = queueLoads.findIndex(l => String(l.order_no) === String(orderNo));
-  if (idx > -1) queueLoads[idx]._draft = true;
+  // Draft Bid = a bid — move to Bids Sent immediately, same as Send Bid
+  queueLoads = queueLoads.filter(l => String(l.order_no) !== String(orderNo));
+  bidLoads.unshift({ ...load, bid_amount: amount, bid_sent_at: t5, _drafted: true });
+  if (bidLoads.length > 100) bidLoads.length = 100;
   saveState();
-  renderQueue();
+  renderAll();
 
   chrome.runtime.sendMessage({
     action: 'create_draft',
@@ -229,16 +274,18 @@ function doWin(orderNo) {
   });
 }
 
-function doDelete(orderNo) {
+function doPassBid(orderNo) {
+  const load = bidLoads.find(l => String(l.order_no) === String(orderNo));
+  if (!load) return;
   bidLoads = bidLoads.filter(l => String(l.order_no) !== String(orderNo));
   saveState();
   renderBids();
   updateCounts();
 
-  // Log delete to Supabase
+  // Log as pass — bid was sent but load was lost
   chrome.runtime.sendMessage({
     action: 'log_delete',
-    load: { order_no: orderNo }
+    load: { ...load, order_no: orderNo }
   });
 }
 
@@ -255,11 +302,11 @@ function updateMetrics(log) {
   const passes = todayLog.filter(m => m.decision === 'pass');
   const wins   = todayLog.filter(m => m.decision === 'win');
 
-  el('m-scanned').textContent  = (queueLoads.length + bidLoads.length + winLoads.length + passes.length);
+  el('m-scanned').textContent   = (queueLoads.length + bidLoads.length + winLoads.length + passCount);
   el('m-qualified').textContent = todayLog.length;
-  el('m-bids').textContent     = bids.length;
-  el('m-passes').textContent   = passes.length;
-  el('m-wins').textContent     = wins.length;
+  el('m-bids').textContent      = bids.length;
+  el('m-passes').textContent    = passCount;
+  el('m-wins').textContent      = wins.length;
 
   const avg = (arr, key) => {
     const vals = arr.map(m => m[key]).filter(v => v != null);
@@ -276,11 +323,48 @@ function updateMetrics(log) {
 
 // ─── SORT ─────────────────────────────────────────────────────────────────────
 
-el('sort-btn').addEventListener('click', () => {
-  sortAsc = !sortAsc;
-  el('sort-btn').textContent = sortAsc ? '⬆ Oldest First' : '⬇ Newest First';
-  renderQueue();
-});
+// ─── EVENT DELEGATION — ALL BUTTON CLICKS ─────────────────────────────────────
+// Inline onclick can't reach module-scope functions in extension pages.
+// Delegate from the stable section containers instead.
+
+function _wireTableDelegation() {
+  // Queue tbody — pass / draft / send
+  const qTbody = el('queue-tbody');
+  if (qTbody) {
+    qTbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action  = btn.dataset.action;
+      const orderNo = btn.dataset.order;
+      if (action === 'pass')  doPass(orderNo);
+      if (action === 'draft') doDraft(orderNo);
+      if (action === 'send')  doSend(orderNo);
+    });
+  }
+
+  // Bids tbody — win / pass
+  const bTbody = el('bids-tbody');
+  if (bTbody) {
+    bTbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action  = btn.dataset.action;
+      const orderNo = btn.dataset.order;
+      if (action === 'win')  doWin(orderNo);
+      if (action === 'pass') doPassBid(orderNo);
+    });
+  }
+
+  // Sort button
+  const sortBtn = el('sort-btn');
+  if (sortBtn) {
+    sortBtn.addEventListener('click', () => {
+      sortAsc = !sortAsc;
+      sortBtn.textContent = sortAsc ? '⬆ Oldest First' : '⬇ Newest First';
+      renderQueue();
+    });
+  }
+}
 
 // ─── MESSAGES ─────────────────────────────────────────────────────────────────
 
@@ -296,18 +380,81 @@ chrome.runtime.onMessage.addListener((message) => {
       updateMetrics();
     }
   }
+
+  // Popup or background confirmed bid sent — move to Bids Sent
   if (message.action === 'bid_sent') {
-    // Sync from popup bid action
-    queueLoads = queueLoads.filter(l => String(l.order_no) !== String(message.load.order_no));
-    bidLoads.unshift({ ...message.load, bid_amount: message.bid_amount, bid_sent_at: new Date().toISOString() });
-    saveState();
-    renderAll();
+    const orderNo = message.load?.order_no;
+    if (!orderNo) return;
+    const load = queueLoads.find(l => String(l.order_no) === String(orderNo));
+    if (load) {
+      queueLoads = queueLoads.filter(l => String(l.order_no) !== String(orderNo));
+      bidLoads.unshift({ ...load, bid_amount: message.bid_amount, bid_sent_at: new Date().toISOString() });
+      if (bidLoads.length > 100) bidLoads.length = 100;
+      saveState();
+      renderAll();
+    }
+  }
+
+  // Background confirmed draft created — move to Bids Sent same as Send Bid
+  if (message.action === 'draft_created') {
+    const orderNo = message.order_no;
+    const load = queueLoads.find(l => String(l.order_no) === String(orderNo));
+    if (load) {
+      queueLoads = queueLoads.filter(l => String(l.order_no) !== String(orderNo));
+      bidLoads.unshift({ ...load, bid_amount: load.suggested_rate, bid_sent_at: new Date().toISOString(), _drafted: true });
+      if (bidLoads.length > 100) bidLoads.length = 100;
+      saveState();
+      renderAll();
+    }
+  }
+
+  // Pass from popup OR dashboard broadcast — single source of truth for passCount
+  if (message.action === 'pass_load') {
+    const orderNo = message.order_no;
+    // Increment authoritative pass counter
+    passCount++;
+    el('m-passes').textContent = passCount;
+    // If source is dashboard the row is already animating out — skip duplicate removal
+    if (message.source === 'dashboard') return;
+    const row = el(`qrow-${orderNo}`);
+    if (row) {
+      row.classList.add('flash-pass');
+      setTimeout(() => {
+        queueLoads = queueLoads.filter(l => String(l.order_no) !== String(orderNo));
+        saveState();
+        renderQueue();
+        updateCounts();
+        updateMetrics();
+      }, 2000);
+    } else {
+      queueLoads = queueLoads.filter(l => String(l.order_no) !== String(orderNo));
+      saveState();
+      renderQueue();
+      updateCounts();
+      updateMetrics();
+    }
+  }
+
+  // Background or popup reported bid failure — move load back to queue
+  if (message.action === 'bid_failed') {
+    const orderNo = message.order_no;
+    const load = bidLoads.find(l => String(l.order_no) === String(orderNo));
+    if (load) {
+      bidLoads = bidLoads.filter(l => String(l.order_no) !== String(orderNo));
+      const { bid_amount, bid_sent_at, ...restored } = load;
+      queueLoads.unshift({ ...restored, _draft: false });
+      saveState();
+      renderAll();
+      console.log(`[ACE Dashboard] bid_failed — order ${orderNo} moved back to queue`);
+    }
   }
 });
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  _wireTableDelegation();
   loadState();
   setInterval(() => updateMetrics(), 15000);
+  setInterval(() => { expireOldLoads(); renderQueue(); updateCounts(); el('m-passes').textContent = passCount; }, 5 * 60 * 1000);
 });

@@ -4,17 +4,17 @@
 <meta charset="UTF-8">
 <title>ACE — Load Alert</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;500;600&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@200;400;500&family=Share+Tech+Mono&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:440px;background:#0d0d0d;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;overflow:hidden}
 .header{background:#111;border-bottom:3px solid #E8A020;padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:#E8A020;letter-spacing:2px}
+.logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:500;color:#E8A020;letter-spacing:2px}
 .badge{font-size:9px;color:rgba(255,255,255,0.35);letter-spacing:2px;text-transform:uppercase}
-.new-tag{background:#E8A020;color:#000;font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:3px;text-transform:uppercase;animation:pulse 1.5s ease-in-out infinite}
+.new-tag{background:#E8A020;color:#000;font-size:9px;font-weight:500;letter-spacing:1px;padding:2px 7px;border-radius:3px;text-transform:uppercase;animation:pulse 1.5s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .card{background:#141414;border:1px solid rgba(232,160,32,0.2);border-radius:6px;margin:10px}
 .lane{background:linear-gradient(135deg,#1a1200,#1a1a1a);padding:12px 14px;border-bottom:1px solid rgba(232,160,32,0.1)}
-.lane-cities{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.lane-cities{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:500;text-transform:uppercase;display:flex;align-items:center;gap:8px}
 .arrow{color:#E8A020}
 .lane-meta{display:flex;gap:14px;margin-top:6px}
 .chip{font-size:11px;color:rgba(255,255,255,0.45);display:flex;align-items:center;gap:3px}
@@ -22,36 +22,36 @@ html,body{width:440px;background:#0d0d0d;color:#fff;font-family:'Barlow',sans-se
 .details{padding:10px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;border-bottom:1px solid rgba(255,255,255,0.05)}
 .det{background:#1a1a1a;border-radius:3px;padding:7px 9px}
 .det-label{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
-.det-val{font-size:13px;font-weight:600;color:#fff}
+.det-val{font-size:13px;font-weight:400;color:#fff}
 .det-val.gold{color:#E8A020}
 .broker{padding:9px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05)}
-.b-name{font-weight:600;font-size:13px}
+.b-name{font-weight:400;font-size:13px}
 .b-email{font-size:11px;color:rgba(232,160,32,0.7);margin-top:2px}
 .b-meta{font-size:10px;color:rgba(255,255,255,0.35);margin-top:1px}
-.credit{font-size:11px;font-weight:700;padding:3px 8px;border-radius:3px;background:rgba(46,204,113,0.12);color:#2ecc71;border:1px solid rgba(46,204,113,0.2);text-align:right}
+.credit{font-size:11px;font-weight:500;padding:3px 8px;border-radius:3px;background:rgba(46,204,113,0.12);color:#2ecc71;border:1px solid rgba(46,204,113,0.2);text-align:right}
 .days{font-size:10px;color:rgba(255,255,255,0.3);margin-top:3px;text-align:right}
 .raw{padding:6px 14px;font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(255,255,255,0.25);line-height:1.4;border-bottom:1px solid rgba(255,255,255,0.05);max-height:52px;overflow:hidden;background:#0a0a0a}
 .rate-section{padding:12px 14px}
-.rate-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:8px}
+.rate-label{font-size:9px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:8px}
 .suggested{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.sug-amt{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:#E8A020;line-height:1}
+.sug-amt{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:500;color:#E8A020;line-height:1}
 .sug-calc{font-size:11px;color:rgba(255,255,255,0.25);line-height:1.5}
 .rate-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.prefix{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;color:rgba(255,255,255,0.25)}
-.rate-input{flex:1;background:#1a1a1a;border:2px solid rgba(232,160,32,0.3);border-radius:5px;padding:9px 12px;color:#E8A020;font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;outline:none;transition:border-color .2s;letter-spacing:1px}
+.prefix{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:500;color:rgba(255,255,255,0.25)}
+.rate-input{flex:1;background:#1a1a1a;border:2px solid rgba(232,160,32,0.3);border-radius:5px;padding:9px 12px;color:#E8A020;font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:500;outline:none;transition:border-color .2s;letter-spacing:1px}
 .rate-input:focus{border-color:#E8A020}
 .rate-input::placeholder{color:rgba(232,160,32,0.2)}
 .use-sug{font-size:10px;color:#E8A020;cursor:pointer;text-decoration:underline;opacity:0.6;white-space:nowrap}
 .use-sug:hover{opacity:1}
 .btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
-.btn-pass{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:#e74c3c;border-radius:4px;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.btn-pass{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:#e74c3c;border-radius:4px;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:500;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
 .btn-pass:hover{background:rgba(231,76,60,0.22)}
-.btn-draft{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);border-radius:4px;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.btn-draft{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);border-radius:4px;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:500;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
 .btn-draft:hover{background:rgba(255,255,255,0.1);color:#fff}
-.btn-send{background:#E8A020;border:none;color:#000;border-radius:4px;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.btn-send{background:#E8A020;border:none;color:#000;border-radius:4px;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:500;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
 .btn-send:hover{background:#d4911c}
 .btn-send:disabled{background:rgba(232,160,32,0.3);color:rgba(0,0,0,0.4);cursor:not-allowed}
-.feedback{text-align:center;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;display:none;border-radius:4px;margin:0 10px 10px}
+.feedback{text-align:center;padding:11px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:500;letter-spacing:1px;display:none;border-radius:4px;margin:0 10px 10px}
 .feedback.ok{background:rgba(46,204,113,0.12);color:#2ecc71;border:1px solid rgba(46,204,113,0.25)}
 .feedback.pass{background:rgba(231,76,60,0.08);color:#e74c3c;border:1px solid rgba(231,76,60,0.2)}
 .status-bar{background:#0a0a0a;padding:7px 14px;display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.04)}
@@ -120,8 +120,8 @@ html,body{width:440px;background:#0d0d0d;color:#fff;font-family:'Barlow',sans-se
   </div>
   <div class="btns">
     <button class="btn-pass" id="btn-pass">✕ Pass</button>
-    <button class="btn-draft" id="btn-draft">📋 Draft</button>
-    <button class="btn-send" id="btn-send">⚡ Send Now</button>
+    <button class="btn-draft" id="btn-draft">Draft Bid</button>
+    <button class="btn-send" id="btn-send">⚡ Send Bid</button>
   </div>
 </div>
 

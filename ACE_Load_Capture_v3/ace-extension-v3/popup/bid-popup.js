@@ -66,13 +66,16 @@ function getBidAmount() {
 
 // PASS
 el('btn-pass').addEventListener('click', () => {
+  if (!currentLoad) return;
   const t5 = new Date().toISOString();
+  el('btn-pass').disabled = true;
   chrome.runtime.sendMessage({
     action: 'pass_load',
     load: { ...currentLoad, t5_decision_at: t5 }
+  }, () => {
+    showFeedback('✕ Passed — watching for next load', 'pass');
+    setTimeout(() => window.close(), 1800);
   });
-  showFeedback('✕ Passed — watching for next load', 'pass');
-  setTimeout(() => window.close(), 1800);
 });
 
 // DRAFT
@@ -82,6 +85,32 @@ el('btn-draft').addEventListener('click', () => {
   const t5 = new Date().toISOString();
   el('btn-draft').disabled = true;
   el('btn-draft').textContent = 'Creating...';
+
+  // Listen for background confirmation
+  const handler = (message) => {
+    if (message.action === 'draft_created' && String(message.order_no) === String(currentLoad.order_no)) {
+      chrome.runtime.onMessage.removeListener(handler);
+      showFeedback('📋 Draft Bid created in Gmail — review before sending', 'ok');
+      setTimeout(() => window.close(), 2500);
+    }
+    if (message.action === 'bid_failed' && String(message.order_no) === String(currentLoad.order_no)) {
+      chrome.runtime.onMessage.removeListener(handler);
+      el('btn-draft').disabled = false;
+      el('btn-draft').textContent = 'Draft Bid';
+      showError('Gmail error — check Gmail is connected in Settings');
+    }
+  };
+  chrome.runtime.onMessage.addListener(handler);
+  // Timeout fallback — 12s
+  setTimeout(() => {
+    chrome.runtime.onMessage.removeListener(handler);
+    if (el('btn-draft').disabled) {
+      el('btn-draft').disabled = false;
+      el('btn-draft').textContent = 'Draft Bid';
+      showError('No response from Gmail — check connection');
+    }
+  }, 12000);
+
   chrome.runtime.sendMessage({
     action: 'create_draft',
     load: { ...currentLoad, t4_reviewed_at: currentLoad.t4_reviewed_at },
@@ -89,8 +118,6 @@ el('btn-draft').addEventListener('click', () => {
     send_now: false,
     t5_decision_at: t5
   });
-  showFeedback('📋 Draft created in Gmail — review before sending', 'ok');
-  setTimeout(() => window.close(), 2500);
 });
 
 // SEND NOW
@@ -100,6 +127,32 @@ el('btn-send').addEventListener('click', () => {
   const t5 = new Date().toISOString();
   el('btn-send').disabled = true;
   el('btn-send').textContent = 'Sending...';
+
+  // Listen for background confirmation
+  const handler = (message) => {
+    if (message.action === 'bid_sent' && String(message.load?.order_no) === String(currentLoad.order_no)) {
+      chrome.runtime.onMessage.removeListener(handler);
+      showFeedback(`⚡ Bid sent — $${amount} to ${currentLoad.broker_name}`, 'ok');
+      setTimeout(() => window.close(), 2500);
+    }
+    if (message.action === 'bid_failed' && String(message.order_no) === String(currentLoad.order_no)) {
+      chrome.runtime.onMessage.removeListener(handler);
+      el('btn-send').disabled = false;
+      el('btn-send').textContent = '⚡ Send Bid';
+      showError('Send failed — check Gmail is connected in Settings');
+    }
+  };
+  chrome.runtime.onMessage.addListener(handler);
+  // Timeout fallback — 15s
+  setTimeout(() => {
+    chrome.runtime.onMessage.removeListener(handler);
+    if (el('btn-send').disabled) {
+      el('btn-send').disabled = false;
+      el('btn-send').textContent = '⚡ Send Bid';
+      showError('No response from Gmail — check connection');
+    }
+  }, 15000);
+
   chrome.runtime.sendMessage({
     action: 'create_draft',
     load: { ...currentLoad, t4_reviewed_at: currentLoad.t4_reviewed_at },
@@ -107,8 +160,6 @@ el('btn-send').addEventListener('click', () => {
     send_now: true,
     t5_decision_at: t5
   });
-  showFeedback(`⚡ Bid sent — $${amount} to ${currentLoad.broker_name}`, 'ok');
-  setTimeout(() => window.close(), 2500);
 });
 
 // Use suggested
@@ -123,6 +174,28 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') el('btn-pass').click();
 });
 
+// Listen for pass from dashboard — close popup if same order or no order loaded
+chrome.runtime.onMessage.addListener((message) => {
+  const incomingOrder = String(message.order_no || message.load?.order_no || '');
+  const currentOrder  = String(currentLoad?.order_no || '');
+  const isMatch = !currentLoad || incomingOrder === currentOrder;
+
+  if (message.action === 'pass_load' && isMatch) {
+    showFeedback('✕ Passed from dashboard', 'pass');
+    setTimeout(() => window.close(), 1500);
+  }
+
+  if (message.action === 'bid_sent' && isMatch) {
+    showFeedback('⚡ Bid sent from dashboard', 'ok');
+    setTimeout(() => window.close(), 1500);
+  }
+
+  if (message.action === 'draft_created' && isMatch) {
+    showFeedback('📋 Draft Bid created from dashboard', 'ok');
+    setTimeout(() => window.close(), 1500);
+  }
+});
+
 function showFeedback(msg, type) {
   const fb = el('feedback');
   fb.textContent = msg;
@@ -130,6 +203,15 @@ function showFeedback(msg, type) {
   fb.style.display = 'block';
   document.querySelector('.btns').style.display = 'none';
   document.querySelector('.rate-row').style.display = 'none';
+}
+
+function showError(msg) {
+  const fb = el('feedback');
+  fb.textContent = `⚠ ${msg}`;
+  fb.className = 'feedback pass';
+  fb.style.display = 'block';
+  // Keep buttons visible so carrier can retry
+  setTimeout(() => { fb.style.display = 'none'; }, 5000);
 }
 
 // Init

@@ -148,15 +148,25 @@ function updateStatus(status) {
 }
 
 function connectGmail() {
-  chrome.identity.getAuthToken({ interactive: true }, (token) => {
-    if (chrome.runtime.lastError) {
-      alert('Gmail connection failed: ' + chrome.runtime.lastError.message);
-      return;
+  // Clear any cached/stale token first so identity API issues a fresh one
+  chrome.storage.local.get('gmail_token', (r) => {
+    const doConnect = () => {
+      chrome.identity.getAuthToken({ interactive: true }, (token) => {
+        if (chrome.runtime.lastError) {
+          alert('Gmail connection failed: ' + chrome.runtime.lastError.message);
+          return;
+        }
+        chrome.storage.local.set({ gmail_token: token }, () => {
+          updateStatus('active');
+          alert('✓ Gmail connected successfully');
+        });
+      });
+    };
+    if (r.gmail_token) {
+      chrome.identity.removeCachedAuthToken({ token: r.gmail_token }, doConnect);
+    } else {
+      doConnect();
     }
-    chrome.storage.local.set({ gmail_token: token }, () => {
-      updateStatus('active');
-      alert('✓ Gmail connected successfully');
-    });
   });
 }
 

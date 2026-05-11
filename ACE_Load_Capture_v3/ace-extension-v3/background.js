@@ -66,15 +66,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Bid action — send email + log metrics + upsert broker
   if (message.action === 'create_draft') {
+    const load        = message.load;
+    const bidAmount   = message.bid_amount;
+    const sendNow     = message.send_now;
+    const senderTabId = sender?.tab?.id ?? null;
     _getSettings().then(settings => {
-      _getToken(settings).then(token => {
+      _getToken(settings).then(async token => {
+        // If no token, attempt interactive refresh once
+        let activeToken = token;
+        if (!activeToken) {
+          activeToken = await new Promise(res =>
+            chrome.identity.getAuthToken({ interactive: true }, t => res(t || null))
+          );
+          if (activeToken) chrome.storage.local.set({ gmail_token: activeToken });
+        }
         const t5 = new Date().toISOString();
-        if (message.send_now) {
-          // Send bid email immediately
-          _sendBidEmail(message.load, message.bid_amount, token, settings, t5);
+        if (sendNow) {
+          const success = await _sendBidEmail(load, bidAmount, activeToken, settings, t5);
+          const msg = success
+            ? { action: 'bid_sent', load: { ...load, t5_decision_at: t5 }, bid_amount: bidAmount }
+            : { action: 'bid_failed', order_no: load.order_no };
+          if (senderTabId) chrome.tabs.sendMessage(senderTabId, msg).catch(() => {});
+          _broadcastToDashboard(msg);
+          _broadcastToPopups(msg);
         } else {
-          // Create draft only
-          _createDraftOnly(message.load, message.bid_amount, token, settings);
+          const drafted = await _createDraftOnly(load, bidAmount, activeToken, settings);
+          const msg = drafted
+            ? { action: 'draft_created', order_no: load.order_no }
+            : { action: 'bid_failed', order_no: load.order_no };
+          if (senderTabId) chrome.tabs.sendMessage(senderTabId, msg).catch(() => {});
+          _broadcastToDashboard(msg);
+          _broadcastToPopups(msg);
         }
       });
     });
@@ -112,19 +134,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  // Pass on load — log metrics
+  // Pass on load — log metrics + sync dashboard
   if (message.action === 'pass_load') {
     _getSettings().then(settings => {
       const t5 = new Date().toISOString();
       const load = message.load || {};
-      const payload = _buildMetricsPayload(load, 'pass', null, {
-        t1: load.t1_posted_at, t2: load.t2_detected_at,
-        t3: load.t3_alerted_at, t4: load.t4_reviewed_at,
-        t5, t6: null
+      // Guard — only log if this order has no prior decision in metrics log
+      chrome.storage.local.get('ace_metrics_log', (r) => {
+        const log = r.ace_metrics_log || [];
+        const alreadyLogged = log.some(m => String(m.order_no) === String(load.order_no) && m.decision !== 'identified');
+        if (!alreadyLogged) {
+          const payload = _buildMetricsPayload(load, 'pass', null, {
+            t1: load.t1_posted_at, t2: load.t2_detected_at,
+            t3: load.t3_alerted_at, t4: load.t4_reviewed_at,
+            t5, t6: null
+          });
+          _logMetrics(payload, settings);
+        }
       });
-      _logMetrics(payload, settings);
     });
     chrome.storage.local.remove('pending_bid_load');
+
+    // Remove from board loads + increment pass tally in storage
+    const orderNo = (message.load || {}).order_no;
+    if (orderNo) {
+      chrome.storage.local.get(['ace_board_loads', 'ace_pass_tracker'], (r) => {
+        const loads = (r.ace_board_loads || []).filter(l => String(l.order_no) !== String(orderNo));
+        const tracker = r.ace_pass_tracker || {};
+        if (!tracker[orderNo]) tracker[orderNo] = { count: 0, lastPassAt: null };
+        tracker[orderNo].count++;
+        tracker[orderNo].lastPassAt = Date.now();
+        chrome.storage.local.set({ ace_board_loads: loads, ace_pass_tracker: tracker });
+      });
+      // Broadcast to any open dashboard window
+      _broadcastToDashboard({ action: 'pass_load', order_no: orderNo, source: message.source || 'unknown' });
+      // Broadcast to any open bid popup windows so popup closes if same order
+      _broadcastToPopups({ action: 'pass_load', order_no: orderNo, source: message.source || 'unknown' });
+    }
+
     sendResponse({ status: 'ok' });
     return false;
   }
@@ -152,6 +199,9 @@ async function _handleLoadCaptured(load, suggestedRate, t2) {
 
   // Add to dashboard loads list
   _addToDashboardLoads(load, suggestedRate);
+
+  // Broadcast to any open dashboard window — real-time update
+  _broadcastToDashboard({ action: 'new_load', load: { ...load, suggested_rate: suggestedRate, captured_at: Date.now() }, suggested_rate: suggestedRate });
 
   // Store as pending bid load
   chrome.storage.local.set({
@@ -247,14 +297,21 @@ async function _sendGmailAlert(load, suggestedRate, token, settings, t3) {
 </div>
 </div>`;
 
-  await _gmailSend(to, subject, body, token, settings.gmail_address);
-  console.log(`[ACE] ✓ Gmail alert sent — order ${load.order_no}`);
+  const alertResult = await _gmailSend(to, subject, body, token, settings.gmail_address);
+  if (alertResult.success) {
+    console.log(`[ACE] ✓ Gmail alert sent — order ${load.order_no}`);
+  } else {
+    console.warn(`[ACE] Gmail alert failed — order ${load.order_no}`);
+  }
 }
 
 // ─── BID EMAIL ───────────────────────────────────────────────────────────────
 
 async function _sendBidEmail(load, bidAmount, token, settings, t5) {
-  if (!token || !load.broker_email) return;
+  if (!token || !load.broker_email) {
+    console.warn('[ACE] _sendBidEmail — missing token or broker_email');
+    return false;
+  }
 
   // CARRIER from settings — not hardcoded
   const carrierName     = settings.carrier_name     || '';
@@ -309,11 +366,17 @@ CELL: ${carrierPhone}</p>
     _upsertBroker(load, settings);
 
     chrome.storage.local.remove('pending_bid_load');
+    return true;
   }
+  console.warn('[ACE] _sendBidEmail — Gmail send failed');
+  return false;
 }
 
 async function _createDraftOnly(load, bidAmount, token, settings) {
-  if (!token || !load.broker_email) return;
+  if (!token || !load.broker_email) {
+    console.warn('[ACE] _createDraftOnly — missing token or broker_email');
+    return false;
+  }
   const carrierName     = settings.carrier_name     || '';
   const companyName     = settings.company_name     || '';
   const carrierLocation = settings.carrier_location || '';
@@ -329,8 +392,13 @@ async function _createDraftOnly(load, bidAmount, token, settings) {
 <p>--</p>
 <p>Thank you,<br>${carrierName}<br>${companyName}<br>${carrierLocation}<br>CELL: ${carrierPhone}</p>
 </div>`;
-  await _gmailCreateDraft(load.broker_email, subject, body, token, fromEmail);
-  console.log(`[ACE] ✓ Draft created — ${load.broker_name} — $${bidAmount}`);
+  const draft = await _gmailCreateDraft(load.broker_email, subject, body, token, fromEmail);
+  if (draft) {
+    console.log(`[ACE] ✓ Draft created — ${load.broker_name} — $${bidAmount}`);
+    return true;
+  }
+  console.warn('[ACE] _createDraftOnly — Gmail draft creation failed');
+  return false;
 }
 
 // ─── GMAIL API ────────────────────────────────────────────────────────────────
@@ -362,10 +430,17 @@ async function _gmailCreateDraft(to, subject, htmlBody, token, from) {
       body: JSON.stringify({ message: { raw: encoded } })
     });
     if (!res.ok) {
-      // Token expired — try refresh
+      // Token expired — refresh and retry once
       const newToken = await _refreshToken(token);
-      if (newToken) chrome.storage.local.set({ gmail_token: newToken });
-      return null;
+      if (!newToken) return null;
+      chrome.storage.local.set({ gmail_token: newToken });
+      const retry = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${newToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: { raw: encoded } })
+      });
+      if (!retry.ok) { console.warn('[ACE] Gmail draft failed after token refresh'); return null; }
+      return await retry.json();
     }
     return await res.json();
   } catch(e) {
@@ -551,6 +626,24 @@ function _createDashboard() {
 }
 
 // ─── UTILITIES ───────────────────────────────────────────────────────────────
+
+function _broadcastToDashboard(message) {
+  const dashUrl = chrome.runtime.getURL('popup/dashboard.html');
+  chrome.tabs.query({ url: dashUrl }, (tabs) => {
+    tabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+    });
+  });
+}
+
+function _broadcastToPopups(message) {
+  const popupUrl = chrome.runtime.getURL('popup/bid-popup.html');
+  chrome.tabs.query({ url: popupUrl }, (tabs) => {
+    tabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+    });
+  });
+}
 
 function _adoptOrOpenSylectusTab() {
   chrome.tabs.query({ url: '*://*.sylectus.com/*' }, (tabs) => {
