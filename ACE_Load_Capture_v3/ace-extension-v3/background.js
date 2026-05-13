@@ -265,17 +265,23 @@ function _openBidPopup(load, suggestedRate) {
 
 async function _sendGmailAlert(load, suggestedRate, token, settings, t3) {
   const to      = settings.gmail_address;
-  const subject = `⚡ ACE LOAD — ${load.pickup_city} ${load.pickup_state} → ${load.delivery_city} ${load.delivery_state} — $${suggestedRate} suggested`;
+  const puDate  = (load.pickup_date || 'ASAP').split(' ')[0];
+  const subject = `ACE LOAD - ${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - ${puDate} - ${load.vehicle_size || ''}`;
+  const aceUrl  = `https://xtxtec.com/ace?order=${load.order_no}&carrier=${settings.carrier_uuid || ''}`;
+
+  // mailto — use %0A for line breaks so iOS Gmail renders them correctly
   const mailSubject = encodeURIComponent(`${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${suggestedRate}`);
-  const composeUrl  = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(load.broker_email)}&su=${mailSubject}`;
+  const nl = '%0D%0A';
+  const mailBody = `QUOTE: $${suggestedRate}${nl}MC ${settings.mc_number || ''}${nl}${nl}${load.load_type || ''}${nl}Order ${load.order_no}${nl}${load.pickup_city}, ${load.pickup_state} ${load.pickup_zip || ''} - ${load.pickup_date || ''}${nl}${load.delivery_city}, ${load.delivery_state} ${load.delivery_zip || ''} - ${load.delivery_date || ''}${nl}${load.vehicle_size || ''} ${load.miles || ''}mi${nl}${load.pieces || ''} pcs / ${load.weight || ''} lbs${nl}${nl}*******************${nl}Equipment:${nl}26' Straight,${nl}Dock-high, Air-ride, 3 row e-tracks${nl}Box Door: 94"W x 97"H${nl}Box Interior 98.5"W x 26'L${nl}TWIC${nl}Gear:${nl}Lift gate${nl}Pallet jack${nl}Load bars, Straps, Blankets.`;
+  const mailtoUrl = `mailto:${load.broker_email}?subject=${mailSubject}&body=${mailBody}`;
 
   const body = `<div style="font-family:Arial,sans-serif;font-size:14px;max-width:480px;">
 <div style="background:#E8A020;color:#000;padding:12px 16px;border-radius:6px 6px 0 0;">
-  <strong>⚡ ACE LOAD ALERT</strong>
+  <strong>ACE LOAD ALERT</strong>
 </div>
 <div style="background:#111;color:#fff;padding:16px;border-radius:0 0 6px 6px;">
   <p style="font-size:20px;font-weight:bold;margin:0 0 8px;">
-    ${load.pickup_city}, ${load.pickup_state} → ${load.delivery_city}, ${load.delivery_state}
+    ${load.pickup_city}, ${load.pickup_state} to ${load.delivery_city}, ${load.delivery_state}
   </p>
   <table style="width:100%;font-size:13px;color:#ccc;border-collapse:collapse;">
     <tr><td style="padding:4px 0;"><strong style="color:#fff;">Order:</strong></td><td>${load.order_no}</td></tr>
@@ -286,10 +292,9 @@ async function _sendGmailAlert(load, suggestedRate, token, settings, t3) {
     <tr><td style="padding:4px 0;"><strong style="color:#fff;">Weight:</strong></td><td>${load.weight} lbs</td></tr>
     <tr><td style="padding:4px 0;"><strong style="color:#fff;">Broker:</strong></td><td>${load.broker_name}</td></tr>
     <tr><td style="padding:4px 0;"><strong style="color:#E8A020;font-size:16px;">Suggested:</strong></td><td style="color:#E8A020;font-size:16px;font-weight:bold;">$${suggestedRate}</td></tr>
-    <tr><td style="padding:4px 0;"><strong style="color:#fff;">Broker Posted:</strong></td><td>${load.posted_amount || '—'}</td></tr>
   </table>
   <div style="margin-top:16px;text-align:center;">
-    <a href="${composeUrl}" style="background:#E8A020;color:#000;padding:12px 24px;border-radius:5px;font-weight:bold;font-size:15px;text-decoration:none;display:inline-block;">
+    <a href="${mailtoUrl}" style="background:#E8A020;color:#000;padding:12px 24px;border-radius:5px;font-weight:bold;font-size:15px;text-decoration:none;display:inline-block;">
       ⚡ Draft Bid
     </a>
   </div>
@@ -323,7 +328,7 @@ async function _sendBidEmail(load, bidAmount, token, settings, t5) {
   const mcNumber        = settings.mc_number        || '';
   const fromEmail       = settings.gmail_address    || '';
 
-  const subject = `${load.pickup_city} ${load.pickup_state} to ${load.delivery_city} ${load.delivery_state}- $${bidAmount}`;
+  const subject = `${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${bidAmount}`;
 
   const loadTable = _buildLoadTable(load);
 
@@ -341,12 +346,6 @@ Gear:<br>
 Lift gate<br>
 Pallet jack<br>
 Load bars, Straps, Blankets.</p>
-<p>--</p>
-<p>Thank you,<br>
-${carrierName}<br>
-${companyName}<br>
-${carrierLocation}<br>
-CELL: ${carrierPhone}</p>
 </div>`;
 
   const t6 = new Date().toISOString();
@@ -384,14 +383,12 @@ async function _createDraftOnly(load, bidAmount, token, settings) {
   const carrierPhone    = settings.carrier_phone    || '';
   const mcNumber        = settings.mc_number        || '';
   const fromEmail       = settings.gmail_address    || '';
-  const subject = `${load.pickup_city} ${load.pickup_state} to ${load.delivery_city} ${load.delivery_state}- $${bidAmount}`;
+  const subject = `${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${bidAmount}`;
   const loadTable = _buildLoadTable(load);
   const body = `<div style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;">
 <p><strong>QUOTE: $${bidAmount}</strong><br>MC ${mcNumber}</p>
 ${loadTable}
 <p style="margin-top:12px;">*******************<br>Equipment:<br>26' Straight,<br>Dock-high, Air-ride, 3 row e-tracks<br>Box Door: 94"W x 97"H<br>Box Interior 98.5"W x 26'L<br>TWIC<br>Gear:<br>Lift gate<br>Pallet jack<br>Load bars, Straps, Blankets.</p>
-<p>--</p>
-<p>Thank you,<br>${carrierName}<br>${companyName}<br>${carrierLocation}<br>CELL: ${carrierPhone}</p>
 </div>`;
   const draft = await _gmailCreateDraft(load.broker_email, subject, body, token, fromEmail);
   if (draft) {
@@ -412,7 +409,7 @@ function _buildLoadTable(load) {
   return `
 <table style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;border-collapse:collapse;background:#f0f0f0;display:inline-table;">
   <tr>
-    <td style="padding:2px 4px;vertical-align:top;border:1px solid #d0d0d0;"><br>${load.load_type||''}<br>${load.ref_no||''}${load.posted_amount ? '<br>' + load.posted_amount : ''}</td>
+    <td style="padding:2px 4px;vertical-align:top;border:1px solid #d0d0d0;"><br>${load.load_type||''}<br>${load.ref_no||''}</td>
     <td style="padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;"><br><span style="color:#cc0000;text-decoration:underline;">${load.order_no||''}</span></td>
     <td style="padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;">${load.pickup_city||''},${load.pickup_state||''}<br>${load.pickup_zip||''}<br>${load.pickup_date||''}</td>
     <td style="padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;">${load.delivery_city||''},${load.delivery_state||''}<br>${load.delivery_zip||''}<br>${load.delivery_date||''}</td>
@@ -575,8 +572,6 @@ async function _upsertBroker(load, settings) {
     last_load_date:        now,
     last_load_origin:      `${load.pickup_city} ${load.pickup_state}`.trim(),
     last_load_destination: `${load.delivery_city} ${load.delivery_state}`.trim(),
-    broker_mc:             load.broker_mc || '',
-    posted_amount:         load.posted_amount || '',
     notes:                 `ACE Sylectus — ${load.load_type} order ${load.order_no}`
   };
   try {
@@ -588,44 +583,6 @@ async function _upsertBroker(load, settings) {
     console.log(`[ACE] ✓ Broker upserted — ${load.broker_email}`);
   } catch(e) {
     console.warn('[ACE] Broker upsert failed:', e.message);
-  }
-
-  // Write lane row to broker_lanes
-  const nameParts = (load.broker_contact_name || '').trim().split(/\s+/);
-  const lanePayload = {
-    carrier_id:        uuid,
-    broker_first_name: nameParts[0] || null,
-    broker_last_name:  nameParts.length > 1 ? nameParts.slice(1).join(' ') : null,
-    broker_company:    load.company_name || load.broker_name || null,
-    broker_mc:         load.broker_mc    || null,
-    broker_email:      load.broker_email,
-    broker_phone:      load.broker_phone || null,
-    pickup_city:       load.pickup_city  || null,
-    pickup_state:      load.pickup_state || null,
-    pickup_zip:        load.pickup_zip   || null,
-    delivery_city:     load.delivery_city  || null,
-    delivery_state:    load.delivery_state || null,
-    delivery_zip:      load.delivery_zip   || null,
-    vehicle_size:      load.vehicle_size   || null,
-    miles:             parseInt(load.miles) || null,
-    posted_amount:     load.posted_amount  || null,
-    decision:          'harvest',
-    source:            'SYL'
-  };
-  try {
-    const laneRes = await fetch('https://edgeai-gmail-webhook-417422203146.us-central1.run.app/upsert-broker-lane', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lanePayload)
-    });
-    const laneData = await laneRes.json();
-    if (laneData.success) {
-      console.log(`[ACE] ✓ Lane written — ${load.pickup_city} ${load.pickup_state} → ${load.delivery_city} ${load.delivery_state} | MC: ${load.broker_mc || 'n/a'}`);
-    } else {
-      console.warn('[ACE] Lane write failed:', laneData.error);
-    }
-  } catch(e) {
-    console.warn('[ACE] Lane fetch error:', e.message);
   }
 }
 
