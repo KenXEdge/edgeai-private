@@ -73,7 +73,7 @@ function renderQueue() {
       <td class="mono">${load.order_no}</td>
       <td class="gold-text">${load.miles||'—'}</td>
       <td style="font-size:11px;color:rgba(255,255,255,0.5)">${load.load_type||'—'}</td>
-      <td style="font-size:11px;color:rgba(255,255,255,0.4)">${load.weight||'—'}</td>
+      <td style="font-size:11px;color:rgba(255,255,255,0.4)">${load.weight||'—'}${load.posted_amount ? '<br><span style="color:#E8A020;font-size:10px;">' + load.posted_amount + '</span>' : ''}</td>
       <td class="gold-text">$${load.suggested_rate||'—'}</td>
       <td><input type="number" class="bid-input" id="bid-${load.order_no}" value="${load.suggested_rate||''}" placeholder="${load.suggested_rate||''}"></td>
       <td>
@@ -106,7 +106,7 @@ function renderBids() {
       <td>
         <div class="actions">
           <button class="btn-w" data-action="win" data-order="${load.order_no}">✓ WIN</button>
-          <button class="btn-x" data-action="pass" data-order="${load.order_no}">✕ PASS</button>
+          <button class="btn-x" data-action="delete" data-order="${load.order_no}">DELETE</button>
         </div>
       </td>
     </tr>
@@ -274,18 +274,16 @@ function doWin(orderNo) {
   });
 }
 
-function doPassBid(orderNo) {
-  const load = bidLoads.find(l => String(l.order_no) === String(orderNo));
-  if (!load) return;
+function doDelete(orderNo) {
   bidLoads = bidLoads.filter(l => String(l.order_no) !== String(orderNo));
   saveState();
   renderBids();
   updateCounts();
 
-  // Log as pass — bid was sent but load was lost
+  // Log delete to Supabase
   chrome.runtime.sendMessage({
     action: 'log_delete',
-    load: { ...load, order_no: orderNo }
+    load: { order_no: orderNo }
   });
 }
 
@@ -342,7 +340,7 @@ function _wireTableDelegation() {
     });
   }
 
-  // Bids tbody — win / pass
+  // Bids tbody — win / delete
   const bTbody = el('bids-tbody');
   if (bTbody) {
     bTbody.addEventListener('click', (e) => {
@@ -350,8 +348,8 @@ function _wireTableDelegation() {
       if (!btn) return;
       const action  = btn.dataset.action;
       const orderNo = btn.dataset.order;
-      if (action === 'win')  doWin(orderNo);
-      if (action === 'pass') doPassBid(orderNo);
+      if (action === 'win')    doWin(orderNo);
+      if (action === 'delete') doDelete(orderNo);
     });
   }
 
@@ -395,16 +393,14 @@ chrome.runtime.onMessage.addListener((message) => {
     }
   }
 
-  // Background confirmed draft created — move to Bids Sent same as Send Bid
+  // Background confirmed draft created — show DRAFT badge in queue
   if (message.action === 'draft_created') {
     const orderNo = message.order_no;
-    const load = queueLoads.find(l => String(l.order_no) === String(orderNo));
-    if (load) {
-      queueLoads = queueLoads.filter(l => String(l.order_no) !== String(orderNo));
-      bidLoads.unshift({ ...load, bid_amount: load.suggested_rate, bid_sent_at: new Date().toISOString(), _drafted: true });
-      if (bidLoads.length > 100) bidLoads.length = 100;
+    const idx = queueLoads.findIndex(l => String(l.order_no) === String(orderNo));
+    if (idx > -1) {
+      queueLoads[idx]._draft = true;
       saveState();
-      renderAll();
+      renderQueue();
     }
   }
 

@@ -148,25 +148,15 @@ function updateStatus(status) {
 }
 
 function connectGmail() {
-  // Clear any cached/stale token first so identity API issues a fresh one
-  chrome.storage.local.get('gmail_token', (r) => {
-    const doConnect = () => {
-      chrome.identity.getAuthToken({ interactive: true }, (token) => {
-        if (chrome.runtime.lastError) {
-          alert('Gmail connection failed: ' + chrome.runtime.lastError.message);
-          return;
-        }
-        chrome.storage.local.set({ gmail_token: token }, () => {
-          updateStatus('active');
-          alert('✓ Gmail connected successfully');
-        });
-      });
-    };
-    if (r.gmail_token) {
-      chrome.identity.removeCachedAuthToken({ token: r.gmail_token }, doConnect);
-    } else {
-      doConnect();
+  chrome.identity.getAuthToken({ interactive: true }, (token) => {
+    if (chrome.runtime.lastError) {
+      alert('Gmail connection failed: ' + chrome.runtime.lastError.message);
+      return;
     }
+    chrome.storage.local.set({ gmail_token: token }, () => {
+      updateStatus('active');
+      alert('✓ Gmail connected successfully');
+    });
   });
 }
 
@@ -198,12 +188,39 @@ function togglePause() {
   });
 }
 
+function toggleHarvest() {
+  chrome.storage.local.get('ace_harvest_mode', (r) => {
+    const newState = !r.ace_harvest_mode;
+    chrome.storage.local.set({ ace_harvest_mode: newState }, () => {
+      const btn = el('harvest-btn');
+      btn.textContent = newState ? '⏹ Stop Harvest' : '⟳ Start Harvest';
+      btn.style.color = newState ? '#e74c3c' : '#2ecc71';
+      btn.style.borderColor = newState ? 'rgba(231,76,60,0.3)' : 'rgba(46,204,113,0.3)';
+      btn.style.background = newState ? 'rgba(231,76,60,0.15)' : 'rgba(46,204,113,0.15)';
+      console.log(`[ACE] Harvest mode ${newState ? 'ON' : 'OFF'}`);
+    });
+  });
+}
+
 // Events
-document.addEventListener('DOMContentLoaded', loadSettings);
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  // Set harvest button state on load
+  chrome.storage.local.get('ace_harvest_mode', (r) => {
+    if (r.ace_harvest_mode) {
+      const btn = el('harvest-btn');
+      btn.textContent = '⏹ Stop Harvest';
+      btn.style.color = '#e74c3c';
+      btn.style.borderColor = 'rgba(231,76,60,0.3)';
+      btn.style.background = 'rgba(231,76,60,0.15)';
+    }
+  });
+});
 el('save-btn').addEventListener('click', saveSettings);
 el('board-btn').addEventListener('click', () => chrome.runtime.sendMessage({ action: 'open_board' }));
 el('gmail-btn').addEventListener('click', connectGmail);
 el('pause-btn').addEventListener('click', togglePause);
+el('harvest-btn').addEventListener('click', toggleHarvest);
 el('rpm')?.addEventListener('input', updateRPM);
 el('ex-miles')?.addEventListener('input', updateRPM);
 el('from-city')?.addEventListener('input', updateSearchPreview);

@@ -35,6 +35,7 @@ function render(load, rpm, suggested) {
   el('miles').textContent        = load.miles         || '—';
   el('vehicle').textContent      = load.vehicle_size  || '—';
   el('weight').textContent       = load.weight ? `${load.weight} lbs` : '—';
+  el('posted-amount').textContent = load.posted_amount || '—';
   el('pickup-full').textContent  = `${load.pickup_city || ''}, ${load.pickup_state || ''}`;
   el('delivery-full').textContent = `${load.delivery_city || ''}, ${load.delivery_state || ''}`;
   el('order-no').textContent     = load.order_no      || '—';
@@ -45,7 +46,7 @@ function render(load, rpm, suggested) {
     : '—';
   el('credit-score').textContent = load.credit_score  || '—';
   el('days-to-pay').textContent  = load.days_to_pay   ? `${load.days_to_pay} day pay` : '—';
-  el('raw-block').textContent    = load.raw_row_text  || '—';
+  el('raw-block').textContent    = load.other_info || '';
   el('sug-amt').textContent      = `$${suggested}`;
   el('sug-calc').textContent     = `${load.miles} mi × $${rpm}\nsuggested rate`;
   el('bid-amount').value         = suggested;

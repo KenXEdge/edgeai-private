@@ -1605,6 +1605,76 @@ def import_brokers():
             "total": total,
         }), 200
 
+# ── Supabase service-role client (bypasses RLS) ───────────────────────────────
+
+_supabase_service: Client | None = None
+
+def supabase_service_client() -> Client:
+    global _supabase_service
+    if _supabase_service is None:
+        _supabase_service = create_client(
+            os.environ["SUPABASE_URL"],
+            os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+        )
+    return _supabase_service
+
+
+# ── /upsert-broker-lane ───────────────────────────────────────────────────────
+
+@app.route("/upsert-broker-lane", methods=["POST"])
+def upsert_broker_lane():
+    """
+    ACE writes one row to broker_lanes per captured load.
+    Uses service role key — bypasses RLS so carrier_id is set explicitly from payload.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+
+        required = ["broker_email", "pickup_state", "delivery_state"]
+        missing = [f for f in required if not data.get(f)]
+        if missing:
+            return jsonify({"success": False, "error": f"missing fields: {', '.join(missing)}"}), 400
+
+        miles_raw = data.get("miles")
+        try:
+            miles = int(miles_raw) if miles_raw is not None else None
+        except (ValueError, TypeError):
+            miles = None
+
+        row = {
+            "carrier_id":        data.get("carrier_id") or None,
+            "broker_first_name": data.get("broker_first_name") or None,
+            "broker_last_name":  data.get("broker_last_name") or None,
+            "broker_company":    data.get("broker_company") or None,
+            "broker_mc":         data.get("broker_mc") or None,
+            "broker_email":      data.get("broker_email"),
+            "broker_phone":      data.get("broker_phone") or None,
+            "team_name":         data.get("team_name") or None,
+            "pickup_city":       data.get("pickup_city") or None,
+            "pickup_state":      data.get("pickup_state"),
+            "pickup_zip":        data.get("pickup_zip") or None,
+            "delivery_city":     data.get("delivery_city") or None,
+            "delivery_state":    data.get("delivery_state"),
+            "delivery_zip":      data.get("delivery_zip") or None,
+            "vehicle_size":      data.get("vehicle_size") or None,
+            "miles":             miles,
+            "decision":          data.get("decision") or None,
+            "source":            data.get("source") or "SYL",
+        }
+
+        supabase_service_client().table("broker_lanes").insert(row).execute()
+
+        log.info(
+            '"upsert-broker-lane — inserted broker=%s lane=%s→%s decision=%s"',
+            row["broker_email"], row["pickup_state"], row["delivery_state"], row["decision"],
+        )
+        return jsonify({"success": True}), 200
+
+    except Exception as exc:
+        log.error('"upsert-broker-lane — error: %s"', exc, exc_info=True)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 # ── Gmail OAuth ──────────────────────────────────────────────────────────────
 from urllib.parse import urlencode
 import requests as _http
