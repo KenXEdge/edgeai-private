@@ -398,9 +398,12 @@ chrome.runtime.onMessage.addListener((message) => {
     const orderNo = message.order_no;
     const idx = queueLoads.findIndex(l => String(l.order_no) === String(orderNo));
     if (idx > -1) {
-      queueLoads[idx]._draft = true;
+      const load = queueLoads[idx];
+      queueLoads = queueLoads.filter(l => String(l.order_no) !== String(orderNo));
+      bidLoads.unshift({ ...load, bid_amount: load.suggested_rate, bid_sent_at: new Date().toISOString(), _drafted: true });
+      if (bidLoads.length > 100) bidLoads.length = 100;
       saveState();
-      renderQueue();
+      renderAll();
     }
   }
 

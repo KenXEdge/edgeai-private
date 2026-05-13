@@ -265,23 +265,17 @@ function _openBidPopup(load, suggestedRate) {
 
 async function _sendGmailAlert(load, suggestedRate, token, settings, t3) {
   const to      = settings.gmail_address;
-  const puDate  = (load.pickup_date || 'ASAP').split(' ')[0];
-  const subject = `ACE LOAD - ${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - ${puDate} - ${load.vehicle_size || ''}`;
-  const aceUrl  = `https://xtxtec.com/ace?order=${load.order_no}&carrier=${settings.carrier_uuid || ''}`;
-
-  // mailto — use %0A for line breaks so iOS Gmail renders them correctly
+  const subject = `⚡ ACE LOAD — ${load.pickup_city} ${load.pickup_state} → ${load.delivery_city} ${load.delivery_state} — $${suggestedRate} suggested`;
   const mailSubject = encodeURIComponent(`${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${suggestedRate}`);
-  const nl = '%0D%0A';
-  const mailBody = `QUOTE: $${suggestedRate}${nl}MC ${settings.mc_number || ''}${nl}${nl}${load.load_type || ''} ${load.ref_no || ''}${nl}Order ${load.order_no}${nl}${load.pickup_city}, ${load.pickup_state} ${load.pickup_zip || ''} - ${load.pickup_date || ''}${nl}${load.delivery_city}, ${load.delivery_state} ${load.delivery_zip || ''} - ${load.delivery_date || ''}${nl}${load.vehicle_size || ''} ${load.miles || ''}mi${nl}${load.pieces || ''} pcs / ${load.weight || ''} lbs${nl}${nl}*******************${nl}Equipment:${nl}26' Straight,${nl}Dock-high, Air-ride, 3 row e-tracks${nl}Box Door: 94"W x 97"H${nl}Box Interior 98.5"W x 26'L${nl}TWIC${nl}Gear:${nl}Lift gate${nl}Pallet jack${nl}Load bars, Straps, Blankets.`;
-  const mailtoUrl = `googlegmail://co?to=${encodeURIComponent(load.broker_email)}&subject=${mailSubject}&body=${mailBody}`;
+  const composeUrl  = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(load.broker_email)}&su=${mailSubject}`;
 
   const body = `<div style="font-family:Arial,sans-serif;font-size:14px;max-width:480px;">
 <div style="background:#E8A020;color:#000;padding:12px 16px;border-radius:6px 6px 0 0;">
-  <strong>ACE LOAD ALERT</strong>
+  <strong>⚡ ACE LOAD ALERT</strong>
 </div>
 <div style="background:#111;color:#fff;padding:16px;border-radius:0 0 6px 6px;">
   <p style="font-size:20px;font-weight:bold;margin:0 0 8px;">
-    ${load.pickup_city}, ${load.pickup_state} to ${load.delivery_city}, ${load.delivery_state}
+    ${load.pickup_city}, ${load.pickup_state} → ${load.delivery_city}, ${load.delivery_state}
   </p>
   <table style="width:100%;font-size:13px;color:#ccc;border-collapse:collapse;">
     <tr><td style="padding:4px 0;"><strong style="color:#fff;">Order:</strong></td><td>${load.order_no}</td></tr>
@@ -295,7 +289,7 @@ async function _sendGmailAlert(load, suggestedRate, token, settings, t3) {
     <tr><td style="padding:4px 0;"><strong style="color:#fff;">Broker Posted:</strong></td><td>${load.posted_amount || '—'}</td></tr>
   </table>
   <div style="margin-top:16px;text-align:center;">
-    <a href="${mailtoUrl}" style="background:#E8A020;color:#000;padding:12px 24px;border-radius:5px;font-weight:bold;font-size:15px;text-decoration:none;display:inline-block;">
+    <a href="${composeUrl}" style="background:#E8A020;color:#000;padding:12px 24px;border-radius:5px;font-weight:bold;font-size:15px;text-decoration:none;display:inline-block;">
       ⚡ Draft Bid
     </a>
   </div>
@@ -329,7 +323,7 @@ async function _sendBidEmail(load, bidAmount, token, settings, t5) {
   const mcNumber        = settings.mc_number        || '';
   const fromEmail       = settings.gmail_address    || '';
 
-  const subject = `${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${bidAmount}`;
+  const subject = `${load.pickup_city} ${load.pickup_state} to ${load.delivery_city} ${load.delivery_state}- $${bidAmount}`;
 
   const loadTable = _buildLoadTable(load);
 
@@ -347,6 +341,12 @@ Gear:<br>
 Lift gate<br>
 Pallet jack<br>
 Load bars, Straps, Blankets.</p>
+<p>--</p>
+<p>Thank you,<br>
+${carrierName}<br>
+${companyName}<br>
+${carrierLocation}<br>
+CELL: ${carrierPhone}</p>
 </div>`;
 
   const t6 = new Date().toISOString();
@@ -384,12 +384,14 @@ async function _createDraftOnly(load, bidAmount, token, settings) {
   const carrierPhone    = settings.carrier_phone    || '';
   const mcNumber        = settings.mc_number        || '';
   const fromEmail       = settings.gmail_address    || '';
-  const subject = `${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${bidAmount}`;
+  const subject = `${load.pickup_city} ${load.pickup_state} to ${load.delivery_city} ${load.delivery_state}- $${bidAmount}`;
   const loadTable = _buildLoadTable(load);
   const body = `<div style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;">
 <p><strong>QUOTE: $${bidAmount}</strong><br>MC ${mcNumber}</p>
 ${loadTable}
 <p style="margin-top:12px;">*******************<br>Equipment:<br>26' Straight,<br>Dock-high, Air-ride, 3 row e-tracks<br>Box Door: 94"W x 97"H<br>Box Interior 98.5"W x 26'L<br>TWIC<br>Gear:<br>Lift gate<br>Pallet jack<br>Load bars, Straps, Blankets.</p>
+<p>--</p>
+<p>Thank you,<br>${carrierName}<br>${companyName}<br>${carrierLocation}<br>CELL: ${carrierPhone}</p>
 </div>`;
   const draft = await _gmailCreateDraft(load.broker_email, subject, body, token, fromEmail);
   if (draft) {
@@ -589,7 +591,7 @@ async function _upsertBroker(load, settings) {
   }
 
   // Write lane row to broker_lanes
-  const nameParts  = (load.broker_contact_name || '').trim().split(/\s+/);
+  const nameParts = (load.broker_contact_name || '').trim().split(/\s+/);
   const lanePayload = {
     carrier_id:        uuid,
     broker_first_name: nameParts[0] || null,

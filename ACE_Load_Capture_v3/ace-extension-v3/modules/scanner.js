@@ -1,4 +1,4 @@
-// ACE - scanner.js
+// ACE — scanner.js
 // Load row scanning, data extraction, filtering, processing
 // Timestamps every step for First to Bid metrics
 
@@ -20,7 +20,7 @@ const ACEScanner = (() => {
       const cells = row.querySelectorAll('td');
       if (cells.length < 5) continue;
 
-      // Find order number - must be 4+ digit number
+      // Find order number — must be 4+ digit number
       let orderNo = null;
       for (const link of row.querySelectorAll('a')) {
         const txt = (link.innerText || '').trim();
@@ -32,9 +32,9 @@ const ACEScanner = (() => {
       const load = extractRowData(row, cells, orderNo);
       if (!load.pickup_city) continue;
 
-      // T1 - load post time from Sylectus
+      // T1 — load post time from Sylectus
       load.t1_posted_at = _parsePostDate(load.post_date);
-      // T2 - ACE detected it right now
+      // T2 — ACE detected it right now
       load.t2_detected_at = ACEUtils.now();
 
       // Apply filters
@@ -43,19 +43,19 @@ const ACEScanner = (() => {
       const loadWeight = parseFloat(load.weight) || 0;
 
       if (maxWeight > 0 && loadWeight > 0 && loadWeight > maxWeight) {
-        console.log(`[ACE:scanner] skip #${orderNo} - ${loadWeight}lbs > ${maxWeight}lbs`);
+        console.log(`[ACE:scanner] skip #${orderNo} — ${loadWeight}lbs > ${maxWeight}lbs`);
         processedLoads.add(orderNo);
         continue;
       }
 
-      // Max load age filter - carrier configurable 10/30/60 min or off
+      // Max load age filter — carrier configurable 10/30/60 min or off
       const maxAge = parseInt(settings.max_load_age) || 0;
       if (maxAge > 0 && load.post_date) {
         try {
           const posted = new Date(load.post_date);
           const ageMin = (Date.now() - posted.getTime()) / 60000;
           if (ageMin > maxAge) {
-            console.log(`[ACE:scanner] skip #${orderNo} - ${Math.round(ageMin)}min old > ${maxAge}min limit`);
+            console.log(`[ACE:scanner] skip #${orderNo} — ${Math.round(ageMin)}min old > ${maxAge}min limit`);
             processedLoads.add(orderNo);
             skipped++;
             continue;
@@ -63,7 +63,7 @@ const ACEScanner = (() => {
         } catch(e) {}
       }
 
-      // Load type filter - match cells[1] load type OR cells[6] vehicle size
+      // Load type filter — match cells[1] load type OR cells[6] vehicle size
       // against carrier's selected load types in ACE settings
       const targetTypes = (settings.target_load_types && settings.target_load_types.length > 0)
         ? settings.target_load_types.map(t => t.toLowerCase().trim())
@@ -77,7 +77,7 @@ const ACEScanner = (() => {
           vehicleSize.includes(t) || t.includes(vehicleSize)
         );
         if (!matched) {
-          console.log(`[ACE:scanner] skip #${orderNo} - type "${load.load_type}" / vehicle "${load.vehicle_size}" not in carrier selections`);
+          console.log(`[ACE:scanner] skip #${orderNo} — type "${load.load_type}" / vehicle "${load.vehicle_size}" not in carrier selections`);
           processedLoads.add(orderNo);
           skipped++;
           continue;
@@ -87,7 +87,7 @@ const ACEScanner = (() => {
       processedLoads.add(orderNo);
       newCount++;
 
-      console.log(`[ACE:scanner] ✓ Load #${orderNo} - ${load.pickup_city}, ${load.pickup_state} → ${load.delivery_city}, ${load.delivery_state} | ${loadMiles}mi`);
+      console.log(`[ACE:scanner] ✓ Load #${orderNo} — ${load.pickup_city}, ${load.pickup_state} → ${load.delivery_city}, ${load.delivery_state} | ${loadMiles}mi`);
 
       if (load.broker_href) {
         await processLoad(load, settings);
@@ -95,7 +95,7 @@ const ACEScanner = (() => {
       }
     }
 
-    console.log(`[ACE:scanner] Done - new: ${newCount} skipped: ${skipped}`);
+    console.log(`[ACE:scanner] Done — new: ${newCount} skipped: ${skipped}`);
   }
 
   function extractRowData(row, cells, orderNo) {
@@ -105,7 +105,7 @@ const ACEScanner = (() => {
       raw_row_html: row.outerHTML
     };
 
-    // cells[0] - broker name + profile URL + days to pay + credit score
+    // cells[0] — broker name + profile URL + days to pay + credit score
     const { href, name } = ACEProfile.getBrokerHref(cells[0]);
     load.broker_href = href;
     load.broker_name = name;
@@ -117,12 +117,12 @@ const ACEScanner = (() => {
     load.credit_score = creditMatch ? creditMatch[1] : '';
     load.has_safer    = cell0Text.includes('S.A.F.E.R');
 
-    // cells[1] - load type, broker MC (leading blank line filtered by filter(Boolean))
+    // cells[1] — load type, broker MC (leading blank line filtered by filter(Boolean))
     const c1 = (cells[1]?.innerText || '').trim().split('\n').map(s => s.trim()).filter(Boolean);
     load.load_type = c1[0] || '';
     load.broker_mc = c1[1] || '';
 
-    // cells[2] - ref no, broker posted amount (e.g. "442844\nU$ 1,400.00")
+    // cells[2] — ref no, broker posted amount (e.g. "442844\nU$ 1,400.00")
     const c2 = (cells[2]?.innerText || '').trim().split('\n').map(s => s.trim()).filter(Boolean);
     load.ref_no = c2[0] || '';
     const rawAmt = c2[1] || '';
@@ -133,7 +133,7 @@ const ACEScanner = (() => {
       load.posted_amount = '';
     }
 
-    // cells[3] - pickup city, state, zip, date
+    // cells[3] — pickup city, state, zip, date
     const pu = (cells[3]?.innerText || '').trim().split('\n').map(s => s.trim()).filter(Boolean);
     if (pu[0]) {
       const cs = pu[0].split(',');
@@ -144,7 +144,7 @@ const ACEScanner = (() => {
     }
     load.pickup_date = pu[1] || '';
 
-    // cells[4] - delivery city, state, zip, date
+    // cells[4] — delivery city, state, zip, date
     const del = (cells[4]?.innerText || '').trim().split('\n').map(s => s.trim()).filter(Boolean);
     if (del[0]) {
       const cs = del[0].split(',');
@@ -155,12 +155,12 @@ const ACEScanner = (() => {
     }
     load.delivery_date = del[1] || '';
 
-    // cells[5] - post date / expiry
+    // cells[5] — post date / expiry
     const dates = (cells[5]?.innerText || '').trim().split('\n').map(s => s.trim()).filter(Boolean);
     load.post_date   = dates[0] || '';
     load.expiry_date = dates[1] || '';
 
-    // cells[6] - vehicle size / miles
+    // cells[6] — vehicle size / miles
     // Split on newline first; if that yields one token, split on the boundary
     // between the last letter and the first digit (handles "LARGE STRAIGHT117")
     const vehRaw = (cells[6]?.innerText || '').trim();
@@ -174,12 +174,12 @@ const ACEScanner = (() => {
     load.vehicle_size = vehSize;
     load.miles        = vehMiles.replace(/[^0-9]/g, '');
 
-    // cells[7] - pieces / weight
+    // cells[7] — pieces / weight
     const pcs = (cells[7]?.innerText || '').trim().split('\n').map(s => s.trim()).filter(Boolean);
     load.pieces = pcs[0] || '';
     load.weight = pcs[1] || '';
 
-    // cells[8] - other info
+    // cells[8] — other info
     load.other_info = (cells[8]?.innerText || '').trim();
 
     return load;
@@ -188,17 +188,12 @@ const ACEScanner = (() => {
   async function processLoad(load, settings) {
     await ACEUtils.randomDelay();
 
-    // Fetch broker profile - 6 critical fields
+    // Fetch broker profile — 6 critical fields
     const profileData = await ACEProfile.fetch6Fields(load.broker_href);
     const fullLoad = { ...load, ...profileData };
 
     if (!fullLoad.broker_email) {
-      console.warn(`[ACE:scanner] No broker email for order ${fullLoad.order_no} - skipping`);
-      return fullLoad;
-    }
-
-    if (settings.ace_harvest_mode) {
-      chrome.runtime.sendMessage({ action: 'harvest_lane', load: fullLoad });
+      console.warn(`[ACE:scanner] No broker email for order ${fullLoad.order_no} — skipping`);
       return fullLoad;
     }
 
