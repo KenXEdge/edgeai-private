@@ -31,7 +31,6 @@
     { "source": "/verify", "destination": "/verify.html" },
     { "source": "/cmo", "destination": "/cmo.html" },
     { "source": "/cfo", "destination": "/cfo.html" },
-    { "source": "/", "has": [{ "type": "host", "value": "xbase1.com" }], "destination": "/xbase1.html" },
     { "source": "/", "destination": "/home.html" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ],
