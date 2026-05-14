@@ -824,6 +824,7 @@ def process_message(message_id: str, carrier_id: str) -> None:
         # ── Known broker path ────────────────────────────────────────────────
         log.info('"known broker %s id=%s"', email_data["from_email"], broker.get("id"))
 
+        log.info('"process_message — about to classify message_id=%s from=%s"', message_id, email_data.get("from_email"))
         classification = classify_reply(email_data)
         log.info('"classified %s as %s"', message_id, classification)
 
