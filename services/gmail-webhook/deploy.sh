@@ -21,10 +21,9 @@ fi
 REQUIRED_VARS=(
   SUPABASE_KEY
   ANTHROPIC_API_KEY
-  TWILIO_ACCOUNT_SID
-  TWILIO_AUTH_TOKEN
-  TWILIO_FROM
-  TWILIO_TO
+  TELNYX_API_KEY
+  TELNYX_FROM
+  TELNYX_TO
   GMAIL_CLIENT_ID
   GMAIL_CLIENT_SECRET
   GMAIL_OAUTH_REFRESH_TOKEN
@@ -80,10 +79,9 @@ gcloud run deploy "${SERVICE_NAME}" \
   --set-env-vars "SUPABASE_URL=https://siafwhlzazefyoevslde.supabase.co" \
   --set-env-vars "SUPABASE_KEY=${SUPABASE_KEY}" \
   --set-env-vars "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" \
-  --set-env-vars "TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}" \
-  --set-env-vars "TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}" \
-  --set-env-vars "TWILIO_FROM=${TWILIO_FROM}" \
-  --set-env-vars "TWILIO_TO=${TWILIO_TO}" \
+  --set-env-vars "TELNYX_API_KEY=${TELNYX_API_KEY}" \
+  --set-env-vars "TELNYX_FROM=${TELNYX_FROM}" \
+  --set-env-vars "TELNYX_TO=${TELNYX_TO}" \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=edgeai-493115" \
   --set-env-vars "GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID}" \
   --set-env-vars "GMAIL_CLIENT_SECRET=${GMAIL_CLIENT_SECRET}" \

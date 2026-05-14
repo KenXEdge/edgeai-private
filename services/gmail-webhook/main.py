@@ -18,7 +18,7 @@ from email.utils import parseaddr, parsedate_to_datetime
 import anthropic
 from flask import Flask, request, jsonify, redirect, Response, stream_with_context
 from supabase import create_client, Client
-from twilio.rest import Client as TwilioClient
+import telnyx
 from google.oauth2.credentials import Credentials as OAuthCredentials
 from googleapiclient.discovery import build
 
@@ -72,7 +72,6 @@ def server_error(e):
 # ── Lazy singletons (initialised once per container cold start) ────────────────
 _supabase: Client | None = None
 _anthropic: anthropic.Anthropic | None = None
-_twilio: TwilioClient | None = None
 
 
 def supabase_client() -> Client:
@@ -90,16 +89,6 @@ def anthropic_client() -> anthropic.Anthropic:
     if _anthropic is None:
         _anthropic = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     return _anthropic
-
-
-def twilio_client() -> TwilioClient:
-    global _twilio
-    if _twilio is None:
-        _twilio = TwilioClient(
-            os.environ["TWILIO_ACCOUNT_SID"],
-            os.environ["TWILIO_AUTH_TOKEN"],
-        )
-    return _twilio
 
 
 def gmail_service():
@@ -574,7 +563,7 @@ def classify_and_extract(email_data: dict) -> dict:
         return fallback
 
 
-# ── Twilio SMS ─────────────────────────────────────────────────────────────────
+# ── Telnyx SMS ─────────────────────────────────────────────────────────────────
 
 def send_load_offer_sms(email_data: dict) -> None:
     if os.environ.get("SMS_ENABLED", "true") == "false":
@@ -586,10 +575,11 @@ def send_load_offer_sms(email_data: dict) -> None:
         f"{email_data['body'][:200]}"
     )
     try:
-        twilio_client().messages.create(
-            body=body,
-            from_=os.environ["TWILIO_FROM"],
-            to=os.environ["TWILIO_TO"],
+        telnyx.api_key = os.environ["TELNYX_API_KEY"]
+        telnyx.Message.create(
+            from_=os.environ["TELNYX_FROM"],
+            to=os.environ["TELNYX_TO"],
+            text=body,
         )
         log.info('"SMS sent — known broker load offer from=%s"', email_data["from_email"])
     except Exception as exc:
@@ -616,10 +606,11 @@ def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
         f"\nReply Y to accept, P to pass"
     )
     try:
-        twilio_client().messages.create(
-            body=body,
-            from_=os.environ["TWILIO_FROM"],
-            to=os.environ["TWILIO_TO"],
+        telnyx.api_key = os.environ["TELNYX_API_KEY"]
+        telnyx.Message.create(
+            from_=os.environ["TELNYX_FROM"],
+            to=os.environ["TELNYX_TO"],
+            text=body,
         )
         log.info('"SMS sent — unknown broker load offer from=%s"', email_data["from_email"])
     except Exception as exc:
@@ -719,10 +710,11 @@ def send_load_board_sms(email_data: dict, parsed: dict, board_name: str) -> None
         f"Shipment {shipment}"
     )
     try:
-        twilio_client().messages.create(
-            body=body,
-            from_=os.environ["TWILIO_FROM"],
-            to=os.environ["TWILIO_TO"],
+        telnyx.api_key = os.environ["TELNYX_API_KEY"]
+        telnyx.Message.create(
+            from_=os.environ["TELNYX_FROM"],
+            to=os.environ["TELNYX_TO"],
+            text=body,
         )
         log.info(
             '"SMS sent — load board alert board=%s shipment=%s"',
