@@ -955,6 +955,16 @@ def health():
     return jsonify({"status": "ok", "service": "edgeai-gmail-webhook"}), 200
 
 
+@app.route("/debug-gmail", methods=["GET"])
+def debug_gmail():
+    try:
+        svc = gmail_service()
+        profile = svc.users().getProfile(userId="me").execute()
+        return jsonify({"email": profile.get("emailAddress"), "messagesTotal": profile.get("messagesTotal")})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route("/confirm-win", methods=["POST"])
 def confirm_win():
     """
