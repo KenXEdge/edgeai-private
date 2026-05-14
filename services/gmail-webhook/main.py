@@ -831,7 +831,7 @@ def process_message(message_id: str, carrier_id: str) -> None:
         # Must succeed before SMS so that any retry finds it and stops.
         log_response(email_data, classification, carrier_id, broker_id=broker.get("id"), broker_name=broker.get("name"))
 
-        if classification == "load_offer":
+        if classification.lower() == "load_offer":
             if not has_carrier_replied(email_data["thread_id"]):
                 send_load_offer_sms(email_data)
             else:
@@ -851,7 +851,7 @@ def process_message(message_id: str, carrier_id: str) -> None:
 
         log_unknown_broker_inbox(email_data, extracted, carrier_id)
 
-        if classification == "load_offer":
+        if classification.lower() == "load_offer":
             send_unknown_broker_sms(email_data, extracted)
 
     # Mark as read AFTER all logging and SMS complete
