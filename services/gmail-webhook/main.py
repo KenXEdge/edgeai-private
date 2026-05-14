@@ -583,7 +583,7 @@ def send_load_offer_sms(email_data: dict) -> None:
         )
         log.info('"SMS sent — known broker load offer from=%s"', email_data["from_email"])
     except Exception as exc:
-        log.error('"send_load_offer_sms failed: %s"', exc)
+        log.error('"send_load_offer_sms failed: %s"', exc, exc_info=True)
 
 
 def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
