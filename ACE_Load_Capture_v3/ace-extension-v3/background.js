@@ -262,7 +262,7 @@ function _openBidPopup(load, suggestedRate) {
 }
 
 // ─── GMAIL ALERT ─────────────────────────────────────────────────────────────
-
+// !! LOCKED — DO NOT MODIFY — any changes require explicit Ken approval !!
 async function _sendGmailAlert(load, suggestedRate, token, settings, t3) {
   const to      = settings.gmail_address;
   const puDate  = (load.pickup_date || 'ASAP').split(' ')[0];
@@ -272,7 +272,7 @@ async function _sendGmailAlert(load, suggestedRate, token, settings, t3) {
   // mailto — use %0A for line breaks so iOS Gmail renders them correctly
   const mailSubject = encodeURIComponent(`${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${suggestedRate}`);
   const nl = '%0D%0A';
-  const mailBody = `QUOTE: $${suggestedRate}${nl}MC ${settings.mc_number || ''}${nl}${nl}${load.load_type || ''}${nl}Order ${load.order_no}${nl}${load.pickup_city}, ${load.pickup_state} ${load.pickup_zip || ''} - ${load.pickup_date || ''}${nl}${load.delivery_city}, ${load.delivery_state} ${load.delivery_zip || ''} - ${load.delivery_date || ''}${nl}${load.vehicle_size || ''} ${load.miles || ''}mi${nl}${load.pieces || ''} pcs / ${load.weight || ''} lbs${nl}${nl}*******************${nl}Equipment:${nl}26' Straight,${nl}Dock-high, Air-ride, 3 row e-tracks${nl}Box Door: 94"W x 97"H${nl}Box Interior 98.5"W x 26'L${nl}TWIC${nl}Gear:${nl}Lift gate${nl}Pallet jack${nl}Load bars, Straps, Blankets.`;
+  const mailBody = `QUOTE: $${suggestedRate}${nl}MC ${settings.mc_number || ''}${nl}${nl}${load.load_type || ''}${nl}Order ${load.order_no}${nl}${load.pickup_city}, ${load.pickup_state} ${load.pickup_zip || ''} - ${load.pickup_date || ''}${nl}${load.delivery_city}, ${load.delivery_state} ${load.delivery_zip || ''} - ${load.delivery_date || ''}${nl}${load.vehicle_size || ''} ${load.miles || ''}mi${nl}${load.pieces || ''} pcs / ${load.weight || ''} lbs${nl}${nl}${settings.email_signature || ''}`;
   const mailtoUrl = `mailto:${load.broker_email}?subject=${mailSubject}&body=${mailBody}`;
 
   const body = `<div style="font-family:Arial,sans-serif;font-size:14px;max-width:480px;">
@@ -326,26 +326,19 @@ async function _sendBidEmail(load, bidAmount, token, settings, t5) {
   const carrierLocation = settings.carrier_location || '';
   const carrierPhone    = settings.carrier_phone    || '';
   const mcNumber        = settings.mc_number        || '';
-  const fromEmail       = settings.gmail_address    || '';
+  const fromEmail       = settings.secondary_email  || settings.gmail_address || '';
 
   const subject = `${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${bidAmount}`;
 
   const loadTable = _buildLoadTable(load);
 
+  const firstName = settings.bid_contact_name || (settings.carrier_name || '').split(' ')[0];
+  const gmailSig = await _getGmailSignature(token, settings);
   const body = `<div style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;">
+<p>Hey there, this is ${firstName}..interested in this load. Thx!</p>
 <p><strong>QUOTE: $${bidAmount}</strong><br>MC ${mcNumber}</p>
 ${loadTable}
-<p style="margin-top:12px;">*******************<br>
-Equipment:<br>
-26' Straight,<br>
-Dock-high, Air-ride, 3 row e-tracks<br>
-Box Door: 94"W x 97"H<br>
-Box Interior 98.5"W x 26'L<br>
-TWIC<br>
-Gear:<br>
-Lift gate<br>
-Pallet jack<br>
-Load bars, Straps, Blankets.</p>
+${gmailSig ? '<div style="margin-top:12px;">' + gmailSig + '</div>' : ''}
 </div>`;
 
   const t6 = new Date().toISOString();
@@ -382,13 +375,16 @@ async function _createDraftOnly(load, bidAmount, token, settings) {
   const carrierLocation = settings.carrier_location || '';
   const carrierPhone    = settings.carrier_phone    || '';
   const mcNumber        = settings.mc_number        || '';
-  const fromEmail       = settings.gmail_address    || '';
+  const fromEmail       = settings.secondary_email  || settings.gmail_address || '';
   const subject = `${load.pickup_city},${load.pickup_state} to ${load.delivery_city},${load.delivery_state} - Bid $${bidAmount}`;
   const loadTable = _buildLoadTable(load);
+  const firstName2 = settings.bid_contact_name || (settings.carrier_name || '').split(' ')[0];
+  const gmailSig2 = await _getGmailSignature(token, settings);
   const body = `<div style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;">
+<p>Hey there, this is ${firstName2}..interested in this load. Thx!</p>
 <p><strong>QUOTE: $${bidAmount}</strong><br>MC ${mcNumber}</p>
 ${loadTable}
-<p style="margin-top:12px;">*******************<br>Equipment:<br>26' Straight,<br>Dock-high, Air-ride, 3 row e-tracks<br>Box Door: 94"W x 97"H<br>Box Interior 98.5"W x 26'L<br>TWIC<br>Gear:<br>Lift gate<br>Pallet jack<br>Load bars, Straps, Blankets.</p>
+${gmailSig2 ? '<div style="margin-top:12px;">' + gmailSig2 + '</div>' : ''}
 </div>`;
   const draft = await _gmailCreateDraft(load.broker_email, subject, body, token, fromEmail);
   if (draft) {
@@ -407,7 +403,7 @@ function _buildLoadTable(load) {
   const postStr   = postParts.length > 1   ? `${postParts[0]}<br>${postParts[1]}`   : (load.post_date   || '');
   const expiryStr = expiryParts.length > 1 ? `${expiryParts[0]}<br>${expiryParts[1]}` : (load.expiry_date || '');
   return `
-<table style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;border-collapse:collapse;background:#f0f0f0;display:inline-table;">
+<table style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;border-collapse:collapse;background:transparent;display:inline-table;">
   <tr>
     <td style="padding:2px 4px;vertical-align:top;border:1px solid #d0d0d0;"><br>${load.load_type||''}<br>${load.ref_no||''}</td>
     <td style="padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;"><br><span style="color:#cc0000;text-decoration:underline;">${load.order_no||''}</span></td>
@@ -421,6 +417,27 @@ function _buildLoadTable(load) {
 }
 
 // ─── GMAIL API ────────────────────────────────────────────────────────────────
+
+async function _getGmailSignature(token, settings) {
+  const alias = settings?.secondary_email || settings?.gmail_address || '';
+  if (!alias) return '';
+  try {
+    const resp = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs/${encodeURIComponent(alias)}`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    const data = await resp.json();
+    console.log('[ACE] Gmail sendAs response:', JSON.stringify(data));
+    if (resp.ok && data.signature) {
+      console.log('[ACE] ✓ Signature fetched — length:', data.signature.length);
+      return data.signature;
+    }
+    console.warn('[ACE] No signature in response:', data);
+  } catch(e) {
+    console.error('[ACE] Signature fetch error:', e.message);
+  }
+  return '';
+}
 
 async function _gmailSend(to, subject, htmlBody, token, from) {
   const draft = await _gmailCreateDraft(to, subject, htmlBody, token, from);
@@ -439,14 +456,16 @@ async function _gmailSend(to, subject, htmlBody, token, from) {
 }
 
 async function _gmailCreateDraft(to, subject, htmlBody, token, from) {
+  // From: must be first header for Gmail alias sending to work correctly
   const fromLine = from ? `From: ${from}\r\n` : '';
-  const raw = `To: ${to}\r\n${fromLine}Subject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${htmlBody}`;
+  const raw = `${fromLine}To: ${to}\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${htmlBody}`;
   const encoded = btoa(unescape(encodeURIComponent(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const msgBody = { message: { raw: encoded } };
   try {
     const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: { raw: encoded } })
+      body: JSON.stringify(msgBody)
     });
     if (!res.ok) {
       // Token expired — refresh and retry once
@@ -456,7 +475,7 @@ async function _gmailCreateDraft(to, subject, htmlBody, token, from) {
       const retry = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${newToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: { raw: encoded } })
+        body: JSON.stringify(msgBody)
       });
       if (!retry.ok) { console.warn('[ACE] Gmail draft failed after token refresh'); return null; }
       return await retry.json();
@@ -694,7 +713,7 @@ function _getSettings() {
       'search_from_state', 'search_to_states', 'search_to_city',
       'pickup_radius', 'bid_radius', 'max_weight',
       'target_load_types', 'ace_paused', 'ace_locked',
-      'operating_start', 'operating_end'
+      'operating_start', 'operating_end', 'bid_contact_name', 'secondary_email', 'email_signature'
     ], resolve);
   });
 }

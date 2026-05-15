@@ -33,6 +33,13 @@ const ACEValidator = (() => {
           tier:     data.tier || null
         };
         _cacheResult(carrierUuid, result);
+        // Write carrier fields from validation response into storage
+        chrome.storage.local.set({
+          secondary_email:  data.secondary_email  || '',
+          ace_tier:         data.tier             || '',
+          ace_carrier_name: data.carrier_name     || '',
+          email_signature:  data.email_signature  || ''
+        });
         console.log(`[ACE:validator] ✓ UUID validated — ${result.valid ? 'ACTIVE' : 'INACTIVE'} | tier: ${result.tier}`);
         return result;
       } else {
