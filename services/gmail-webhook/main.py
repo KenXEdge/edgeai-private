@@ -1928,6 +1928,42 @@ def update_broker_win():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/validate-carrier', methods=['GET'])
+def validate_carrier():
+    try:
+        uuid = request.args.get('uuid')
+        if not uuid:
+            return jsonify({'active': False, 'reason': 'missing_uuid'}), 400
+
+        result = supabase_client().table('carriers') \
+            .select('id, status, subscription_status, tier, secondary_email, email, name, email_signature') \
+            .eq('id', uuid) \
+            .execute()
+
+        if not result.data:
+            return jsonify({'active': False, 'reason': 'not_found'}), 200
+
+        carrier = result.data[0]
+        is_active = (
+            carrier.get('status') == 'active' and
+            carrier.get('subscription_status') == 'active'
+        )
+
+        return jsonify({
+            'active':           is_active,
+            'reason':           'active' if is_active else 'inactive',
+            'tier':             carrier.get('tier'),
+            'secondary_email':  carrier.get('secondary_email'),
+            'email':            carrier.get('email'),
+            'carrier_name':     carrier.get('name'),
+            'email_signature':  carrier.get('email_signature')
+        }), 200
+
+    except Exception as e:
+        logging.error(f'[validate-carrier] Error: {e}')
+        return jsonify({'active': True, 'reason': 'offline_failopen'}), 200
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
