@@ -304,6 +304,144 @@ def require_carrier_auth(view_func):
 # ── End Phase D middleware ─────────────────────────────────────────────────────
 
 
+"""
+================================================================================
+Phase C — /get-gmail-access-token endpoint
+================================================================================
+ADD THIS BLOCK TO main.py
+
+Placement: insert AFTER the Phase D middleware block ends (currently line 304,
+the "# ── End Phase D middleware" comment) and BEFORE the
+"# ── Load board constants" section (currently line 307).
+
+Purpose: provides a single authoritative endpoint for cloud-edition containers
+to obtain a valid Gmail access token for a carrier. All consumers (ACE cloud
+containers, future EDGE Outreach, future CMO) call this endpoint rather than
+each managing their own token refresh. Centralizes token lifecycle management.
+
+Design:
+  - Protected by @require_carrier_auth (Phase D). Only authenticated carrier
+    service accounts can call this. carrier_id extracted from JWT — not from
+    request body (prevents spoofing).
+  - Reads carriers.gmail_token (the refresh token) from Supabase for the
+    authenticated carrier.
+  - Reuses existing gmail_service() function to refresh the token. This is the
+    same function used by the Gmail webhook handler — no duplicate refresh logic.
+  - Returns the refreshed access token + expiry. Container caches it for the
+    remaining lifetime and calls this endpoint again when it expires.
+  - Does NOT return the refresh token. Access token only.
+
+Token lifecycle:
+  - Google access tokens expire after ~3600 seconds (1 hour)
+  - Container should refresh ~5 minutes before expiry (at ~3300 seconds)
+  - Container holds the access token in memory only — never written to disk
+
+Required env vars (already present in main.py from gmail_service()):
+  GMAIL_CLIENT_ID
+  GMAIL_CLIENT_SECRET
+
+No new env vars required for this endpoint.
+
+Failure modes:
+  - 401: invalid or missing service account JWT (handled by @require_carrier_auth)
+  - 404: carrier has no gmail_token in Supabase (never connected Gmail)
+  - 502: Google token refresh failed (Google API error)
+  - 500: unexpected error
+================================================================================
+"""
+
+# ── Phase C: Gmail access token endpoint ──────────────────────────────────────
+
+import time as _time
+
+
+@app.route("/get-gmail-access-token", methods=["POST"])
+@require_carrier_auth
+def get_gmail_access_token():
+    """
+    Returns a fresh Gmail access token for the authenticated carrier.
+    carrier_id is sourced from the verified JWT via flask.g — not from request body.
+
+    Response (200):
+        {
+            "access_token": "<google-access-token>",
+            "expires_at": <unix-timestamp-int>,
+            "carrier_id": "<uuid>"
+        }
+
+    Error responses:
+        404 — carrier has no gmail_token (Gmail not connected)
+        502 — Google token refresh failed
+        500 — unexpected error
+    """
+    carrier_id = g.carrier_id  # set by @require_carrier_auth, already validated
+
+    # 1. Fetch carrier's Gmail refresh token from Supabase
+    try:
+        sb = supabase_client()
+        resp = (
+            sb.table("carriers")
+            .select("gmail_token")
+            .eq("id", carrier_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        log.error(f'"[PHASE-C] supabase fetch failed for carrier {carrier_id}: {e}"')
+        return jsonify({"error": "internal"}), 500
+
+    if not resp.data or not resp.data[0].get("gmail_token"):
+        log.warning(f'"[PHASE-C] no gmail_token for carrier {carrier_id}"')
+        return jsonify({"error": "gmail_not_connected"}), 404
+
+    refresh_token = resp.data[0]["gmail_token"]
+
+    # 2. Refresh the access token using existing gmail_service() function.
+    #    gmail_service() calls creds.refresh() internally and returns
+    #    an authenticated Gmail service. We extract the access token from
+    #    the credentials object after refresh.
+    try:
+        import google.auth.transport.requests as google_requests
+        import requests as requests_lib
+        from google.oauth2.credentials import Credentials as OAuthCredentials
+
+        creds = OAuthCredentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.environ["GMAIL_CLIENT_ID"],
+            client_secret=os.environ["GMAIL_CLIENT_SECRET"],
+            scopes=["https://www.googleapis.com/auth/gmail.modify"],
+        )
+        auth_req = google_requests.Request(session=requests_lib.Session())
+        creds.refresh(auth_req)
+
+        access_token = creds.token
+        # creds.expiry is a datetime object. Convert to unix timestamp.
+        expires_at = int(creds.expiry.timestamp()) if creds.expiry else int(_time.time()) + 3600
+
+    except Exception as e:
+        log.error(f'"[PHASE-C] token refresh failed for carrier {carrier_id}: {e}"')
+        return jsonify({"error": "token_refresh_failed"}), 502
+
+    # 3. Return access token to container. Container caches and reuses
+    #    until expires_at - 300 (5-min buffer), then calls this endpoint again.
+    log.info(json.dumps({
+        "event": "gmail_token_issued",
+        "carrier_id": carrier_id,
+        "expires_at": expires_at
+    }))
+
+    return jsonify({
+        "access_token": access_token,
+        "expires_at": expires_at,
+        "carrier_id": carrier_id
+    }), 200
+
+
+# ── End Phase C ────────────────────────────────────────────────────────────────
+
+
 # ── Load board constants ───────────────────────────────────────────────────────
 
 LOAD_BOARD_SENDERS: dict[str, str] = {
