@@ -91,12 +91,16 @@ def anthropic_client() -> anthropic.Anthropic:
     return _anthropic
 
 
-def gmail_service():
+def gmail_service(refresh_token: str):
+    """Build authenticated Gmail service using carrier's own refresh token.
+    Token passed per-call, never read from env. Required for multi-carrier."""
     import google.auth.transport.requests as google_requests
     import requests as requests_lib
+    if not refresh_token:
+        raise ValueError("gmail_service called without refresh_token")
     creds = OAuthCredentials(
         token=None,
-        refresh_token=os.environ["GMAIL_OAUTH_REFRESH_TOKEN"],
+        refresh_token=refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.environ["GMAIL_CLIENT_ID"],
         client_secret=os.environ["GMAIL_CLIENT_SECRET"],
@@ -105,6 +109,199 @@ def gmail_service():
     auth_req = google_requests.Request(session=requests_lib.Session())
     creds.refresh(auth_req)
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+"""
+================================================================================
+Phase D — Service Account Auth Middleware for cloud-edition endpoints
+================================================================================
+ADD THIS BLOCK TO main.py
+
+Placement: insert AFTER the `anthropic_client()` function (line ~91) and BEFORE
+the "Load board constants" section (line ~114).
+
+Purpose: provides @require_carrier_auth decorator that verifies Google-issued
+service account ID tokens on incoming requests. Each carrier has a dedicated
+GCP service account; container running for that carrier uses its service
+account's ID token to authenticate against main.py endpoints.
+
+Token format expected: Google-signed JWT in header
+    Authorization: Bearer <google-id-token>
+
+Verification steps:
+  1. Extract token from Authorization header
+  2. Verify signature with Google's public keys (via google.oauth2.id_token)
+  3. Confirm audience matches our Cloud Run service URL
+  4. Confirm issuer is accounts.google.com
+  5. Extract email claim — must match pattern ace-carrier-{uuid}@<project>.iam.gserviceaccount.com
+  6. Parse carrier_id from service account email
+  7. Confirm carrier has active ace_vm_access in Supabase
+  8. Attach carrier_id to flask.g for endpoint use
+
+If any step fails: return 401 immediately, log the rejection.
+
+This decorator is applied ONLY to new cloud-edition endpoints. Existing
+endpoints (/webhook, /stripe-webhook, /validate-carrier, etc.) keep their
+current behavior. Cleanup of those endpoints is separate future work.
+
+REQUIRED ENV VARS (must be set on Cloud Run service):
+  CLOUD_RUN_SERVICE_URL  — the public URL of this service
+                           (e.g. https://edgeai-gmail-webhook-jh6fc2627a-uc.a.run.app)
+                           Used as JWT audience to prevent token reuse across services.
+  CARRIER_SA_PROJECT     — GCP project where carrier service accounts live
+                           (e.g. "xbase1-prod"). Defense-in-depth check.
+================================================================================
+"""
+
+# ── Phase D: Service account auth middleware ───────────────────────────────────
+
+from functools import wraps
+import re
+
+import google.auth.transport.requests as google_auth_requests
+from google.oauth2 import id_token as google_id_token
+from flask import g
+
+
+# Pattern: ace-carrier-{32_hex_uuid_no_dashes}@<gcp_project>.iam.gserviceaccount.com
+# Example: ace-carrier-e71595ed72ad46d5a4244265df3b29ec@xbase1-prod.iam.gserviceaccount.com
+_CARRIER_SA_EMAIL_RE = re.compile(
+    r'^ace-carrier-(?P<uuid_hex>[0-9a-f]{32})@'
+    r'(?P<project>[a-z][a-z0-9-]{4,28}[a-z0-9])\.iam\.gserviceaccount\.com$'
+)
+
+
+def _uuid_from_hex(uuid_hex: str) -> str:
+    """Convert 32-char hex UUID (no dashes) back to canonical 8-4-4-4-12 form."""
+    return f"{uuid_hex[0:8]}-{uuid_hex[8:12]}-{uuid_hex[12:16]}-{uuid_hex[16:20]}-{uuid_hex[20:32]}"
+
+
+def _audit_log(event: str, **kwargs) -> None:
+    """Structured log for auth events. Picked up by Cloud Logging."""
+    payload = {"event": event, **kwargs}
+    log.info(json.dumps(payload))
+
+
+def require_carrier_auth(view_func):
+    """
+    Decorator: enforces Google-signed service account JWT on a Flask endpoint.
+
+    Behavior:
+      - Reads Authorization: Bearer <token> header
+      - Verifies token via Google's public keys
+      - Validates token's audience matches expected Cloud Run URL
+      - Extracts carrier UUID from the service account email
+      - Confirms carrier has active ace_vm_access in Supabase
+      - Sets flask.g.carrier_id and flask.g.sa_email for view to use
+      - Returns 401 on any failure
+
+    Usage:
+        @app.route("/get-gmail-access-token", methods=["POST"])
+        @require_carrier_auth
+        def get_gmail_access_token():
+            carrier_id = g.carrier_id  # already validated
+            ...
+    """
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        # Step 1 — Extract token from Authorization header
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            _audit_log("auth_rejected", reason="missing_token",
+                       path=request.path, ip=request.remote_addr)
+            return jsonify({"error": "unauthorized"}), 401
+
+        token = auth_header.split(" ", 1)[1].strip()
+        if not token:
+            _audit_log("auth_rejected", reason="empty_token",
+                       path=request.path, ip=request.remote_addr)
+            return jsonify({"error": "unauthorized"}), 401
+
+        # Step 2 — Server must know its own URL to verify token audience
+        expected_audience = os.environ.get("CLOUD_RUN_SERVICE_URL", "")
+        if not expected_audience:
+            log.error('"[AUTH] CLOUD_RUN_SERVICE_URL env var not set — cannot verify tokens"')
+            return jsonify({"error": "server misconfigured"}), 500
+
+        # Step 3 — Verify Google JWT signature and audience
+        try:
+            req = google_auth_requests.Request()
+            claims = google_id_token.verify_token(
+                token,
+                request=req,
+                audience=expected_audience,
+            )
+        except ValueError as e:
+            _audit_log("auth_rejected", reason="invalid_token",
+                       path=request.path, ip=request.remote_addr, detail=str(e))
+            return jsonify({"error": "unauthorized"}), 401
+
+        # Step 4 — Confirm issuer is Google
+        if claims.get("iss") not in ("https://accounts.google.com", "accounts.google.com"):
+            _audit_log("auth_rejected", reason="wrong_issuer",
+                       path=request.path, ip=request.remote_addr, iss=claims.get("iss"))
+            return jsonify({"error": "unauthorized"}), 401
+
+        # Step 5 — Pull service account email claim
+        sa_email = claims.get("email", "")
+        if not sa_email:
+            _audit_log("auth_rejected", reason="no_email_claim",
+                       path=request.path, ip=request.remote_addr)
+            return jsonify({"error": "unauthorized"}), 401
+
+        # Step 6 — Email must match carrier SA naming pattern
+        match = _CARRIER_SA_EMAIL_RE.match(sa_email)
+        if not match:
+            _audit_log("auth_rejected", reason="not_carrier_sa",
+                       path=request.path, ip=request.remote_addr, sa_email=sa_email)
+            return jsonify({"error": "unauthorized"}), 401
+
+        # Step 7 — Optional GCP project match (defense in depth)
+        expected_project = os.environ.get("CARRIER_SA_PROJECT", "")
+        if expected_project and match.group("project") != expected_project:
+            _audit_log("auth_rejected", reason="wrong_project",
+                       path=request.path, ip=request.remote_addr,
+                       sa_project=match.group("project"))
+            return jsonify({"error": "unauthorized"}), 401
+
+        # Step 8 — Convert hex UUID back to canonical UUID form
+        try:
+            carrier_id = _uuid_from_hex(match.group("uuid_hex"))
+        except Exception:
+            _audit_log("auth_rejected", reason="malformed_carrier_id",
+                       path=request.path, ip=request.remote_addr)
+            return jsonify({"error": "unauthorized"}), 401
+
+        # Step 9 — Confirm carrier has active ace_vm_access row in Supabase
+        try:
+            sb = supabase_client()
+            resp = (
+                sb.table("ace_vm_access")
+                .select("active")
+                .eq("carrier_id", carrier_id)
+                .eq("active", True)
+                .limit(1)
+                .execute()
+            )
+            if not resp.data:
+                _audit_log("auth_rejected", reason="no_active_vm_access",
+                           path=request.path, carrier_id=carrier_id)
+                return jsonify({"error": "access revoked"}), 401
+        except Exception as e:
+            log.error(f'"[AUTH] supabase lookup failed: {e}"')
+            return jsonify({"error": "internal"}), 500
+
+        # All checks passed — attach to request context for the view function
+        g.carrier_id = carrier_id
+        g.sa_email = sa_email
+        _audit_log("auth_accepted", path=request.path, carrier_id=carrier_id)
+
+        return view_func(*args, **kwargs)
+
+    return wrapper
+
+
+# ── End Phase D middleware ─────────────────────────────────────────────────────
 
 
 # ── Load board constants ───────────────────────────────────────────────────────
@@ -133,7 +330,7 @@ LOAD_BOARD_PARSE_PROMPT = (
 
 # ── Gmail helpers ──────────────────────────────────────────────────────────────
 
-def get_history(start_history_id: str) -> list[dict]:
+def get_history(start_history_id: str, refresh_token: str) -> list[dict]:
     """Primary method: return messagesAdded entries since start_history_id.
     Returns [] on 0 records OR on exception — caller is responsible for fallback.
     """
@@ -141,7 +338,7 @@ def get_history(start_history_id: str) -> list[dict]:
     try:
         print(f"[get_history] calling history.list startHistoryId={start_history_id}", flush=True)
         resp = (
-            gmail_service()
+            gmail_service(refresh_token)
             .users()
             .history()
             .list(
@@ -169,7 +366,7 @@ def get_history(start_history_id: str) -> list[dict]:
     return messages
 
 
-def get_unread_messages() -> list[dict]:
+def get_unread_messages(refresh_token: str) -> list[dict]:
     """Fallback: fetch recent inbox messages via messages.list q='in:inbox newer_than:1h'.
     Catches emails regardless of read/unread status.
     Returns a list of minimal message dicts {id, threadId} matching history.list format.
@@ -177,7 +374,7 @@ def get_unread_messages() -> list[dict]:
     try:
         print(f"[get_unread] calling messages.list q=in:inbox newer_than:1h maxResults=10", flush=True)
         resp = (
-            gmail_service()
+            gmail_service(refresh_token)
             .users()
             .messages()
             .list(
@@ -198,10 +395,10 @@ def get_unread_messages() -> list[dict]:
         return []
 
 
-def mark_as_read(message_id: str) -> None:
+def mark_as_read(message_id: str, refresh_token: str) -> None:
     """Remove the UNREAD label after successful processing."""
     try:
-        gmail_service().users().messages().modify(
+        gmail_service(refresh_token).users().messages().modify(
             userId="me",
             id=message_id,
             body={"removeLabelIds": ["UNREAD"]},
@@ -211,11 +408,11 @@ def mark_as_read(message_id: str) -> None:
         log.error('"mark_as_read failed messageId=%s: %s"', message_id, exc)
 
 
-def fetch_message(message_id: str) -> dict | None:
+def fetch_message(message_id: str, refresh_token: str) -> dict | None:
     """Fetch a single Gmail message and return parsed fields."""
     try:
         raw = (
-            gmail_service()
+            gmail_service(refresh_token)
             .users()
             .messages()
             .get(userId="me", id=message_id, format="raw")
@@ -726,14 +923,14 @@ def send_load_board_sms(email_data: dict, parsed: dict, board_name: str) -> None
 
 # ── Thread helpers ────────────────────────────────────────────────────────────
 
-def has_carrier_replied(thread_id: str) -> bool:
+def has_carrier_replied(thread_id: str, refresh_token: str, carrier_email: str) -> bool:
     """Return True if the carrier's own Gmail account has sent a message in this thread.
-    Checks thread message headers for GMAIL_USER as the From address.
+    Checks thread message headers for carrier_email as the From address.
     Returns False on any exception so SMS is never suppressed due to an API error.
     """
     try:
         thread = (
-            gmail_service()
+            gmail_service(refresh_token)
             .users()
             .threads()
             .get(
@@ -744,7 +941,7 @@ def has_carrier_replied(thread_id: str) -> bool:
             )
             .execute()
         )
-        carrier_email = os.environ.get("GMAIL_USER", "").lower()
+        carrier_email = (carrier_email or "").lower()
         for message in thread.get("messages", []):
             headers = message.get("payload", {}).get("headers", [])
             for h in headers:
@@ -757,18 +954,18 @@ def has_carrier_replied(thread_id: str) -> bool:
 
 # ── Core processing pipeline ───────────────────────────────────────────────────
 
-def process_message(message_id: str, carrier_id: str) -> None:
+def process_message(message_id: str, carrier_id: str, refresh_token: str, carrier_email: str) -> None:
     """Full pipeline for one Gmail message."""
 
     # Step 1 — deduplication FIRST, before any API calls or processing
     # Prevents 150x replay: if the message is already in either table, stop immediately.
     if is_duplicate(message_id):
         log.info('"duplicate message %s — skipping"', message_id)
-        mark_as_read(message_id)
+        mark_as_read(message_id, refresh_token)
         return
 
     # Step 2 — fetch email content from Gmail API
-    email_data = fetch_message(message_id)
+    email_data = fetch_message(message_id, refresh_token)
     if not email_data:
         return
 
@@ -782,17 +979,17 @@ def process_message(message_id: str, carrier_id: str) -> None:
         parsed = parse_load_board_email(email_data)
         if parsed is None:
             log.error('"load board parse failed — skipping message=%s"', message_id)
-            mark_as_read(message_id)
+            mark_as_read(message_id, refresh_token)
             return
         carrier = get_carrier_profile(carrier_id)
 
         if carrier and not load_board_matches_carrier(parsed, carrier):
             log.info('"load board message skipped — equipment mismatch message=%s"', message_id)
-            mark_as_read(message_id)
+            mark_as_read(message_id, refresh_token)
             return
 
         send_load_board_sms(email_data, parsed, board_name)
-        mark_as_read(message_id)
+        mark_as_read(message_id, refresh_token)
         return
 
     # ── Pre-Claude noise filter — discard before API call ─────────────────────
@@ -814,7 +1011,7 @@ def process_message(message_id: str, carrier_id: str) -> None:
         or _domain in _inbox_hard_noise_domains
         or any(_domain == d or _domain.endswith("." + d) for d in _inbox_hard_noise_domains)
     ):
-        mark_as_read(message_id)
+        mark_as_read(message_id, refresh_token)
         return
 
     # Step 3 — broker lookup determines which path to take
@@ -833,8 +1030,14 @@ def process_message(message_id: str, carrier_id: str) -> None:
         log_response(email_data, classification, carrier_id, broker_id=broker.get("id"), broker_name=broker.get("name"))
 
         if classification.lower() == "load_offer":
-            if not has_carrier_replied(email_data["thread_id"]):
+            log.info('"SMS DIAGNOSTIC — entering load_offer branch message_id=%s thread_id=%s carrier_email=%s"',
+                     email_data["message_id"], email_data["thread_id"], carrier_email)
+            replied = has_carrier_replied(email_data["thread_id"], refresh_token, carrier_email)
+            log.info('"SMS DIAGNOSTIC — has_carrier_replied returned %s for thread=%s"', replied, email_data["thread_id"])
+            if not replied:
+                log.info('"SMS DIAGNOSTIC — about to call send_load_offer_sms"')
                 send_load_offer_sms(email_data)
+                log.info('"SMS DIAGNOSTIC — send_load_offer_sms returned"')
             else:
                 log.info('"SMS suppressed — carrier already replied in thread=%s"',
                          email_data["thread_id"])
@@ -856,7 +1059,7 @@ def process_message(message_id: str, carrier_id: str) -> None:
             send_unknown_broker_sms(email_data, extracted)
 
     # Mark as read AFTER all logging and SMS complete
-    mark_as_read(message_id)
+    mark_as_read(message_id, refresh_token)
 
 
 # ── Flask route ────────────────────────────────────────────────────────────────
@@ -903,9 +1106,23 @@ def webhook():
 
         print(f"[WEBHOOK] pubsub notification received — emailAddress={email_address} newHistoryId={new_history_id}", flush=True)
 
-        carrier_id = get_carrier_id_for_email(email_address)
-        if not carrier_id:
+        carrier_resp = (
+            supabase_client()
+            .table("carriers")
+            .select("id, gmail_token, email")
+            .eq("email", email_address)
+            .limit(1)
+            .execute()
+        )
+        if not carrier_resp.data:
             log.warning('"[WEBHOOK] no carrier found for email=%s — skipping"', email_address)
+            return jsonify({"ok": True}), 200
+        carrier_row = carrier_resp.data[0]
+        carrier_id = carrier_row["id"]
+        refresh_token = carrier_row.get("gmail_token")
+        carrier_email = carrier_row.get("email", email_address)
+        if not refresh_token:
+            log.error('"[WEBHOOK] carrier %s has no gmail_token — skipping"', email_address)
             return jsonify({"ok": True}), 200
 
         # ── historyId tracking ────────────────────────────────────────────────
@@ -921,19 +1138,19 @@ def webhook():
         print(f"[WEBHOOK] BRANCH: stored historyId found — startHistoryId={stored_history_id} delta={delta}", flush=True)
 
         # ── Fetch messages (primary then fallback) ────────────────────────────
-        new_messages = get_history(stored_history_id)
+        new_messages = get_history(stored_history_id, refresh_token)
         print(f"[WEBHOOK] get_history returned — messageCount={len(new_messages)}", flush=True)
 
         if not new_messages:
             print(f"[WEBHOOK] messageCount=0 — triggering fallback now", flush=True)
-            new_messages = get_unread_messages()
+            new_messages = get_unread_messages(refresh_token)
             print(f"[WEBHOOK] fallback returned — messageCount={len(new_messages)}", flush=True)
 
         # ── Process each message ──────────────────────────────────────────────
         for idx, msg in enumerate(new_messages):
             print(f"[WEBHOOK] dispatching message[{idx}] id={msg.get('id')}", flush=True)
             try:
-                process_message(msg["id"], carrier_id)
+                process_message(msg["id"], carrier_id, refresh_token, carrier_email)
             except Exception as exc:
                 log.error('"unhandled error processing %s: %s"', msg.get("id"), exc)
                 print(f"[WEBHOOK] ERROR processing message {msg.get('id')}: {exc}", flush=True)
@@ -956,10 +1173,31 @@ def health():
     return jsonify({"status": "ok", "service": "edgeai-gmail-webhook"}), 200
 
 
+@app.route("/debug-telnyx", methods=["GET"])
+def debug_telnyx():
+    """Verify which telnyx version is actually deployed and what attributes exist."""
+    info = {
+        "telnyx_version": getattr(telnyx, "__version__", "UNKNOWN"),
+        "has_Message": hasattr(telnyx, "Message"),
+        "telnyx_module_file": getattr(telnyx, "__file__", "UNKNOWN"),
+        "dir_telnyx_top10": [x for x in dir(telnyx) if not x.startswith("_")][:30],
+    }
+    return jsonify(info)
+
+
 @app.route("/debug-gmail", methods=["GET"])
 def debug_gmail():
     try:
-        svc = gmail_service()
+        carrier_id = request.args.get("carrier_id")
+        if not carrier_id:
+            return jsonify({"error": "carrier_id query param required"}), 400
+        resp = supabase_client().table("carriers").select("gmail_token").eq("id", carrier_id).limit(1).execute()
+        if not resp.data:
+            return jsonify({"error": "carrier not found"}), 404
+        refresh_token = resp.data[0].get("gmail_token")
+        if not refresh_token:
+            return jsonify({"error": "carrier has no gmail_token"}), 400
+        svc = gmail_service(refresh_token)
         profile = svc.users().getProfile(userId="me").execute()
         return jsonify({"email": profile.get("emailAddress"), "messagesTotal": profile.get("messagesTotal")})
     except Exception as exc:
@@ -1017,9 +1255,9 @@ def confirm_win():
 @app.route("/renew-watches", methods=["POST"])
 def renew_watches():
     """
-    Renew Gmail Watch subscriptions for all emails tracked in gmail_sync.
-    Gmail Watch expires every 7 days — invoke weekly via Cloud Scheduler.
-    Always returns 200 so Cloud Scheduler does not retry on error.
+    Renew Gmail Watch for all active carriers using per-carrier gmail_token
+    from carriers table. Gmail Watch expires every 7 days — invoke weekly
+    via Cloud Scheduler. Always returns 200 so Cloud Scheduler does not retry.
     """
     count_success = 0
     count_errors = 0
@@ -1028,18 +1266,30 @@ def renew_watches():
         project = os.environ.get("GOOGLE_CLOUD_PROJECT", "edgeai-493115")
         topic_name = f"projects/{project}/topics/edgeai-gmail"
 
-        # Fetch all tracked email addresses
-        resp = supabase_client().table("gmail_sync").select("email").execute()
-        emails = [row["email"] for row in (resp.data or [])]
+        resp = (
+            supabase_client()
+            .table("carriers")
+            .select("email, gmail_token")
+            .eq("status", "active")
+            .eq("subscription_status", "active")
+            .execute()
+        )
+        carriers = resp.data or []
 
-        if not emails:
-            log.warning('"renew_watches — no rows in gmail_sync, nothing to renew"')
+        if not carriers:
+            log.warning('"renew_watches — no active carriers with active subscriptions"')
             return jsonify({"renewed": 0, "errors": 0}), 200
 
-        for email in emails:
+        for carrier in carriers:
+            email = carrier.get("email", "")
+            refresh_token = carrier.get("gmail_token")
             try:
+                if not refresh_token:
+                    log.error('"renew_watches — no gmail_token for carrier email=%s"', email)
+                    count_errors += 1
+                    continue
                 result = (
-                    gmail_service()
+                    gmail_service(refresh_token)
                     .users()
                     .watch(
                         userId="me",
