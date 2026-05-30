@@ -1130,26 +1130,121 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
         mark_as_read(message_id, refresh_token)
         return
 
-    # ── Pre-Claude noise filter — discard before API call ─────────────────────
-    _sender = email_data["from_email"]
+    # ── Pre-Haiku Noise Gates (v7.8) ──────────────────────────────────────────
+    # Purpose: prevent unnecessary Haiku classification API calls.
+    # A gate that drops an email simply returns — it does NOT mark the message
+    # read and does NOT touch inbox state. The carrier's inbox is left exactly
+    # as Gmail delivered it. (Read/unread policy is a separate, unresolved item.)
+    #
+    #   Gate 1  — carrier self-send (sender == carrier's primary email)
+    #   Gate 2  — noise match (hardcoded core + platform_noise + carrier_noise)
+    #   Gate A  — ACE LOAD alert (subject begins "ACE LOAD")
+    #   Gate 3  — broker lookup (below, unchanged)
+    _sender = (email_data.get("from_email") or "").lower().strip()
     _local = _sender.split("@")[0] if "@" in _sender else ""
     _domain = _sender.split("@")[-1] if "@" in _sender else ""
-    _inbox_hard_noise_domains = {
-        "xtxtransport.com", "xedge-ai.com", "xtxtec.com",
+
+    # ── Gate 1 — carrier self-send ────────────────────────────────────────────
+    # Drops mail sent FROM the carrier's own registered primary email.
+    # secondary_email is intentionally NOT checked — it is an outbound-only
+    # bid sender and never arrives as an inbound sender.
+    try:
+        _c1 = (
+            supabase_client()
+            .table("carriers")
+            .select("email")
+            .eq("id", carrier_id)
+            .limit(1)
+            .execute()
+        )
+        _primary = ""
+        if _c1.data:
+            _primary = (_c1.data[0].get("email") or "").lower().strip()
+        if _primary and _sender == _primary:
+            log.info('"gate 1 — carrier self-send dropped sender=%s"', _sender)
+            return
+    except Exception as _exc:
+        log.error('"gate 1 — carriers lookup failed: %s"', _exc)
+
+    # ── Gate A — ACE LOAD alert ───────────────────────────────────────────────
+    # ACE-generated load alerts (subject "ACE LOAD - ...") are an already-known
+    # interaction — ACE has already alerted the carrier. Drop before any Haiku
+    # call. This replaces the post-classification "ACE LOAD = unknown" prompt
+    # rule, which still cost an API call to reach that verdict.
+    _subject = (email_data.get("subject") or "").strip()
+    if _subject.upper().startswith("ACE LOAD"):
+        log.info('"gate A — ACE LOAD alert dropped subject=%s"', _subject)
+        return
+
+    # ── Gate 2 — noise match ──────────────────────────────────────────────────
+    # Sources merged: hardcoded core (un-deletable) + platform_noise (admin,
+    # global) + carrier_noise (this carrier only). Match types: domain, prefix,
+    # address. Fail-open: a Supabase read failure falls back to core only
+    # rather than crashing the webhook.
+    _core_noise_domains = {
         "stripe.com", "paypal.com", "amazonaws.com", "github.com",
         "squarespace.com", "twilio.com", "supabase.io", "anthropic.com",
         "irs.gov", "dol.gov", "fmcsa.dot.gov", "dot.gov",
     }
-    _inbox_noreply_prefixes = {
+    _core_noise_prefixes = {
         "noreply", "no-reply", "donotreply", "do-not-reply",
         "notifications", "automated", "mailer", "bounce",
     }
+    _noise_domains = set(_core_noise_domains)
+    _noise_prefixes = set(_core_noise_prefixes)
+    _noise_addresses: set[str] = set()
+
+    try:
+        _pf = (
+            supabase_client()
+            .table("platform_noise")
+            .select("match_type, value")
+            .eq("active", True)
+            .execute()
+        )
+        for _row in (_pf.data or []):
+            _mt = _row.get("match_type")
+            _val = (_row.get("value") or "").lower().strip()
+            if not _val:
+                continue
+            if _mt == "domain":
+                _noise_domains.add(_val)
+            elif _mt == "prefix":
+                _noise_prefixes.add(_val)
+            elif _mt == "address":
+                _noise_addresses.add(_val)
+    except Exception as _exc:
+        log.error('"gate 2 — platform_noise read failed: %s"', _exc)
+
+    try:
+        _cn = (
+            supabase_client()
+            .table("carrier_noise")
+            .select("match_type, value")
+            .eq("carrier_id", carrier_id)
+            .eq("active", True)
+            .execute()
+        )
+        for _row in (_cn.data or []):
+            _mt = _row.get("match_type")
+            _val = (_row.get("value") or "").lower().strip()
+            if not _val:
+                continue
+            if _mt == "domain":
+                _noise_domains.add(_val)
+            elif _mt == "prefix":
+                _noise_prefixes.add(_val)
+            elif _mt == "address":
+                _noise_addresses.add(_val)
+    except Exception as _exc:
+        log.error('"gate 2 — carrier_noise read failed: %s"', _exc)
+
     if (
-        _local in _inbox_noreply_prefixes
-        or _domain in _inbox_hard_noise_domains
-        or any(_domain == d or _domain.endswith("." + d) for d in _inbox_hard_noise_domains)
+        _sender in _noise_addresses
+        or _local in _noise_prefixes
+        or any(_domain == d or _domain.endswith("." + d) for d in _noise_domains)
     ):
-        mark_as_read(message_id, refresh_token)
+        log.info('"gate 2 — noise dropped sender=%s"', _sender)
         return
 
     # Step 3 — broker lookup determines which path to take

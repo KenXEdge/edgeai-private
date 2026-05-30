@@ -9,12 +9,17 @@ __pycache__/
 *.pyc
 .venv/
 
-# Chrome extension build artifacts
-*.crx
-*.pem
-
 # OS
 .DS_Store
 Thumbs.db
 .vercel
 .env*.local
+
+services/gmail-webhook/edgelog.txt
+*.log
+
+services/gmail-webhook/main_gates_BACKUP_*.py
+
+services/gmail-webhook/edgelog.txt
+*.log
+services/gmail-webhook/main_gates_BACKUP_*.py
