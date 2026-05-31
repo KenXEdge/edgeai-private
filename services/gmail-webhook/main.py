@@ -1099,7 +1099,6 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
     # Prevents 150x replay: if the message is already in either table, stop immediately.
     if is_duplicate(message_id):
         log.info('"duplicate message %s — skipping"', message_id)
-        mark_as_read(message_id, refresh_token)
         return
 
     # Step 2 — fetch email content from Gmail API
@@ -1117,17 +1116,14 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
         parsed = parse_load_board_email(email_data)
         if parsed is None:
             log.error('"load board parse failed — skipping message=%s"', message_id)
-            mark_as_read(message_id, refresh_token)
             return
         carrier = get_carrier_profile(carrier_id)
 
         if carrier and not load_board_matches_carrier(parsed, carrier):
             log.info('"load board message skipped — equipment mismatch message=%s"', message_id)
-            mark_as_read(message_id, refresh_token)
             return
 
         send_load_board_sms(email_data, parsed, board_name)
-        mark_as_read(message_id, refresh_token)
         return
 
     # ── Pre-Haiku Gates (v8.0) ────────────────────────────────────
@@ -1343,8 +1339,6 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
             log.info('"unknown sender non-offer — logged to unknown_brokers_inbox silent drop from=%s"',
                      _sender)
 
-    # Mark as read AFTER all logging and SMS complete
-    mark_as_read(message_id, refresh_token)
 
 
 # ── Flask route ────────────────────────────────────────────────────────────────
