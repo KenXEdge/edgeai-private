@@ -1276,7 +1276,7 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
                 .table("brokers")
                 .select("*")
                 .eq("carrier_id", carrier_id)
-                .like("email", f"%@{_domain}")
+                .ilike("email", f"%@{_domain}")
                 .limit(1)
                 .execute()
             )
