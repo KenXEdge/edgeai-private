@@ -1130,57 +1130,50 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
         mark_as_read(message_id, refresh_token)
         return
 
-    # ── Pre-Haiku Noise Gates (v7.8) ──────────────────────────────────────────
-    # Purpose: prevent unnecessary Haiku classification API calls.
-    # A gate that drops an email simply returns — it does NOT mark the message
-    # read and does NOT touch inbox state. The carrier's inbox is left exactly
-    # as Gmail delivered it. (Read/unread policy is a separate, unresolved item.)
+    # ── Pre-Haiku Gates (v8.0) ────────────────────────────────────
+    # Purpose: prevent unnecessary Haiku API calls. A gate that drops an email
+    # simply returns — it does NOT mark the message read and does NOT touch
+    # inbox state. The carrier's Gmail inbox is left exactly as delivered.
     #
-    #   Gate 1  — carrier self-send (sender == carrier's primary email)
-    #   Gate 2  — noise match (hardcoded core + platform_noise + carrier_noise)
-    #   Gate A  — ACE LOAD alert (subject begins "ACE LOAD")
-    #   Gate 3  — broker lookup (below, unchanged)
+    #   Gate A  — platform subject catch-all (ACE LOAD, ACE ALERT, ACE , EDGE )
+    #   Gate B  — noise match (hardcoded prefixes + platform_noise + carrier_noise)
+    #   Gate C1 — exact email match in brokers table (known contact)
+    #   Gate C2 — domain match derived from broker emails (known brokerage,
+    #              unknown contact — e.g. mary@ when john@ is the known contact)
+    #   Cleared — unknown sender that passed all gates → Haiku decides:
+    #              load_offer   → log to unknown_brokers_inbox + SMS to carrier
+    #              anything else → log to unknown_brokers_inbox, silent drop
+    #   Auto-promotion: any carrier interaction (reply, BOOK, RE-BID, PASS)
+    #              promotes sender from unknown_brokers_inbox to brokers table.
+    #
+    # LOCKED: broker extraction process is untouchable. Gate C2 derives domain
+    # from existing broker email records — no schema changes required.
+
     _sender = (email_data.get("from_email") or "").lower().strip()
-    _local = _sender.split("@")[0] if "@" in _sender else ""
+    _local  = _sender.split("@")[0] if "@" in _sender else ""
     _domain = _sender.split("@")[-1] if "@" in _sender else ""
 
-    # ── Gate 1 — carrier self-send ────────────────────────────────────────────
-    # Drops mail sent FROM the carrier's own registered primary email.
-    # secondary_email is intentionally NOT checked — it is an outbound-only
-    # bid sender and never arrives as an inbound sender.
-    try:
-        _c1 = (
-            supabase_client()
-            .table("carriers")
-            .select("email")
-            .eq("id", carrier_id)
-            .limit(1)
-            .execute()
-        )
-        _primary = ""
-        if _c1.data:
-            _primary = (_c1.data[0].get("email") or "").lower().strip()
-        if _primary and _sender == _primary:
-            log.info('"gate 1 — carrier self-send dropped sender=%s"', _sender)
-            return
-    except Exception as _exc:
-        log.error('"gate 1 — carriers lookup failed: %s"', _exc)
-
-    # ── Gate A — ACE LOAD alert ───────────────────────────────────────────────
-    # ACE-generated load alerts (subject "ACE LOAD - ...") are an already-known
-    # interaction — ACE has already alerted the carrier. Drop before any Haiku
-    # call. This replaces the post-classification "ACE LOAD = unknown" prompt
-    # rule, which still cost an API call to reach that verdict.
-    _subject = (email_data.get("subject") or "").strip()
-    if _subject.upper().startswith("ACE LOAD"):
-        log.info('"gate A — ACE LOAD alert dropped subject=%s"', _subject)
+    # ── Gate A — platform subject catch-all ───────────────────────
+    # Drops any email whose subject starts with a platform-generated prefix.
+    # Covers all ACE and EDGE generated alerts in all forms. Option 1 locked:
+    # simple prefix match, zero SB reads, no broker domain cross-check.
+    _PLATFORM_SUBJECT_PREFIXES = (
+        "ACE LOAD",
+        "ACE ALERT",
+        "ACE ",
+        "EDGE ",
+    )
+    _subject = (email_data.get("subject") or "").strip().upper()
+    if _subject.startswith(_PLATFORM_SUBJECT_PREFIXES):
+        log.info('"gate A — platform subject dropped subject=%s"', _subject)
         return
 
-    # ── Gate 2 — noise match ──────────────────────────────────────────────────
-    # Sources merged: hardcoded core (un-deletable) + platform_noise (admin,
-    # global) + carrier_noise (this carrier only). Match types: domain, prefix,
-    # address. Fail-open: a Supabase read failure falls back to core only
-    # rather than crashing the webhook.
+    # ── Gate B — noise match ──────────────────────────────────────────
+    # Hardcoded core prefixes and domains are universal and un-deletable.
+    # Expanded prefix list catches common automated freight/logistics senders.
+    # platform_noise: admin-managed global suppressions (all carriers).
+    # carrier_noise:  per-carrier suppressions managed via carrier dashboard UI.
+    # Fail-open: Supabase read failure falls back to hardcoded core only.
     _core_noise_domains = {
         "stripe.com", "paypal.com", "amazonaws.com", "github.com",
         "squarespace.com", "twilio.com", "supabase.io", "anthropic.com",
@@ -1189,9 +1182,12 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
     _core_noise_prefixes = {
         "noreply", "no-reply", "donotreply", "do-not-reply",
         "notifications", "automated", "mailer", "bounce",
+        "loadmatch", "alert", "alerts", "dispatch-auto",
+        "billing", "invoice", "payment", "support",
+        "newsletter", "marketing", "unsubscribe",
     }
-    _noise_domains = set(_core_noise_domains)
-    _noise_prefixes = set(_core_noise_prefixes)
+    _noise_domains:   set[str] = set(_core_noise_domains)
+    _noise_prefixes:  set[str] = set(_core_noise_prefixes)
     _noise_addresses: set[str] = set()
 
     try:
@@ -1203,7 +1199,7 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
             .execute()
         )
         for _row in (_pf.data or []):
-            _mt = _row.get("match_type")
+            _mt  = _row.get("match_type")
             _val = (_row.get("value") or "").lower().strip()
             if not _val:
                 continue
@@ -1214,7 +1210,7 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
             elif _mt == "address":
                 _noise_addresses.add(_val)
     except Exception as _exc:
-        log.error('"gate 2 — platform_noise read failed: %s"', _exc)
+        log.error('"gate B — platform_noise read failed: %s"', _exc)
 
     try:
         _cn = (
@@ -1226,7 +1222,7 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
             .execute()
         )
         for _row in (_cn.data or []):
-            _mt = _row.get("match_type")
+            _mt  = _row.get("match_type")
             _val = (_row.get("value") or "").lower().strip()
             if not _val:
                 continue
@@ -1237,36 +1233,80 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
             elif _mt == "address":
                 _noise_addresses.add(_val)
     except Exception as _exc:
-        log.error('"gate 2 — carrier_noise read failed: %s"', _exc)
+        log.error('"gate B — carrier_noise read failed: %s"', _exc)
 
     if (
         _sender in _noise_addresses
         or _local in _noise_prefixes
         or any(_domain == d or _domain.endswith("." + d) for d in _noise_domains)
     ):
-        log.info('"gate 2 — noise dropped sender=%s"', _sender)
+        log.info('"gate B — noise dropped sender=%s"', _sender)
         return
 
-    # Step 3 — broker lookup determines which path to take
-    broker = lookup_broker(email_data["from_email"], carrier_id)
+    # ── Gate C1 — exact email match in brokers table ──────────────────
+    # Fastest broker path: sender is a fully validated known contact for this
+    # carrier. Single SB read on indexed email+carrier_id columns.
+    _broker = None
+    try:
+        _c1 = (
+            supabase_client()
+            .table("brokers")
+            .select("*")
+            .eq("email", _sender)
+            .eq("carrier_id", carrier_id)
+            .limit(1)
+            .execute()
+        )
+        if _c1.data:
+            _broker = _c1.data[0]
+            log.info('"gate C1 — known contact matched sender=%s broker_id=%s"',
+                     _sender, _broker.get("id"))
+    except Exception as _exc:
+        log.error('"gate C1 — brokers exact lookup failed: %s"', _exc)
 
-    if broker:
-        # ── Known broker path ────────────────────────────────────────────────
-        log.info('"known broker %s id=%s"', email_data["from_email"], broker.get("id"))
+    # ── Gate C2 — domain match derived from broker emails ─────────────────
+    # Handles unknown contacts at known brokerages (e.g. mary@ntgfreight.com
+    # when john@ntgfreight.com is the validated contact). Derives domain from
+    # existing broker email column via LIKE query — no schema changes required.
+    # LOCKED: broker extraction process is not touched.
+    if _broker is None and _domain:
+        try:
+            _c2 = (
+                supabase_client()
+                .table("brokers")
+                .select("*")
+                .eq("carrier_id", carrier_id)
+                .like("email", f"%@{_domain}")
+                .limit(1)
+                .execute()
+            )
+            if _c2.data:
+                _broker = _c2.data[0]
+                log.info('"gate C2 — known domain matched sender=%s domain=%s broker_id=%s"',
+                         _sender, _domain, _broker.get("id"))
+        except Exception as _exc:
+            log.error('"gate C2 — brokers domain lookup failed: %s"', _exc)
 
-        log.info('"process_message — about to classify message_id=%s from=%s"', message_id, email_data.get("from_email"))
+    # ── Known broker path (C1 or C2 matched) ──────────────────────
+    if _broker:
+        log.info('"known broker path — classifying message_id=%s from=%s"',
+                 message_id, _sender)
+
         classification = classify_reply(email_data)
         log.info('"classified %s as %s"', message_id, classification)
 
-        # Insert into responses FIRST — this is the dedup record.
-        # Must succeed before SMS so that any retry finds it and stops.
-        log_response(email_data, classification, carrier_id, broker_id=broker.get("id"), broker_name=broker.get("name"))
+        # Insert into responses FIRST — this is the dedup anchor.
+        # Must succeed before SMS so any retry finds it and stops.
+        log_response(email_data, classification, carrier_id,
+                     broker_id=_broker.get("id"),
+                     broker_name=_broker.get("name"))
 
         if classification.lower() == "load_offer":
             log.info('"SMS DIAGNOSTIC — entering load_offer branch message_id=%s thread_id=%s carrier_email=%s"',
                      email_data["message_id"], email_data["thread_id"], carrier_email)
             replied = has_carrier_replied(email_data["thread_id"], refresh_token, carrier_email)
-            log.info('"SMS DIAGNOSTIC — has_carrier_replied returned %s for thread=%s"', replied, email_data["thread_id"])
+            log.info('"SMS DIAGNOSTIC — has_carrier_replied returned %s for thread=%s"',
+                     replied, email_data["thread_id"])
             if not replied:
                 log.info('"SMS DIAGNOSTIC — about to call send_load_offer_sms"')
                 send_load_offer_sms(email_data)
@@ -1275,21 +1315,33 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
                 log.info('"SMS suppressed — carrier already replied in thread=%s"',
                          email_data["thread_id"])
 
-        update_broker_status(broker["id"], classification)
+        update_broker_status(_broker["id"], classification)
 
+    # ── Cleared all gates — unknown sender ──────────────────────────────────────────
+    # Sender passed Gates A, B, C1, C2 but is not a known broker or domain.
+    # Haiku classifies via classify_and_extract (classify + extract in one call).
+    #   load_offer   → log to unknown_brokers_inbox + SMS to carrier.
+    #                  Auto-promotion to brokers table on carrier interaction:
+    #                  reply, BOOK, RE-BID, or PASS.
+    #   anything else → log to unknown_brokers_inbox only, silent drop.
+    #                  Carrier reviews pending queue via dashboard.
     else:
-        # ── Unknown broker path ──────────────────────────────────────────────
-        log.info('"unknown broker %s — classifying and logging to unknown_brokers_inbox"',
-                 email_data["from_email"])
+        log.info('"gate cleared — unknown sender %s — classifying"', _sender)
 
         extracted = classify_and_extract(email_data)
         classification = extracted.get("classification", "unknown")
-        log.info('"unknown broker classified %s as %s"', message_id, classification)
+        log.info('"unknown sender classified %s as %s"', message_id, classification)
 
         log_unknown_broker_inbox(email_data, extracted, carrier_id)
 
         if classification.lower() == "load_offer":
+            log.info('"unknown sender load offer — SMS firing from=%s"', _sender)
             send_unknown_broker_sms(email_data, extracted)
+            # Auto-promotion to brokers table occurs on carrier interaction.
+            # See: BOOK/RE-BID/PASS token handlers (Phase 2) and reply detection.
+        else:
+            log.info('"unknown sender non-offer — logged to unknown_brokers_inbox silent drop from=%s"',
+                     _sender)
 
     # Mark as read AFTER all logging and SMS complete
     mark_as_read(message_id, refresh_token)
