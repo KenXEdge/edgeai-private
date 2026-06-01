@@ -23,3 +23,10 @@ services/gmail-webhook/main_gates_BACKUP_*.py
 services/gmail-webhook/edgelog.txt
 *.log
 services/gmail-webhook/main_gates_BACKUP_*.py
+
+# Cloud Run env files - contain secrets
+env.yaml
+*.env.yaml
+
+# Backup/scratch files
+*.bak
