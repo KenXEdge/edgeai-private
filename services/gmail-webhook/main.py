@@ -8,6 +8,7 @@ import os
 import json
 import base64
 import logging
+import secrets
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -789,9 +790,7 @@ CLASSIFICATION_PROMPT = """You are classifying a freight broker's email reply to
 Classify the reply as EXACTLY ONE of these labels:
 - load_offer   : broker is offering a specific load, lane, or rate
 - positive     : interested, wants more info, positive engagement (but no specific load offered)
-- negative     : not interested, removed from list, do not contact, out of network
-- question     : asking a clarifying question before committing
-- unknown      : cannot determine intent
+- negative     : not interested, removed from list, do not contact, out of network, OR cannot determine intent
 
 Reply with only the label, nothing else.
 
@@ -808,12 +807,10 @@ EXTRACT_PROMPT = (
     "\"load_origin\": \"<city, state or null>\", "
     "\"load_destination\": \"<city, state or null>\", "
     "\"rate_offered\": \"<amount or null>\"}\n\n"
-    "Classification labels:\n"
+    "Classification labels (EXACTLY one of these three):\n"
     "- load_offer   : offering a specific load, lane, or rate\n"
     "- positive     : interested/positive but no specific load offered\n"
-    "- negative     : not interested, DNC, out of network\n"
-    "- question     : asking a clarifying question\n"
-    "- unknown      : cannot determine intent\n\n"
+    "- negative     : not interested, DNC, out of network, OR cannot determine intent\n\n"
     "Extraction rules:\n"
     "- sender_name: full name from email signature, null if not present\n"
     "- load_origin: pickup city/state e.g. Dallas TX, null if not mentioned\n"
@@ -827,7 +824,10 @@ EXTRACT_PROMPT = (
 
 
 def classify_reply(email_data: dict) -> str:
-    """Known-broker path: classify only. Returns one of the 5 labels."""
+    """Known-broker path: classify only. Returns one of three labels:
+    load_offer, positive, negative. Per v8.1 §2 — 'question' and 'unknown'
+    dropped from the value space; negative is the default fallback.
+    """
     try:
         msg = anthropic_client().messages.create(
             model="claude-haiku-4-5-20251001",
@@ -843,41 +843,32 @@ def classify_reply(email_data: dict) -> str:
             ],
         )
         label = msg.content[0].text.strip().lower()
-        if label not in {"load_offer", "positive", "negative", "question", "unknown"}:
-            label = "unknown"
+        if label not in {"load_offer", "positive", "negative"}:
+            label = "negative"
         return label
     except Exception as exc:
         log.error('"classify_reply failed: %s"', exc)
-        return "unknown"
+        return "negative"
 
 
 def classify_and_extract(email_data: dict) -> dict:
     """Unknown-broker path: classify + extract load details in one Claude call.
 
     Returns dict with keys: classification, sender_name, load_origin,
-    load_destination, rate_offered.
+    load_destination, rate_offered. Per v8.1 §2 — labels reduced to
+    load_offer / positive / negative; negative is the default fallback.
     """
     fallback = {
-        "classification": "unknown",
+        "classification": "negative",
         "sender_name": None,
         "load_origin": None,
         "load_destination": None,
         "rate_offered": None,
     }
     try:
-        subject = email_data["subject"]
-        body = email_data["body"]
-        prompt_text = (
-            "You are analyzing a freight broker email sent to a carrier.\n\n"
-            "Return ONLY valid JSON with these exact fields:\n"
-            "{\"classification\": \"\", \"sender_name\": null, "
-            "\"load_origin\": null, \"load_destination\": null, "
-            "\"rate_offered\": null}\n\n"
-            "classification must be exactly one of: load_offer, positive, "
-            "negative, question, unknown\n\n"
-            f"Subject: {subject}\n"
-            f"Body:\n{body[:3000]}"
-        )
+        subject = email_data.get("subject", "")
+        body = email_data.get("body", "")
+        prompt_text = EXTRACT_PROMPT.format(subject=subject, body=body[:3000])
         msg = anthropic_client().messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=200,
@@ -886,9 +877,9 @@ def classify_and_extract(email_data: dict) -> dict:
         raw = msg.content[0].text.strip()
         extracted = json.loads(raw)
         if extracted.get("classification") not in {
-            "load_offer", "positive", "negative", "question", "unknown"
+            "load_offer", "positive", "negative"
         }:
-            extracted["classification"] = "unknown"
+            extracted["classification"] = "negative"
         return extracted
     except Exception as exc:
         log.error('"classify_and_extract failed: %s"', str(exc))
@@ -950,6 +941,641 @@ def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
         log.info('"SMS sent — unknown broker load offer from=%s"', email_data["from_email"])
     except Exception as exc:
         log.error('"send_unknown_broker_sms failed: %s"', exc)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── Piece 5 — Load offer action loop helpers (additive, v8.1) ────────────────
+#
+# All helpers below are introduced by EDGE Runbook v8.1 Piece 5 build.
+# They are NOT yet called from process_message — Step 2 of §12 (additive only).
+# Step 5 of §12 will rewire process_message to call these.
+# Until then, behavior is identical to v8.0.
+# ══════════════════════════════════════════════════════════════════════════════
+
+EDGE_LOAD_OFFER_TTL_MINUTES = 60
+EDGE_SMS_BROKER_NAME_MAX = 20
+
+
+def _generate_load_offer_tokens() -> tuple[str, str, str]:
+    """Mint three opaque, non-semantic 6-character tokens for one load offer.
+    Returns (book_token, rebid_token, pass_token). Per v8.1 §2.
+    secrets.token_urlsafe(5) yields ~7 chars; slice to 6 for SMS economy.
+    Collision probability is negligible at platform scale (64^6 ≈ 68B values)
+    and the UNIQUE index on book_token would catch any collision at INSERT.
+    """
+    return (
+        secrets.token_urlsafe(5)[:6],
+        secrets.token_urlsafe(5)[:6],
+        secrets.token_urlsafe(5)[:6],
+    )
+
+
+def _resolve_source(carrier_id: str, broker_id: str | None) -> str:
+    """Determine the source code for an inbound load offer. Per v8.1 §5.
+    - OUTRCH if broker_id is known AND outreach_log has a matching row
+    - INBND otherwise (covers known-no-outreach AND unknown sender)
+    - SYL is reserved for ACE Chrome extension via /upsert-broker-lane
+    Defensive default: INBND on any error (safer than failing the SMS path).
+    """
+    if not broker_id:
+        return "INBND"
+    try:
+        resp = (
+            supabase_client()
+            .table("outreach_log")
+            .select("id")
+            .eq("carrier_id", carrier_id)
+            .eq("broker_id", broker_id)
+            .limit(1)
+            .execute()
+        )
+        return "OUTRCH" if resp.data else "INBND"
+    except Exception as exc:
+        log.error('"_resolve_source failed carrier=%s broker=%s: %s"',
+                  carrier_id, broker_id, exc)
+        return "INBND"
+
+
+def _build_carrier_signature(carrier_id: str) -> str:
+    """Build the stacked email signature for a carrier per v8.1 §7.4.
+    Lines: {first_name (skip if single char)} / {company} / {phone} / MC {mc_number}
+    Returns multi-line string, or empty string if lookup fails or no fields populated.
+    Resilient to missing columns — silently skips any field that isn't present.
+    """
+    try:
+        # SELECT * to tolerate column-name uncertainty on the carriers table.
+        # Reads only one row; cost is negligible.
+        resp = (
+            supabase_client()
+            .table("carriers")
+            .select("*")
+            .eq("id", carrier_id)
+            .limit(1)
+            .execute()
+        )
+        if not resp.data:
+            return ""
+        row = resp.data[0]
+        lines: list[str] = []
+
+        # First-name line (skip if single character per §7.4)
+        first_name = (row.get("first_name") or "").strip()
+        if not first_name:
+            # Fall back to the first whitespace-separated token in `name`
+            full = (row.get("name") or "").strip()
+            first_name = full.split()[0] if full else ""
+        if first_name and len(first_name) > 1:
+            lines.append(first_name)
+
+        # Company line (try the common candidate column names)
+        company = (
+            (row.get("company") or "").strip()
+            or (row.get("company_name") or "").strip()
+            or (row.get("dba_name") or "").strip()
+        )
+        if company:
+            lines.append(company)
+
+        # Phone line (try the common candidate column names)
+        phone = (
+            (row.get("phone") or "").strip()
+            or (row.get("mobile") or "").strip()
+            or (row.get("phone_number") or "").strip()
+        )
+        if phone:
+            lines.append(phone)
+
+        # MC line
+        mc = (row.get("mc_number") or "").strip()
+        if mc:
+            lines.append(f"MC {mc}")
+
+        return "\n".join(lines)
+    except Exception as exc:
+        log.error('"_build_carrier_signature failed carrier=%s: %s"', carrier_id, exc)
+        return ""
+
+
+def _truncate_broker_display(name: str | None, fallback: str | None = None,
+                              max_chars: int = EDGE_SMS_BROKER_NAME_MAX) -> str:
+    """Build a ≤20-char broker display name for SMS per v8.1 §6.5.
+    Prefers `name`, falls back to `fallback`, else "Broker".
+    Truncates with ellipsis (…) if longer than max_chars.
+    """
+    candidate = (name or "").strip() or (fallback or "").strip() or "Broker"
+    if len(candidate) <= max_chars:
+        return candidate
+    return candidate[: max_chars - 1] + "…"
+
+
+def _split_city_state(value: str | None) -> tuple[str | None, str | None]:
+    """Split 'Dallas, TX' (or 'Dallas TX') into ('Dallas', 'TX').
+    Defensive: Haiku-extracted strings vary in format. Returns (None, None)
+    on bad/empty input. Last 2-char all-caps token is treated as state.
+    """
+    if not value or not isinstance(value, str):
+        return (None, None)
+    parts = value.replace(",", " ").split()
+    if not parts:
+        return (None, None)
+    state: str | None = None
+    city_parts = list(parts)
+    if len(parts[-1]) == 2 and parts[-1].isupper():
+        state = parts[-1]
+        city_parts = parts[:-1]
+    city = " ".join(city_parts) if city_parts else None
+    return (city, state)
+
+
+def _format_load_offer_sms(broker_display: str, pickup: str, delivery: str,
+                            miles: int | None, rate,
+                            book_token: str, rebid_token: str,
+                            pass_token: str) -> str:
+    """Build the 3-segment Unicode NTG-card SMS per v8.1 §6.1 (full card)."""
+    miles_part = f"{miles}mi · " if miles else ""
+    rate_part = f"Offer ${rate}" if rate else "Offer TBD"
+    return (
+        f"{broker_display} · {pickup} → {delivery}\n"
+        f"{miles_part}{rate_part}\n"
+        f"\n"
+        f"✅ BOOK   xbase1.com/{book_token}\n"
+        f"🔄 RE-BID xbase1.com/{rebid_token}\n"
+        f"❌ PASS   xbase1.com/{pass_token}"
+    )
+
+
+def _format_nudge_sms(broker_display: str, delivery_city: str) -> str:
+    """Build the 1-segment nudge SMS per v8.1 §6.3.
+    Fired when Haiku could not extract a rate. ≤67 chars target.
+    """
+    return f"{broker_display} load offer to {delivery_city} — check your email for details"
+
+
+def _format_counter_sms(broker_display: str, pickup: str, delivery: str,
+                         miles: int | None, original_offer, counter_amount,
+                         book_token: str, pass_token: str) -> str:
+    """Build the Volley 2 counter card per v8.1 §6.2.
+    Two action emojis only — no RE-BID at Volley 2 (2-volley cap).
+    """
+    miles_part = f"{miles}mi · " if miles else ""
+    return (
+        f"{broker_display} · {pickup} → {delivery}\n"
+        f"{miles_part}Offer ${original_offer} / Counter ${counter_amount}\n"
+        f"\n"
+        f"✅ BOOK xbase1.com/{book_token}\n"
+        f"❌ PASS xbase1.com/{pass_token}"
+    )
+
+
+def _format_win_sms() -> str:
+    """Build the 1-segment win SMS per v8.1 §6.4.
+    Fires when broker accepts a carrier's RE-BID (Haiku → 'positive').
+    """
+    return "Broker accepted — looks like you won it. Take it from here!"
+
+
+def _build_agreement_email(pickup_city: str, delivery_city: str,
+                            rate, signature: str) -> str:
+    """BOOK agreement email body per v8.1 §7.1.
+    Sent via the carrier's Gmail as a reply on thread_id.
+    """
+    body = (
+        f"Let's book the {pickup_city} - {delivery_city} load at ${rate}. "
+        f"Thx! Send over the RC or onboard link.\n"
+    )
+    if signature:
+        body += signature
+    return body
+
+
+def _build_counter_email(counter_amount, signature: str) -> str:
+    """RE-BID counter email body per v8.1 §7.2."""
+    body = f"Do you have room to move to ${counter_amount} on this one? Thanks!\n"
+    if signature:
+        body += signature
+    return body
+
+
+def _build_decline_email(pickup_city: str, delivery_city: str,
+                          signature: str) -> str:
+    """PASS courtesy decline email body per v8.1 §7.3.
+    Sent only when source=OUTRCH (relationship preservation).
+    """
+    body = (
+        f"Appreciate the offer on {pickup_city} - {delivery_city}. "
+        f"Not the right fit this time — keep me in mind for future lanes!\n"
+    )
+    if signature:
+        body += signature
+    return body
+
+
+def _create_edge_load_activity_row(
+    carrier_id: str,
+    broker_id: str | None,
+    source: str,
+    email_data: dict,
+    extracted: dict,
+    book_token: str,
+    rebid_token: str,
+    pass_token: str,
+    ttl_minutes: int = EDGE_LOAD_OFFER_TTL_MINUTES,
+) -> dict | None:
+    """Insert a row into edge_load_activity at stage='offer' with TTL expiry.
+    Returns the inserted row (with id) or None on failure.
+    Writes via service-role client per v8.1 §4.1 (RLS bypass).
+    """
+    try:
+        sender_name = extracted.get("sender_name") or ""
+        first_name = ""
+        last_name = ""
+        if sender_name:
+            parts = sender_name.split()
+            first_name = parts[0] if parts else ""
+            last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+
+        pickup_city, pickup_state = _split_city_state(extracted.get("load_origin"))
+        delivery_city, delivery_state = _split_city_state(extracted.get("load_destination"))
+
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(minutes=ttl_minutes)
+
+        row = {
+            "carrier_id": carrier_id,
+            "broker_id": broker_id,
+            "source": source,
+            "thread_id": email_data["thread_id"],
+            "gmail_message_id": email_data["message_id"],
+            "broker_email": email_data["from_email"],
+            "broker_first_name": first_name or None,
+            "broker_last_name": last_name or None,
+            "stage": "offer",
+            "book_token": book_token,
+            "rebid_token": rebid_token,
+            "pass_token": pass_token,
+            "consumed": False,
+            "expires_at": expires.isoformat(),
+            "rate_offered": _parse_rate_numeric(extracted.get("rate_offered")),
+            "pickup_city": pickup_city,
+            "pickup_state": pickup_state,
+            "delivery_city": delivery_city,
+            "delivery_state": delivery_state,
+            "created_at": now.isoformat(),
+        }
+        # Drop NULL keys so DB defaults can apply where appropriate
+        row = {k: v for k, v in row.items() if v is not None}
+
+        resp = (
+            supabase_service_client()
+            .table("edge_load_activity")
+            .insert(row)
+            .execute()
+        )
+        if resp.data:
+            log.info('"edge_load_activity created id=%s source=%s thread=%s"',
+                     resp.data[0].get("id"), source, email_data["thread_id"])
+            return resp.data[0]
+        return None
+    except Exception as exc:
+        log.error('"_create_edge_load_activity_row failed: %s"', exc, exc_info=True)
+        return None
+
+
+def _write_broker_lanes_row(carrier_id: str, source: str,
+                             broker_info: dict, lane: dict,
+                             decision: str | None = None) -> str | None:
+    """Insert one row into broker_lanes (cross-source intelligence capture).
+    Mirrors the row shape ACE's /upsert-broker-lane writes (source='SYL').
+    EDGE writes here with source='OUTRCH' or 'INBND'. Per v8.1 §3.4.
+    Returns inserted row id or None on failure.
+    decision starts NULL at SMS send time; updated to booked/rebid/passed/etc.
+    when the carrier acts. Service role write (bypasses RLS).
+    """
+    try:
+        row = {
+            "carrier_id": carrier_id,
+            "source": source,
+            "decision": decision,
+            "broker_first_name": broker_info.get("first_name"),
+            "broker_last_name": broker_info.get("last_name"),
+            "broker_company": broker_info.get("company"),
+            "broker_mc": broker_info.get("mc"),
+            "broker_email": broker_info.get("email"),
+            "broker_phone": broker_info.get("phone"),
+            "team_name": broker_info.get("team_name"),
+            "pickup_city": lane.get("pickup_city"),
+            "pickup_state": lane.get("pickup_state"),
+            "pickup_zip": lane.get("pickup_zip"),
+            "delivery_city": lane.get("delivery_city"),
+            "delivery_state": lane.get("delivery_state"),
+            "delivery_zip": lane.get("delivery_zip"),
+            "vehicle_size": lane.get("vehicle_size"),
+            "miles": lane.get("miles"),
+            "posted_amount": lane.get("posted_amount"),
+        }
+        # Drop NULL keys to keep the row clean
+        row = {k: v for k, v in row.items() if v is not None}
+
+        resp = (
+            supabase_service_client()
+            .table("broker_lanes")
+            .insert(row)
+            .execute()
+        )
+        if resp.data:
+            return resp.data[0].get("id")
+        return None
+    except Exception as exc:
+        log.error('"_write_broker_lanes_row failed: %s"', exc, exc_info=True)
+        return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── End Piece 5 helpers ──────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── Piece 5 — v2 SMS sender + supporting glue ────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_carrier_dict(carrier_id: str) -> dict:
+    """Fetch the carrier row needed for SMS sending and signature templating.
+    Returns the row dict, or empty dict on lookup failure (defensive — SMS
+    code path should still attempt with whatever it has).
+    """
+    try:
+        resp = (
+            supabase_client()
+            .table("carriers")
+            .select("*")
+            .eq("id", carrier_id)
+            .limit(1)
+            .execute()
+        )
+        return resp.data[0] if resp.data else {}
+    except Exception as exc:
+        log.error('"_get_carrier_dict failed carrier=%s: %s"', carrier_id, exc)
+        return {}
+
+
+def send_load_offer_sms_v2(
+    carrier: dict,
+    broker: dict | None,
+    extracted: dict,
+    email_data: dict,
+) -> bool:
+    """Piece 5 tokenized SMS sender.
+
+    Resolves source, writes edge_load_activity + broker_lanes rows, formats
+    the NTG-card or nudge SMS, and sends via Telnyx. Returns True on success.
+
+    Per v8.1 standing rule: legacy send_load_offer_sms / send_unknown_broker_sms
+    remain in this file as dead code (no callers) until end-to-end verification
+    is complete.
+    """
+    try:
+        carrier_id = carrier.get("id") if carrier else None
+        if not carrier_id:
+            log.error('"send_load_offer_sms_v2: missing carrier_id — aborting"')
+            return False
+
+        broker_id = broker.get("id") if broker else None
+
+        # 1. Source resolution (OUTRCH / INBND — SYL is ACE's domain)
+        source = _resolve_source(carrier_id, broker_id)
+
+        # 2. Mint tokens
+        book_token, rebid_token, pass_token = _generate_load_offer_tokens()
+
+        # 3. Write edge_load_activity row
+        ela_row = _create_edge_load_activity_row(
+            carrier_id=carrier_id,
+            broker_id=broker_id,
+            source=source,
+            email_data=email_data,
+            extracted=extracted,
+            book_token=book_token,
+            rebid_token=rebid_token,
+            pass_token=pass_token,
+        )
+        if not ela_row:
+            log.error('"send_load_offer_sms_v2: edge_load_activity insert failed message=%s"',
+                      email_data.get("message_id"))
+            return False
+
+        # 4. Write broker_lanes row (intelligence capture — decision starts NULL)
+        broker_info = {}
+        sender_name = extracted.get("sender_name") or ""
+        if sender_name:
+            _parts = sender_name.split()
+            broker_info["first_name"] = _parts[0] if _parts else None
+            broker_info["last_name"] = " ".join(_parts[1:]) if len(_parts) > 1 else None
+        if broker:
+            broker_info["first_name"] = broker_info.get("first_name") or broker.get("first_name")
+            broker_info["last_name"] = broker_info.get("last_name") or broker.get("last_name")
+            broker_info["company"] = broker.get("company")
+            broker_info["mc"] = broker.get("mc_number")
+            broker_info["phone"] = broker.get("phone")
+            broker_info["team_name"] = broker.get("team_name")
+        broker_info["email"] = email_data.get("from_email")
+
+        pickup_city, pickup_state = _split_city_state(extracted.get("load_origin"))
+        delivery_city, delivery_state = _split_city_state(extracted.get("load_destination"))
+        lane = {
+            "pickup_city": pickup_city,
+            "pickup_state": pickup_state,
+            "delivery_city": delivery_city,
+            "delivery_state": delivery_state,
+            "posted_amount": (f"${extracted.get('rate_offered')}"
+                              if extracted.get("rate_offered") else None),
+        }
+        _write_broker_lanes_row(
+            carrier_id=carrier_id,
+            source=source,
+            broker_info=broker_info,
+            lane=lane,
+            decision=None,  # set on carrier action
+        )
+
+        # 5. Format SMS body
+        broker_display = _truncate_broker_display(
+            name=(broker_info.get("first_name") and broker_info.get("last_name")
+                  and f"{broker_info['first_name']} {broker_info['last_name']}"),
+            fallback=broker_info.get("company") or broker_info.get("email"),
+        )
+        rate = _parse_rate_numeric(extracted.get("rate_offered"))
+        miles_val = ela_row.get("miles")
+        pickup_disp = (f"{pickup_city}, {pickup_state}"
+                       if pickup_city and pickup_state else (pickup_city or "—"))
+        delivery_disp = (f"{delivery_city}, {delivery_state}"
+                         if delivery_city and delivery_state else (delivery_city or "—"))
+
+        if rate:
+            sms_body = _format_load_offer_sms(
+                broker_display=broker_display,
+                pickup=pickup_disp,
+                delivery=delivery_disp,
+                miles=miles_val,
+                rate=int(rate) if rate == int(rate) else rate,
+                book_token=book_token,
+                rebid_token=rebid_token,
+                pass_token=pass_token,
+            )
+        else:
+            sms_body = _format_nudge_sms(
+                broker_display=broker_display,
+                delivery_city=delivery_city or "your area",
+            )
+
+        # 6. Send via Telnyx
+        carrier_phone = carrier.get("phone")
+        if not carrier_phone:
+            log.error('"send_load_offer_sms_v2: no phone on carrier %s — SMS not sent"',
+                      carrier_id)
+            return False
+
+        if os.environ.get("SMS_ENABLED", "false").lower() != "true":
+            log.info('"send_load_offer_sms_v2: SMS_ENABLED=false — would have sent to=%s body=%s"',
+                     carrier_phone, sms_body)
+            return True
+
+        telnyx.api_key = os.environ.get("TELNYX_API_KEY", "")
+        telnyx.Message.create(
+            from_=os.environ["TELNYX_FROM"],
+            to=carrier_phone,
+            text=sms_body,
+        )
+        log.info('"send_load_offer_sms_v2: SMS sent to=%s source=%s message=%s"',
+                 carrier_phone, source, email_data.get("message_id"))
+        return True
+
+    except Exception as exc:
+        log.error('"send_load_offer_sms_v2 failed: %s"', exc, exc_info=True)
+        return False
+
+
+def _handle_volley2_reply(
+    row: dict,
+    classification: str,
+    email_data: dict,
+    carrier_id: str,
+    broker: dict,
+) -> None:
+    """Process broker reply on a thread with an open stage='counter' row.
+    Per v8.1 §3.7:
+      positive  → win SMS, stage=closed, broker_lanes decision='won'
+      load_offer with new $ → volley 2 SMS, stage=counter, mint new BOOK/PASS
+      negative  → no SMS, stage=closed, broker_lanes decision='declined'
+    """
+    try:
+        if classification.lower() == "positive":
+            # Broker accepted the carrier's rebid — fire win SMS, close out
+            _carrier = _get_carrier_dict(carrier_id)
+            phone = _carrier.get("phone")
+            if phone and os.environ.get("SMS_ENABLED", "false").lower() == "true":
+                telnyx.api_key = os.environ.get("TELNYX_API_KEY", "")
+                telnyx.Message.create(
+                    from_=os.environ["TELNYX_FROM"],
+                    to=phone,
+                    text=_format_win_sms(),
+                )
+                log.info('"volley2: win SMS sent to=%s row=%s"', phone, row["id"])
+            elif phone:
+                log.info('"volley2: would have sent win SMS to=%s (SMS_ENABLED=false)"', phone)
+
+            supabase_service_client().table("edge_load_activity").update({
+                "stage": "closed",
+            }).eq("id", row["id"]).execute()
+            supabase_service_client().table("broker_lanes").update({
+                "decision": "won",
+            }).eq("carrier_id", carrier_id).eq("broker_email", row.get("broker_email")).execute()
+
+        elif classification.lower() == "load_offer":
+            # Broker counter-countered with a new $ — fire volley 2 SMS with BOOK/PASS only
+            _extracted = classify_and_extract(email_data)
+            new_rate = _parse_rate_numeric(_extracted.get("rate_offered"))
+            if not new_rate:
+                log.info('"volley2: load_offer but no rate extracted — closing thread"')
+                supabase_service_client().table("edge_load_activity").update({
+                    "stage": "closed",
+                }).eq("id", row["id"]).execute()
+                return
+
+            _carrier = _get_carrier_dict(carrier_id)
+            phone = _carrier.get("phone")
+            if not phone:
+                log.error('"volley2: no phone for carrier %s"', carrier_id)
+                return
+
+            # Mint new BOOK and PASS tokens (RE-BID not offered at volley 2)
+            new_book, _new_rebid_unused, new_pass = _generate_load_offer_tokens()
+            broker_display = _truncate_broker_display(
+                name=(row.get("broker_first_name") and row.get("broker_last_name")
+                      and f"{row['broker_first_name']} {row['broker_last_name']}"),
+                fallback=row.get("broker_company") or row.get("broker_email"),
+            )
+            pickup_disp = (f"{row.get('pickup_city')}, {row.get('pickup_state')}"
+                           if row.get("pickup_city") and row.get("pickup_state")
+                           else (row.get("pickup_city") or "—"))
+            delivery_disp = (f"{row.get('delivery_city')}, {row.get('delivery_state')}"
+                             if row.get("delivery_city") and row.get("delivery_state")
+                             else (row.get("delivery_city") or "—"))
+            original_offer = row.get("rate_offered")
+            counter_value = int(new_rate) if new_rate == int(new_rate) else new_rate
+
+            sms_body = _format_counter_sms(
+                broker_display=broker_display,
+                pickup=pickup_disp,
+                delivery=delivery_disp,
+                miles=row.get("miles"),
+                original_offer=int(original_offer) if original_offer and original_offer == int(original_offer) else original_offer,
+                counter_amount=counter_value,
+                book_token=new_book,
+                pass_token=new_pass,
+            )
+
+            # Update edge_load_activity: rotate tokens, stash counter_offered amount
+            supabase_service_client().table("edge_load_activity").update({
+                "stage": "counter",
+                "counter_offered": counter_value,
+                "book_token": new_book,
+                "pass_token": new_pass,
+                "consumed_token": None,
+                "consumed_at": None,
+                "expires_at": (datetime.now(timezone.utc) +
+                               timedelta(minutes=EDGE_LOAD_OFFER_TTL_MINUTES)).isoformat(),
+            }).eq("id", row["id"]).execute()
+
+            if os.environ.get("SMS_ENABLED", "false").lower() == "true":
+                telnyx.api_key = os.environ.get("TELNYX_API_KEY", "")
+                telnyx.Message.create(
+                    from_=os.environ["TELNYX_FROM"],
+                    to=phone,
+                    text=sms_body,
+                )
+                log.info('"volley2: counter SMS sent to=%s row=%s"', phone, row["id"])
+            else:
+                log.info('"volley2: would have sent counter SMS to=%s (SMS_ENABLED=false) body=%s"',
+                         phone, sms_body)
+
+        else:
+            # Negative or fallthrough — log only, close out
+            log.info('"volley2: broker negative — closing thread row=%s"', row["id"])
+            supabase_service_client().table("edge_load_activity").update({
+                "stage": "closed",
+            }).eq("id", row["id"]).execute()
+            supabase_service_client().table("broker_lanes").update({
+                "decision": "declined",
+            }).eq("carrier_id", carrier_id).eq("broker_email", row.get("broker_email")).execute()
+
+    except Exception as exc:
+        log.error('"_handle_volley2_reply failed row=%s: %s"', row.get("id"), exc, exc_info=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── End Piece 5 v2 sender ────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
 
 
 # ── Load board helpers ────────────────────────────────────────────────────────
@@ -1297,6 +1923,44 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
                      broker_id=_broker.get("id"),
                      broker_name=_broker.get("name"))
 
+        # ── Volley 2 detection (v8.1 §3.7) ───────────────────────────
+        # If this thread already has an open edge_load_activity row at
+        # stage='counter', the broker is replying to our carrier's counter.
+        # Haiku verdict drives the next action — independent of the regular
+        # load_offer branch below.
+        try:
+            _vol2_lookup = (
+                supabase_service_client()
+                .table("edge_load_activity")
+                .select("id, stage, rate_offered, carrier_rebid, broker_email, "
+                        "broker_first_name, broker_last_name, broker_company, "
+                        "pickup_city, pickup_state, delivery_city, delivery_state, "
+                        "miles, source")
+                .eq("thread_id", email_data["thread_id"])
+                .eq("carrier_id", carrier_id)
+                .eq("stage", "counter")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            _vol2_row = _vol2_lookup.data[0] if _vol2_lookup.data else None
+        except Exception as _exc:
+            log.error('"volley2 lookup failed: %s"', _exc)
+            _vol2_row = None
+
+        if _vol2_row:
+            log.info('"volley 2 detected — thread=%s row=%s classification=%s"',
+                     email_data["thread_id"], _vol2_row["id"], classification)
+            _handle_volley2_reply(
+                row=_vol2_row,
+                classification=classification,
+                email_data=email_data,
+                carrier_id=carrier_id,
+                broker=_broker,
+            )
+            update_broker_status(_broker["id"], classification)
+            return  # volley 2 handled — do not fall through to regular load_offer branch
+
         if classification.lower() == "load_offer":
             log.info('"SMS DIAGNOSTIC — entering load_offer branch message_id=%s thread_id=%s carrier_email=%s"',
                      email_data["message_id"], email_data["thread_id"], carrier_email)
@@ -1304,9 +1968,24 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
             log.info('"SMS DIAGNOSTIC — has_carrier_replied returned %s for thread=%s"',
                      replied, email_data["thread_id"])
             if not replied:
-                log.info('"SMS DIAGNOSTIC — about to call send_load_offer_sms"')
-                send_load_offer_sms(email_data)
-                log.info('"SMS DIAGNOSTIC — send_load_offer_sms returned"')
+                # Per v8.1 §2 — extract load details only after classification confirms
+                # load_offer. Avoids unnecessary Haiku call on positive/negative.
+                _extracted = classify_and_extract(email_data)
+                if _extracted.get("classification") != "load_offer":
+                    # Haiku disagreement between classify_reply and classify_and_extract.
+                    # Trust the extract (it had more context) and log the disagreement.
+                    log.info('"haiku disagreement — classify_reply=load_offer extract=%s message=%s"',
+                             _extracted.get("classification"), message_id)
+                else:
+                    # Fetch carrier dict for signature templating + phone
+                    _carrier = _get_carrier_dict(carrier_id)
+                    log.info('"SMS — calling send_load_offer_sms_v2 for known broker"')
+                    send_load_offer_sms_v2(
+                        carrier=_carrier,
+                        broker=_broker,
+                        extracted=_extracted,
+                        email_data=email_data,
+                    )
             else:
                 log.info('"SMS suppressed — carrier already replied in thread=%s"',
                          email_data["thread_id"])
@@ -1316,7 +1995,7 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
     # ── Cleared all gates — unknown sender ──────────────────────────────────────────
     # Sender passed Gates A, B, C1, C2 but is not a known broker or domain.
     # Haiku classifies via classify_and_extract (classify + extract in one call).
-    #   load_offer   → log to unknown_brokers_inbox + SMS to carrier.
+    #   load_offer   → log to unknown_brokers_inbox + SMS to carrier (v8.1 v2 path).
     #                  Auto-promotion to brokers table on carrier interaction:
     #                  reply, BOOK, RE-BID, or PASS.
     #   anything else → log to unknown_brokers_inbox only, silent drop.
@@ -1325,16 +2004,22 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
         log.info('"gate cleared — unknown sender %s — classifying"', _sender)
 
         extracted = classify_and_extract(email_data)
-        classification = extracted.get("classification", "unknown")
+        classification = extracted.get("classification", "negative")
         log.info('"unknown sender classified %s as %s"', message_id, classification)
 
         log_unknown_broker_inbox(email_data, extracted, carrier_id)
 
         if classification.lower() == "load_offer":
             log.info('"unknown sender load offer — SMS firing from=%s"', _sender)
-            send_unknown_broker_sms(email_data, extracted)
+            _carrier = _get_carrier_dict(carrier_id)
+            send_load_offer_sms_v2(
+                carrier=_carrier,
+                broker=None,  # unknown sender — broker_id will be NULL on edge_load_activity
+                extracted=extracted,
+                email_data=email_data,
+            )
             # Auto-promotion to brokers table occurs on carrier interaction.
-            # See: BOOK/RE-BID/PASS token handlers (Phase 2) and reply detection.
+            # See: BOOK/RE-BID/PASS token handlers (§8) and reply detection.
         else:
             log.info('"unknown sender non-offer — logged to unknown_brokers_inbox silent drop from=%s"',
                      _sender)
@@ -2491,6 +3176,377 @@ def validate_carrier():
     except Exception as e:
         logging.error(f'[validate-carrier] Error: {e}')
         return jsonify({'active': True, 'reason': 'offline_failopen'}), 200
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── Piece 5 — Backend routes (v8.1 §8) ───────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+EDGE_VERCEL_BASE = os.environ.get(
+    "EDGE_VERCEL_BASE",
+    "https://edgeai-dashboard.vercel.app",
+)
+
+
+@app.route("/<token>", methods=["GET"])
+def token_resolver(token: str):
+    """Universal token resolver. Looks up edge_load_activity by token,
+    handles state checks (expired, already-used), and dispatches:
+      BOOK   → 302 to Vercel /book-confirm?t=<token> (verification page)
+      RE-BID → 302 to Vercel /rebid?t=<token>&offer=<rate> (amount entry)
+      PASS   → fires action immediately, 302 to /passed (no verification)
+    Per v8.1 §8.1.
+    """
+    # Guard: only treat as token if it looks like one (6-char urlsafe).
+    # Prevents collision with any other future top-level route.
+    if not token or len(token) > 16 or "/" in token or "." in token:
+        return jsonify({"error": "not found"}), 404
+
+    try:
+        result = (
+            supabase_service_client()
+            .table("edge_load_activity")
+            .select("*")
+            .or_(f"book_token.eq.{token},rebid_token.eq.{token},pass_token.eq.{token}")
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return redirect(f"{EDGE_VERCEL_BASE}/expired", code=302)
+
+        row = result.data[0]
+
+        # Idempotent re-tap → "already actioned" page
+        if row.get("consumed_at") is not None:
+            return redirect(f"{EDGE_VERCEL_BASE}/already-used", code=302)
+
+        # Expiry check (server-side; nightly sweep does this for analytics)
+        expires_at = row.get("expires_at")
+        if expires_at:
+            try:
+                exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) > exp:
+                    return redirect(f"{EDGE_VERCEL_BASE}/expired", code=302)
+            except Exception:
+                pass  # malformed timestamp — let action proceed
+
+        # Dispatch by which token matched
+        if token == row.get("book_token"):
+            return redirect(f"{EDGE_VERCEL_BASE}/book-confirm?t={token}", code=302)
+
+        if token == row.get("rebid_token"):
+            # Mark rebid_token as the consumed token at TAP time (not at submit).
+            # Stage stays 'offer' until /rebid-submit completes the action.
+            supabase_service_client().table("edge_load_activity").update({
+                "consumed_token": token,
+                "consumed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", row["id"]).execute()
+            rate = row.get("rate_offered") or ""
+            return redirect(f"{EDGE_VERCEL_BASE}/rebid?t={token}&offer={rate}", code=302)
+
+        if token == row.get("pass_token"):
+            # PASS is one-tap, no verification page. Fire action server-side.
+            supabase_service_client().table("edge_load_activity").update({
+                "stage": "passed",
+                "consumed_token": token,
+                "consumed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", row["id"]).execute()
+            supabase_service_client().table("broker_lanes").update({
+                "decision": "passed",
+            }).eq("carrier_id", row["carrier_id"]).eq(
+                "broker_email", row.get("broker_email")
+            ).execute()
+            # OUTRCH source → courtesy decline reply via carrier's Gmail
+            if row.get("source") == "OUTRCH":
+                try:
+                    _send_decline_email_for_row(row)
+                except Exception as _exc:
+                    log.error('"PASS decline send failed: %s"', _exc)
+            return redirect(f"{EDGE_VERCEL_BASE}/passed", code=302)
+
+        # No token field matched (shouldn't happen given the OR query)
+        return redirect(f"{EDGE_VERCEL_BASE}/expired", code=302)
+
+    except Exception as exc:
+        log.error('"token_resolver failed token=%s: %s"', token, exc, exc_info=True)
+        return redirect(f"{EDGE_VERCEL_BASE}/expired", code=302)
+
+
+@app.route("/book-confirm", methods=["POST"])
+def book_confirm():
+    """POST endpoint called by the Vercel book-confirm.html YES button.
+    Body: {"token": "<book_token>"}. Sends agreement email via carrier's
+    Gmail, marks stage='booked', updates broker_lanes decision='booked'.
+    Per v8.1 §8.2.
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        token = data.get("token")
+        if not token:
+            return jsonify({"error": "missing token"}), 400
+
+        result = (
+            supabase_service_client()
+            .table("edge_load_activity")
+            .select("*")
+            .eq("book_token", token)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return jsonify({"error": "invalid token"}), 404
+
+        row = result.data[0]
+
+        if row.get("consumed_at") is not None:
+            return jsonify({"status": "already_actioned"}), 200
+
+        expires_at = row.get("expires_at")
+        if expires_at:
+            try:
+                exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) > exp:
+                    return jsonify({"error": "expired"}), 410
+            except Exception:
+                pass
+
+        carrier = _get_carrier_dict(row["carrier_id"])
+        if not carrier:
+            return jsonify({"error": "carrier not found"}), 404
+
+        # Build and send agreement email via carrier's Gmail
+        signature = _build_carrier_signature(row["carrier_id"])
+        body = _build_agreement_email(
+            pickup_city=row.get("pickup_city") or "",
+            delivery_city=row.get("delivery_city") or "",
+            rate=row.get("rate_offered") or "",
+            signature=signature,
+        )
+        try:
+            _send_gmail_reply_in_thread(
+                carrier=carrier,
+                thread_id=row["thread_id"],
+                body=body,
+                to_email=row["broker_email"],
+            )
+        except Exception as _exc:
+            log.error('"book_confirm: gmail send failed: %s"', _exc)
+            return jsonify({"error": "email send failed"}), 500
+
+        # Mark booked
+        supabase_service_client().table("edge_load_activity").update({
+            "stage": "booked",
+            "consumed_token": token,
+            "consumed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", row["id"]).execute()
+
+        supabase_service_client().table("broker_lanes").update({
+            "decision": "booked",
+        }).eq("carrier_id", row["carrier_id"]).eq(
+            "broker_email", row.get("broker_email")
+        ).execute()
+
+        log.info('"book_confirm: booked row=%s carrier=%s"', row["id"], row["carrier_id"])
+        return jsonify({"status": "booked"}), 200
+
+    except Exception as exc:
+        log.error('"book_confirm failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal error"}), 500
+
+
+@app.route("/rebid-submit", methods=["POST"])
+def rebid_submit():
+    """POST endpoint called by the Vercel rebid.html SEND COUNTER button.
+    Body: {"token": "<rebid_token>", "counter_amount": <number>}. Sends
+    counter email via carrier's Gmail, sets stage='counter', updates
+    broker_lanes decision='rebid'. Per v8.1 §8.3.
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        token = data.get("token")
+        counter_amount = data.get("counter_amount")
+        if not token or counter_amount is None:
+            return jsonify({"error": "missing token or counter_amount"}), 400
+
+        try:
+            counter_amount = float(counter_amount)
+            if counter_amount <= 0:
+                return jsonify({"error": "counter must be positive"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "counter not a number"}), 400
+
+        result = (
+            supabase_service_client()
+            .table("edge_load_activity")
+            .select("*")
+            .eq("rebid_token", token)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return jsonify({"error": "invalid token"}), 404
+
+        row = result.data[0]
+
+        # If already at stage=booked or passed, the rebid was overridden by another action
+        if row.get("stage") in ("booked", "passed", "closed", "expired"):
+            return jsonify({"error": "no longer active"}), 410
+
+        carrier = _get_carrier_dict(row["carrier_id"])
+        if not carrier:
+            return jsonify({"error": "carrier not found"}), 404
+
+        # Round display to int if whole number
+        display_amount = (int(counter_amount)
+                          if counter_amount == int(counter_amount)
+                          else counter_amount)
+
+        signature = _build_carrier_signature(row["carrier_id"])
+        body = _build_counter_email(
+            counter_amount=display_amount,
+            signature=signature,
+        )
+        try:
+            _send_gmail_reply_in_thread(
+                carrier=carrier,
+                thread_id=row["thread_id"],
+                body=body,
+                to_email=row["broker_email"],
+            )
+        except Exception as _exc:
+            log.error('"rebid_submit: gmail send failed: %s"', _exc)
+            return jsonify({"error": "email send failed"}), 500
+
+        supabase_service_client().table("edge_load_activity").update({
+            "stage": "counter",
+            "carrier_rebid": counter_amount,
+        }).eq("id", row["id"]).execute()
+
+        supabase_service_client().table("broker_lanes").update({
+            "decision": "rebid",
+        }).eq("carrier_id", row["carrier_id"]).eq(
+            "broker_email", row.get("broker_email")
+        ).execute()
+
+        log.info('"rebid_submit: counter=%s sent row=%s"', counter_amount, row["id"])
+        return jsonify({"status": "counter_sent"}), 200
+
+    except Exception as exc:
+        log.error('"rebid_submit failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal error"}), 500
+
+
+@app.route("/expiry-sweep", methods=["POST", "GET"])
+def expiry_sweep():
+    """Nightly cron target. Marks expired edge_load_activity rows and updates
+    broker_lanes.decision='no_action' for analytics hygiene. Per v8.1 §8.6.
+    Idempotent — safe to run repeatedly.
+    """
+    try:
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # Find rows that are still 'offer' but past their expiry with no action taken
+        expired_lookup = (
+            supabase_service_client()
+            .table("edge_load_activity")
+            .select("id, carrier_id, broker_email")
+            .eq("stage", "offer")
+            .is_("consumed_at", "null")
+            .lt("expires_at", now_iso)
+            .execute()
+        )
+        candidates = expired_lookup.data or []
+        count = 0
+        for cand in candidates:
+            try:
+                supabase_service_client().table("edge_load_activity").update({
+                    "stage": "expired",
+                }).eq("id", cand["id"]).execute()
+                supabase_service_client().table("broker_lanes").update({
+                    "decision": "no_action",
+                }).eq("carrier_id", cand["carrier_id"]).eq(
+                    "broker_email", cand.get("broker_email", "")
+                ).is_("decision", "null").execute()
+                count += 1
+            except Exception as _exc:
+                log.error('"expiry_sweep row=%s failed: %s"', cand.get("id"), _exc)
+
+        log.info('"expiry_sweep: marked %d rows expired"', count)
+        return jsonify({"status": "ok", "expired": count}), 200
+
+    except Exception as exc:
+        log.error('"expiry_sweep failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal error"}), 500
+
+
+@app.route("/telnyx-webhook", methods=["POST"])
+def telnyx_webhook():
+    """Placeholder for Telnyx delivery receipts and inbound SMS callbacks.
+    Telnyx Console is configured to POST here. We log the payload type and
+    return 200 to stop the retry storm. Full handling (delivery state to
+    edge_load_activity, inbound SMS reply parsing) is future scope.
+    """
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        event_type = payload.get("data", {}).get("event_type", "unknown")
+        log.info('"telnyx_webhook: received event_type=%s"', event_type)
+        return jsonify({"status": "received"}), 200
+    except Exception as exc:
+        log.error('"telnyx_webhook handler failed: %s"', exc)
+        return jsonify({"status": "received"}), 200  # always 200 to stop retries
+
+
+def _send_decline_email_for_row(row: dict) -> None:
+    """Send the OUTRCH-only PASS courtesy decline email."""
+    carrier = _get_carrier_dict(row["carrier_id"])
+    if not carrier:
+        log.error('"_send_decline_email_for_row: carrier not found row=%s"', row.get("id"))
+        return
+    signature = _build_carrier_signature(row["carrier_id"])
+    body = _build_decline_email(
+        pickup_city=row.get("pickup_city") or "",
+        delivery_city=row.get("delivery_city") or "",
+        signature=signature,
+    )
+    _send_gmail_reply_in_thread(
+        carrier=carrier,
+        thread_id=row["thread_id"],
+        body=body,
+        to_email=row["broker_email"],
+    )
+
+
+def _send_gmail_reply_in_thread(
+    carrier: dict, thread_id: str, body: str, to_email: str
+) -> None:
+    """Send a Gmail reply on behalf of the carrier into an existing thread.
+    Uses the carrier's stored OAuth refresh_token. Reuses gmail_service().
+    """
+    refresh_token = (carrier.get("gmail_token") or
+                     carrier.get("refresh_token") or "")
+    if not refresh_token:
+        raise RuntimeError(
+            f"no gmail refresh token on carrier {carrier.get('id')}"
+        )
+
+    service = gmail_service(refresh_token)
+
+    from email.mime.text import MIMEText  # local import to avoid top-level churn
+    msg = MIMEText(body, _charset="utf-8")
+    msg["to"] = to_email
+    msg["subject"] = "Re: Load offer"
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+    service.users().messages().send(
+        userId="me",
+        body={"raw": raw, "threadId": thread_id},
+    ).execute()
+    log.info('"_send_gmail_reply_in_thread: sent to=%s thread=%s"', to_email, thread_id)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── End Piece 5 routes ───────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
 
 
 if __name__ == "__main__":
