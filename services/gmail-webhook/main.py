@@ -1459,13 +1459,20 @@ def send_load_offer_sms_v2(
             "posted_amount": (f"${extracted.get('rate_offered')}"
                               if extracted.get("rate_offered") else None),
         }
-        _write_broker_lanes_row(
+        broker_lane_id = _write_broker_lanes_row(
             carrier_id=carrier_id,
             source=source,
             broker_info=broker_info,
             lane=lane,
             decision=None,  # set on carrier action
         )
+        if broker_lane_id and ela_row:
+            try:
+                supabase_service_client().table("edge_load_activity").update({
+                    "broker_lane_id": broker_lane_id,
+                }).eq("id", ela_row["id"]).execute()
+            except Exception as _exc:
+                log.error('"send_load_offer_sms_v2: broker_lane_id backfill failed: %s"', _exc)
 
         # 5. Format SMS body
         broker_display = _truncate_broker_display(
@@ -1558,7 +1565,7 @@ def _handle_volley2_reply(
             }).eq("id", row["id"]).execute()
             supabase_service_client().table("broker_lanes").update({
                 "decision": "won",
-            }).eq("carrier_id", carrier_id).eq("broker_email", row.get("broker_email")).execute()
+            }).eq("id", row.get("broker_lane_id")).execute()
 
         elif classification.lower() == "load_offer":
             # Broker counter-countered with a new $ — fire volley 2 SMS with BOOK/PASS only
@@ -1637,7 +1644,7 @@ def _handle_volley2_reply(
             }).eq("id", row["id"]).execute()
             supabase_service_client().table("broker_lanes").update({
                 "decision": "declined",
-            }).eq("carrier_id", carrier_id).eq("broker_email", row.get("broker_email")).execute()
+            }).eq("id", row.get("broker_lane_id")).execute()
 
     except Exception as exc:
         log.error('"_handle_volley2_reply failed row=%s: %s"', row.get("id"), exc, exc_info=True)
@@ -3343,9 +3350,7 @@ def token_resolver(token: str):
             }).eq("id", row["id"]).execute()
             supabase_service_client().table("broker_lanes").update({
                 "decision": "passed",
-            }).eq("carrier_id", row["carrier_id"]).eq(
-                "broker_email", row.get("broker_email")
-            ).execute()
+            }).eq("id", row.get("broker_lane_id")).execute()
             # OUTRCH source → courtesy decline reply via carrier's Gmail
             if row.get("source") == "OUTRCH":
                 try:
@@ -3434,9 +3439,7 @@ def book_confirm():
 
         supabase_service_client().table("broker_lanes").update({
             "decision": "booked",
-        }).eq("carrier_id", row["carrier_id"]).eq(
-            "broker_email", row.get("broker_email")
-        ).execute()
+        }).eq("id", row.get("broker_lane_id")).execute()
 
         log.info('"book_confirm: booked row=%s carrier=%s"', row["id"], row["carrier_id"])
         return jsonify({"status": "booked"}), 200
@@ -3518,9 +3521,7 @@ def rebid_submit():
 
         supabase_service_client().table("broker_lanes").update({
             "decision": "rebid",
-        }).eq("carrier_id", row["carrier_id"]).eq(
-            "broker_email", row.get("broker_email")
-        ).execute()
+        }).eq("id", row.get("broker_lane_id")).execute()
 
         log.info('"rebid_submit: counter=%s sent row=%s"', counter_amount, row["id"])
         return jsonify({"status": "counter_sent"}), 200
@@ -3558,9 +3559,7 @@ def expiry_sweep():
                 }).eq("id", cand["id"]).execute()
                 supabase_service_client().table("broker_lanes").update({
                     "decision": "no_action",
-                }).eq("carrier_id", cand["carrier_id"]).eq(
-                    "broker_email", cand.get("broker_email", "")
-                ).is_("decision", "null").execute()
+                }).eq("id", cand.get("broker_lane_id")).is_("decision", "null").execute()
                 count += 1
             except Exception as _exc:
                 log.error('"expiry_sweep row=%s failed: %s"', cand.get("id"), _exc)
