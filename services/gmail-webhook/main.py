@@ -648,6 +648,17 @@ def lookup_broker(from_email: str, carrier_id: str) -> dict | None:
 
 def is_duplicate(message_id: str) -> bool:
     """Check both processed tables so retried Pub/Sub messages are always skipped."""
+    in_ela = bool(
+        supabase_client()
+        .table("edge_load_activity")
+        .select("id")
+        .eq("gmail_message_id", message_id)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if in_ela:
+        return True
     in_responses = bool(
         supabase_client()
         .table("responses")
@@ -806,7 +817,8 @@ EXTRACT_PROMPT = (
     "\"sender_name\": \"<name or null>\", "
     "\"load_origin\": \"<city, state or null>\", "
     "\"load_destination\": \"<city, state or null>\", "
-    "\"rate_offered\": \"<amount or null>\"}\n\n"
+    "\"rate_offered\": \"<amount or null>\", "
+    "\"miles\": <integer or null>}\n\n"
     "Classification labels (EXACTLY one of these three):\n"
     "- load_offer   : offering a specific load, lane, or rate\n"
     "- positive     : interested/positive but no specific load offered\n"
@@ -815,7 +827,8 @@ EXTRACT_PROMPT = (
     "- sender_name: full name from email signature, null if not present\n"
     "- load_origin: pickup city/state e.g. Dallas TX, null if not mentioned\n"
     "- load_destination: delivery city/state e.g. Chicago IL, null if not mentioned\n"
-    "- rate_offered: dollar rate e.g. $2.50/mile or $1500 flat, null if not mentioned\n\n"
+    "- rate_offered: dollar rate e.g. $2.50/mile or $1500 flat, null if not mentioned\n"
+    "- miles: total trip distance as integer e.g. 950, null if not mentioned\n\n"
     "Return ONLY valid JSON, no other text.\n\n"
     "Subject: {subject}\n"
     "Body:\n"
@@ -864,6 +877,7 @@ def classify_and_extract(email_data: dict) -> dict:
         "load_origin": None,
         "load_destination": None,
         "rate_offered": None,
+        "miles": None,
     }
     try:
         subject = email_data.get("subject", "")
@@ -1170,6 +1184,60 @@ def _build_decline_email(pickup_city: str, delivery_city: str,
     return body
 
 
+def _promote_unknown_broker_to_brokers(row: dict, carrier_id: str) -> None:
+    """Y4: promote unknown sender to brokers table on BOOK/RE-BID.
+    Fire-and-forget — failure never blocks the calling action. v8.1 §2."""
+    if row.get("broker_id"):
+        return
+    broker_email = row.get("broker_email")
+    if not broker_email:
+        return
+    try:
+        first = (row.get("broker_first_name") or "").strip()
+        last = (row.get("broker_last_name") or "").strip()
+        full_name = f"{first} {last}".strip() or broker_email
+        existing = (
+            supabase_service_client()
+            .table("brokers")
+            .select("id")
+            .eq("carrier_id", carrier_id)
+            .eq("email", broker_email)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            broker_id = existing.data[0]["id"]
+        else:
+            inserted = (
+                supabase_service_client()
+                .table("brokers")
+                .insert({
+                    "carrier_id": carrier_id,
+                    "email": broker_email,
+                    "name": full_name,
+                    "first_name": first or None,
+                    "last_name": last or None,
+                    "company": row.get("broker_company"),
+                    "status": "active",
+                    "contact_enabled": True,
+                    "response_count": 0,
+                    "load_count": 0,
+                    "touch_count": 0,
+                    "notes": "auto-promoted on carrier interaction",
+                })
+                .execute()
+            )
+            broker_id = inserted.data[0]["id"]
+        supabase_service_client().table("edge_load_activity").update({
+            "broker_id": broker_id,
+        }).eq("id", row["id"]).execute()
+        log.info('"_promote_unknown_broker: promoted email=%s broker_id=%s row=%s"',
+                 broker_email, broker_id, row["id"])
+    except Exception as exc:
+        log.error('"_promote_unknown_broker failed row=%s: %s"',
+                  row.get("id"), exc, exc_info=True)
+
+
 def _create_edge_load_activity_row(
     carrier_id: str,
     broker_id: str | None,
@@ -1216,6 +1284,7 @@ def _create_edge_load_activity_row(
             "consumed": False,
             "expires_at": expires.isoformat(),
             "rate_offered": _parse_rate_numeric(extracted.get("rate_offered")),
+            "miles": extracted.get("miles"),
             "pickup_city": pickup_city,
             "pickup_state": pickup_state,
             "delivery_city": delivery_city,
@@ -1541,6 +1610,7 @@ def _handle_volley2_reply(
                 "counter_offered": counter_value,
                 "book_token": new_book,
                 "pass_token": new_pass,
+                "rebid_token": None,
                 "consumed_token": None,
                 "consumed_at": None,
                 "expires_at": (datetime.now(timezone.utc) +
@@ -1733,6 +1803,26 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
         return
 
     log.info('"processing message %s from %s"', message_id, email_data["from_email"])
+
+    # Step 2.5 — Y5 thread-state dedup (v8.1 §2): suppress SMS on threads
+    # already in a terminal ELA stage. Scoped by (carrier_id, thread_id).
+    try:
+        _y5 = (
+            supabase_service_client()
+            .table("edge_load_activity")
+            .select("id, stage")
+            .eq("carrier_id", carrier_id)
+            .eq("thread_id", email_data["thread_id"])
+            .in_("stage", ["booked", "passed", "closed", "expired"])
+            .limit(1)
+            .execute()
+        )
+        if _y5.data:
+            log.info('"Y5 dedup — thread=%s stage=%s — suppressing"',
+                     email_data["thread_id"], _y5.data[0]["stage"])
+            return
+    except Exception as _exc:
+        log.error('"Y5 dedup lookup failed: %s"', _exc)
 
     # Step 3a — load board intercept (before broker lookup)
     if is_load_board_email(email_data["from_email"]):
@@ -3333,6 +3423,8 @@ def book_confirm():
             log.error('"book_confirm: gmail send failed: %s"', _exc)
             return jsonify({"error": "email send failed"}), 500
 
+        _promote_unknown_broker_to_brokers(row, row["carrier_id"])
+
         # Mark booked
         supabase_service_client().table("edge_load_activity").update({
             "stage": "booked",
@@ -3416,6 +3508,8 @@ def rebid_submit():
         except Exception as _exc:
             log.error('"rebid_submit: gmail send failed: %s"', _exc)
             return jsonify({"error": "email send failed"}), 500
+
+        _promote_unknown_broker_to_brokers(row, row["carrier_id"])
 
         supabase_service_client().table("edge_load_activity").update({
             "stage": "counter",
