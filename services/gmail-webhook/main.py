@@ -885,11 +885,21 @@ def classify_and_extract(email_data: dict) -> dict:
         prompt_text = EXTRACT_PROMPT.format(subject=subject, body=body[:3000])
         msg = anthropic_client().messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=200,
+            max_tokens=600,
             messages=[{"role": "user", "content": prompt_text}],
         )
         raw = msg.content[0].text.strip()
-        extracted = json.loads(raw)
+        # Strip markdown code fences if Haiku wrapped the JSON
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw
+            if raw.endswith("```"):
+                raw = raw.rsplit("```", 1)[0]
+            raw = raw.strip()
+        try:
+            extracted = json.loads(raw)
+        except json.JSONDecodeError as _je:
+            log.error('"classify_and_extract JSON parse failed raw=%r err=%s"', raw[:500], _je)
+            return fallback
         if extracted.get("classification") not in {
             "load_offer", "positive", "negative"
         }:
