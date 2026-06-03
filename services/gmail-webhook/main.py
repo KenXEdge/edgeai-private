@@ -760,6 +760,7 @@ def log_unknown_broker_inbox(email_data: dict, extracted: dict, carrier_id: str)
                 "gmail_message_id": email_data["message_id"],
                 "sender_email": email_data["from_email"],
                 "sender_name": extracted.get("sender_name"),
+                "broker_company": extracted.get("broker_company"),
                 "raw_email": email_data["body"],
                 "classification": extracted.get("classification", "unknown"),
                 "load_origin": extracted.get("load_origin"),
@@ -815,6 +816,7 @@ EXTRACT_PROMPT = (
     "Return a JSON object with exactly these fields:\n"
     "{{\"classification\": \"<label>\", "
     "\"sender_name\": \"<name or null>\", "
+    "\"broker_company\": \"<brokerage company name or null>\", "
     "\"load_origin\": \"<city, state or null>\", "
     "\"load_destination\": \"<city, state or null>\", "
     "\"rate_offered\": \"<amount or null>\", "
@@ -825,6 +827,7 @@ EXTRACT_PROMPT = (
     "- negative     : not interested, DNC, out of network, OR cannot determine intent\n\n"
     "Extraction rules:\n"
     "- sender_name: full name from email signature, null if not present\n"
+    "- broker_company: brokerage/company name from signature, sender domain, or letterhead. Null if not identifiable.\n"
     "- load_origin: pickup city/state e.g. Dallas TX, null if not mentioned\n"
     "- load_destination: delivery city/state e.g. Chicago IL, null if not mentioned\n"
     "- rate_offered: dollar rate e.g. $2.50/mile or $1500 flat, null if not mentioned\n"
@@ -874,6 +877,7 @@ def classify_and_extract(email_data: dict) -> dict:
     fallback = {
         "classification": "negative",
         "sender_name": None,
+        "broker_company": None,
         "load_origin": None,
         "load_destination": None,
         "rate_offered": None,
@@ -1287,6 +1291,7 @@ def _create_edge_load_activity_row(
             "broker_email": email_data["from_email"],
             "broker_first_name": first_name or None,
             "broker_last_name": last_name or None,
+            "broker_company": extracted.get("broker_company"),
             "stage": "offer",
             "book_token": book_token,
             "rebid_token": rebid_token,
@@ -1453,10 +1458,12 @@ def send_load_offer_sms_v2(
         if broker:
             broker_info["first_name"] = broker_info.get("first_name") or broker.get("first_name")
             broker_info["last_name"] = broker_info.get("last_name") or broker.get("last_name")
-            broker_info["company"] = broker.get("company")
+            broker_info["company"] = broker.get("company") or extracted.get("broker_company")
             broker_info["mc"] = broker.get("mc_number")
             broker_info["phone"] = broker.get("phone")
             broker_info["team_name"] = broker.get("team_name")
+        else:
+            broker_info["company"] = extracted.get("broker_company")
         broker_info["email"] = email_data.get("from_email")
 
         pickup_city, pickup_state = _split_city_state(extracted.get("load_origin"))
@@ -1466,6 +1473,7 @@ def send_load_offer_sms_v2(
             "pickup_state": pickup_state,
             "delivery_city": delivery_city,
             "delivery_state": delivery_state,
+            "miles": extracted.get("miles"),
             "posted_amount": (f"${extracted.get('rate_offered')}"
                               if extracted.get("rate_offered") else None),
         }
@@ -2940,7 +2948,7 @@ def supabase_service_client() -> Client:
     if _supabase_service is None:
         _supabase_service = create_client(
             os.environ["SUPABASE_URL"],
-            os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+            os.environ["SUPABASE_KEY"],
         )
     return _supabase_service
 
