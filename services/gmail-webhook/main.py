@@ -737,12 +737,17 @@ def update_broker_status(broker_id: str, classification: str) -> None:
 
 def _parse_rate_numeric(rate_str: str | None) -> float | None:
     """Extract the first numeric value from a rate string for the numeric DB column.
-    "$2.50/mile" → 2.50   "$1,500 flat" → 1500.0   None → None
+    Flat dollar amounts: "$1,500 flat" → 1500.0
+    Per-mile rates: "$2.50/mile" → None (bypassed — brokers rarely quote RPM in load offers)
     """
     if not rate_str:
         return None
     import re
-    match = re.search(r"[\d,]+\.?\d*", rate_str.replace(",", ""))
+    # Bypass RPM rates per business rule — broker load offers should be flat dollar
+    lowered = str(rate_str).lower()
+    if "/mile" in lowered or "/mi" in lowered or "per mile" in lowered:
+        return None
+    match = re.search(r"[\d,]+\.?\d*", str(rate_str).replace(",", ""))
     if match:
         try:
             return float(match.group().replace(",", ""))
@@ -1474,8 +1479,7 @@ def send_load_offer_sms_v2(
             "delivery_city": delivery_city,
             "delivery_state": delivery_state,
             "miles": extracted.get("miles"),
-            "posted_amount": (f"${extracted.get('rate_offered')}"
-                              if extracted.get("rate_offered") else None),
+            "posted_amount": (f"${_rn:g}" if (_rn := _parse_rate_numeric(extracted.get('rate_offered'))) is not None else None),
         }
         broker_lane_id = _write_broker_lanes_row(
             carrier_id=carrier_id,
