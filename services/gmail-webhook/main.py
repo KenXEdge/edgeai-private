@@ -813,12 +813,12 @@ Email body:
 EXTRACT_PROMPT = (
     "You are analyzing a freight broker email sent to a carrier.\n\n"
     "Return a JSON object with exactly these fields:\n"
-    "{\"classification\": \"<label>\", "
+    "{{\"classification\": \"<label>\", "
     "\"sender_name\": \"<name or null>\", "
     "\"load_origin\": \"<city, state or null>\", "
     "\"load_destination\": \"<city, state or null>\", "
     "\"rate_offered\": \"<amount or null>\", "
-    "\"miles\": <integer or null>}\n\n"
+    "\"miles\": <integer or null>}}\n\n"
     "Classification labels (EXACTLY one of these three):\n"
     "- load_offer   : offering a specific load, lane, or rate\n"
     "- positive     : interested/positive but no specific load offered\n"
@@ -1797,6 +1797,7 @@ def has_carrier_replied(thread_id: str, refresh_token: str, carrier_email: str) 
 
 def process_message(message_id: str, carrier_id: str, refresh_token: str, carrier_email: str) -> None:
     """Full pipeline for one Gmail message."""
+    print("[BUILD_MARKER_20260603A] entered", flush=True)
 
     # Step 1 — deduplication FIRST, before any API calls or processing
     # Prevents 150x replay: if the message is already in either table, stop immediately.
@@ -2068,6 +2069,7 @@ def process_message(message_id: str, carrier_id: str, refresh_token: str, carrie
                 # Per v8.1 §2 — extract load details only after classification confirms
                 # load_offer. Avoids unnecessary Haiku call on positive/negative.
                 _extracted = classify_and_extract(email_data)
+                log.error('"DIAG_EXTRACT: %s"', _extracted)
                 if _extracted.get("classification") != "load_offer":
                     # Haiku disagreement between classify_reply and classify_and_extract.
                     # Trust the extract (it had more context) and log the disagreement.
