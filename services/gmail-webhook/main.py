@@ -1131,9 +1131,9 @@ def _format_load_offer_sms(broker_display: str, pickup: str, delivery: str,
         f"{broker_display} · {pickup} → {delivery}\n"
         f"{miles_part}{rate_part}\n"
         f"\n"
-        f"✅ BOOK   xbase1.com/{book_token}\n"
-        f"🔄 RE-BID xbase1.com/{rebid_token}\n"
-        f"❌ PASS   xbase1.com/{pass_token}"
+        f"✅ BOOK   xtxtec.com/{book_token}\n"
+        f"🔄 RE-BID xtxtec.com/{rebid_token}\n"
+        f"❌ PASS   xtxtec.com/{pass_token}"
     )
 
 
@@ -1155,8 +1155,8 @@ def _format_counter_sms(broker_display: str, pickup: str, delivery: str,
         f"{broker_display} · {pickup} → {delivery}\n"
         f"{miles_part}Offer ${original_offer} / Counter ${counter_amount}\n"
         f"\n"
-        f"✅ BOOK xbase1.com/{book_token}\n"
-        f"❌ PASS xbase1.com/{pass_token}"
+        f"✅ BOOK xtxtec.com/{book_token}\n"
+        f"❌ PASS xtxtec.com/{pass_token}"
     )
 
 
