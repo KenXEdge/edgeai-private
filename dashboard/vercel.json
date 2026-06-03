@@ -32,6 +32,7 @@
     { "source": "/cmo", "destination": "/cmo.html" },
     { "source": "/cfo", "destination": "/cfo.html" },
     { "source": "/", "destination": "/home.html" },
+    { "source": "/:token([A-Za-z0-9]{6})", "destination": "/api/:token" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
