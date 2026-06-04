@@ -11,6 +11,7 @@ import logging
 import secrets
 import string
 import sys
+import jwt as pyjwt
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
@@ -426,18 +427,49 @@ def get_gmail_access_token():
         log.error(f'"[PHASE-C] token refresh failed for carrier {carrier_id}: {e}"')
         return jsonify({"error": "token_refresh_failed"}), 502
 
-    # 3. Return access token to container. Container caches and reuses
-    #    until expires_at - 300 (5-min buffer), then calls this endpoint again.
+    # 3. Mint Supabase JWT for the carrier (30-day exp, no refresh mechanism).
+    #    Container restart re-mints via bootstrap. Phase G weekly restart keeps
+    #    JWT well inside the 30-day window. Stripe non-pay → ace_vm_access.active=false
+    #    → main.py blocks future auth at next bootstrap. Per locked design.
+    try:
+        jwt_secret = os.environ.get("SUPABASE_JWT_SECRET")
+        if not jwt_secret:
+            log.error('"[PHASE-C] SUPABASE_JWT_SECRET missing from Cloud Run env"')
+            return jsonify({"error": "server_misconfigured"}), 500
+
+        _jwt_now = int(_time.time())
+        _jwt_exp = _jwt_now + (30 * 24 * 3600)  # 30 days
+        supabase_jwt = pyjwt.encode(
+            {
+                "sub":  carrier_id,
+                "role": "authenticated",
+                "aud":  "authenticated",
+                "iat":  _jwt_now,
+                "exp":  _jwt_exp,
+            },
+            jwt_secret,
+            algorithm="HS256",
+        )
+        # PyJWT >=2 returns str; <2 returns bytes. Normalize.
+        if isinstance(supabase_jwt, bytes):
+            supabase_jwt = supabase_jwt.decode("utf-8")
+    except Exception as e:
+        log.error(f'"[PHASE-C] supabase_jwt mint failed for carrier {carrier_id}: {e}"')
+        return jsonify({"error": "jwt_mint_failed"}), 500
+
+    # 4. Return access token + JWT to container.
     log.info(json.dumps({
         "event": "gmail_token_issued",
         "carrier_id": carrier_id,
-        "expires_at": expires_at
+        "expires_at": expires_at,
+        "supabase_jwt_exp": _jwt_exp,
     }))
 
     return jsonify({
-        "access_token": access_token,
-        "expires_at": expires_at,
-        "carrier_id": carrier_id
+        "access_token":  access_token,
+        "expires_at":    expires_at,
+        "carrier_id":    carrier_id,
+        "supabase_jwt":  supabase_jwt,
     }), 200
 
 
