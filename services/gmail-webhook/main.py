@@ -9,6 +9,7 @@ import json
 import base64
 import logging
 import secrets
+import string
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -996,10 +997,11 @@ def _generate_load_offer_tokens() -> tuple[str, str, str]:
     Collision probability is negligible at platform scale (64^6 ≈ 68B values)
     and the UNIQUE index on book_token would catch any collision at INSERT.
     """
+    _alphabet = string.ascii_letters + string.digits
     return (
-        secrets.token_urlsafe(5)[:6],
-        secrets.token_urlsafe(5)[:6],
-        secrets.token_urlsafe(5)[:6],
+        ''.join(secrets.choice(_alphabet) for _ in range(6)),
+        ''.join(secrets.choice(_alphabet) for _ in range(6)),
+        ''.join(secrets.choice(_alphabet) for _ in range(6)),
     )
 
 
