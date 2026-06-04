@@ -252,47 +252,49 @@ def require_carrier_auth(view_func):
                        path=request.path, ip=request.remote_addr)
             return jsonify({"error": "unauthorized"}), 401
 
-        # Step 6 — Email must match carrier SA naming pattern
-        match = _CARRIER_SA_EMAIL_RE.match(sa_email)
-        if not match:
-            _audit_log("auth_rejected", reason="not_carrier_sa",
-                       path=request.path, ip=request.remote_addr, sa_email=sa_email)
-            return jsonify({"error": "unauthorized"}), 401
-
-        # Step 7 — Optional GCP project match (defense in depth)
-        expected_project = os.environ.get("CARRIER_SA_PROJECT", "")
-        if expected_project and match.group("project") != expected_project:
-            _audit_log("auth_rejected", reason="wrong_project",
-                       path=request.path, ip=request.remote_addr,
-                       sa_project=match.group("project"))
-            return jsonify({"error": "unauthorized"}), 401
-
-        # Step 8 — Convert hex UUID back to canonical UUID form
-        try:
-            carrier_id = _uuid_from_hex(match.group("uuid_hex"))
-        except Exception:
-            _audit_log("auth_rejected", reason="malformed_carrier_id",
-                       path=request.path, ip=request.remote_addr)
-            return jsonify({"error": "unauthorized"}), 401
-
-        # Step 9 — Confirm carrier has active ace_vm_access row in Supabase
+        # Step 6 — Lookup SA email in ace_vm_access to resolve carrier_id.
+        # Replaces the prior regex+hex-parse path. ace_vm_access.sa_email is
+        # the source of truth for SA→carrier mapping; no naming convention
+        # to maintain, no UUID-length assumptions.
         try:
             sb = supabase_client()
             resp = (
                 sb.table("ace_vm_access")
-                .select("active")
-                .eq("carrier_id", carrier_id)
-                .eq("active", True)
+                .select("carrier_id, active")
+                .eq("sa_email", sa_email)
                 .limit(1)
                 .execute()
             )
-            if not resp.data:
-                _audit_log("auth_rejected", reason="no_active_vm_access",
-                           path=request.path, carrier_id=carrier_id)
-                return jsonify({"error": "access revoked"}), 401
         except Exception as e:
-            log.error(f'"[AUTH] supabase lookup failed: {e}"')
+            log.error(f'"[AUTH] ace_vm_access lookup failed: {e}"')
             return jsonify({"error": "internal"}), 500
+
+        if not resp.data:
+            _audit_log("auth_rejected", reason="sa_not_registered",
+                       path=request.path, ip=request.remote_addr, sa_email=sa_email)
+            return jsonify({"error": "unauthorized"}), 401
+
+        row = resp.data[0]
+        carrier_id = row.get("carrier_id")
+        if not carrier_id:
+            _audit_log("auth_rejected", reason="row_missing_carrier_id",
+                       path=request.path, sa_email=sa_email)
+            return jsonify({"error": "unauthorized"}), 401
+
+        if not row.get("active"):
+            _audit_log("auth_rejected", reason="no_active_vm_access",
+                       path=request.path, carrier_id=carrier_id)
+            return jsonify({"error": "access revoked"}), 401
+
+        # Step 7 — Optional GCP project match (defense in depth).
+        # SA email format: <name>@<project>.iam.gserviceaccount.com
+        expected_project = os.environ.get("CARRIER_SA_PROJECT", "")
+        if expected_project:
+            sa_project = sa_email.split("@")[-1].split(".")[0] if "@" in sa_email else ""
+            if sa_project != expected_project:
+                _audit_log("auth_rejected", reason="wrong_project",
+                           path=request.path, sa_email=sa_email, sa_project=sa_project)
+                return jsonify({"error": "unauthorized"}), 401
 
         # All checks passed — attach to request context for the view function
         g.carrier_id = carrier_id
