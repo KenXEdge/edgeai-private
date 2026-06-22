@@ -1,52 +1,32 @@
 {
   "trailingSlash": false,
   "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [{ "type": "host", "value": "xedge-ai.com" }],
-      "destination": "https://xtxtec.com/$1",
-      "permanent": true
-    },
-    {
-      "source": "/(.*)",
-      "has": [{ "type": "host", "value": "www.xedge-ai.com" }],
-      "destination": "https://xtxtec.com/$1",
-      "permanent": true
-    },
-    {
-      "source": "/(.*)",
-      "has": [{ "type": "host", "value": "www.xtxtec.com" }],
-      "destination": "https://xtxtec.com/$1",
-      "permanent": true
-    }
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "xedge-ai.com" }],     "destination": "https://xtxtec.com/$1", "permanent": true },
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "www.xedge-ai.com" }], "destination": "https://xtxtec.com/$1", "permanent": true },
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "www.xtxtec.com" }],   "destination": "https://xtxtec.com/$1", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/dashboard", "destination": "/dashboard.html" },
-    { "source": "/marketing", "destination": "/marketing.html" },
-    { "source": "/onboard", "destination": "/onboard.html" },
-    { "source": "/onboard/lanes", "destination": "/onboard-lanes.html" },
-    { "source": "/onboard/rates", "destination": "/onboard-rates.html" },
-    { "source": "/onboard/gmail", "destination": "/onboard-gmail.html" },
-    { "source": "/verify", "destination": "/verify.html" },
-    { "source": "/cmo", "destination": "/cmo.html" },
-    { "source": "/cfo", "destination": "/cfo.html" },
-    { "source": "/", "destination": "/home.html" },
+    { "source": "/marketing",      "destination": "/marketing.html" },
+    { "source": "/onboard",        "destination": "/onboard.html" },
+    { "source": "/onboard/lanes",  "destination": "/onboard-lanes.html" },
+    { "source": "/onboard/rates",  "destination": "/onboard-rates.html" },
+    { "source": "/onboard/gmail",  "destination": "/onboard-gmail.html" },
+    { "source": "/verify",         "destination": "/verify.html" },
+    { "source": "/cmo",            "destination": "/cmo.html" },
+    { "source": "/cfo",            "destination": "/cfo.html" },
+    { "source": "/",               "destination": "/home.html" },
+    { "source": "/book-confirm",   "destination": "/book-confirm.html" },
+    { "source": "/rebid",          "destination": "/rebid.html" },
+    { "source": "/booked",         "destination": "/booked.html" },
+    { "source": "/passed",         "destination": "/passed.html" },
+    { "source": "/expired",        "destination": "/expired.html" },
+    { "source": "/already-used",   "destination": "/already-used.html" },
+    { "source": "/counter-sent",   "destination": "/counter-sent.html" },
     { "source": "/:token([A-Za-z0-9]{6})", "destination": "/api/:token" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
-      ]
-    },
-    {
-      "source": "/(.*\\.html)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
-      ]
-    }
+    { "source": "/assets/(.*)",   "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }] },
+    { "source": "/(.*\\.html)",   "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }] }
   ]
 }
