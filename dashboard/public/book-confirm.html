@@ -1,1 +1,103 @@
-﻿<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EDGE · Confirm Booking</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0a;color:#f0f0f0;font-family:Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#111;border:1px solid #222;border-radius:12px;padding:48px 40px;text-align:center;max-width:420px;width:90%}.title{font-size:20px;font-weight:700;margin-bottom:8px}.detail{font-size:28px;font-weight:800;color:#c8f135;margin:16px 0}.sub{font-size:13px;color:#666;margin-bottom:32px}.btn{display:block;width:100%;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;border:none;margin-bottom:12px}.btn-yes{background:#c8f135;color:#0a0a0a}.btn-no{background:#1a1a1a;color:#888;border:1px solid #333}.msg{margin-top:16px;font-size:13px;color:#666}</style></head><body><div class="card"><div class="title">Confirm Booking</div><div id="detail" class="detail">Ready to book</div><div class="sub">Tap YES to send the booking email to the broker.</div><button class="btn btn-yes" onclick="book()">YES, BOOK IT</button><button class="btn btn-no" onclick="history.back()">NO, GO BACK</button><div class="msg" id="msg"></div></div><script>const p=new URLSearchParams(location.search),t=p.get("t");async function book(){const m=document.getElementById("msg");m.textContent="Sending...";try{const r=await fetch("https://edgeai-gmail-webhook-417422203146.us-central1.run.app/book-confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:t})});const d=await r.json();if(r.ok){location.href="/booked"}else{m.textContent=d.error||"Error — try again"}}catch(e){m.textContent="Network error — try again"}}</script></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EDGE · Confirm Booking</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0a0a;color:#f0f0f0;font-family:Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#111;border:1px solid #222;border-radius:12px;padding:40px 32px;max-width:420px;width:90%}
+  .kicker{font-size:11px;letter-spacing:2px;color:#666;text-transform:uppercase;text-align:center;margin-bottom:24px}
+  .lane{text-align:center}
+  .lane-city{font-size:26px;font-weight:800;color:#f0f0f0;line-height:1.2}
+  .lane-mid{display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0;color:#555}
+  .lane-mid .line{height:1px;width:40px;background:#2a2a2a}
+  .lane-mid .miles{font-size:12px;color:#888;white-space:nowrap}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#222;border:1px solid #222;border-radius:10px;overflow:hidden;margin:28px 0 16px}
+  .stat{background:#0e0e0e;padding:16px 8px;text-align:center}
+  .stat-label{font-size:9px;letter-spacing:1.5px;color:#777;text-transform:uppercase;margin-bottom:6px}
+  .stat-val{font-size:18px;font-weight:800;color:#c8f135}
+  .sched{display:none;border:1px solid #222;border-radius:10px;margin-bottom:16px;overflow:hidden}
+  .sched-row{display:flex;justify-content:space-between;padding:11px 16px;font-size:13px}
+  .sched-row+.sched-row{border-top:1px solid #1c1c1c}
+  .sched-label{color:#777}
+  .sched-val{color:#e8e8e8;font-weight:600}
+  .broker{text-align:center;font-size:13px;color:#777;margin-bottom:24px}
+  .broker b{color:#aaa;font-weight:600}
+  .sub{font-size:13px;color:#666;text-align:center;margin-bottom:24px}
+  .btn{display:block;width:100%;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;border:none;margin-bottom:12px}
+  .btn-yes{background:#c8f135;color:#0a0a0a}
+  .btn-no{background:#1a1a1a;color:#888;border:1px solid #333}
+  .msg{margin-top:8px;font-size:13px;color:#666;text-align:center}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="kicker">Confirm Booking</div>
+    <div class="lane">
+      <div class="lane-city" id="lane-from">—</div>
+      <div class="lane-mid"><span class="line"></span><span class="miles" id="miles"></span><span class="line"></span></div>
+      <div class="lane-city" id="lane-to">—</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Rate</div><div class="stat-val" id="stat-rate">—</div></div>
+      <div class="stat"><div class="stat-label">Per Mile</div><div class="stat-val" id="stat-rpm">—</div></div>
+      <div class="stat"><div class="stat-label">Equipment</div><div class="stat-val" id="stat-equip">—</div></div>
+    </div>
+    <div class="sched" id="sched">
+      <div class="sched-row" id="row-pickup"><span class="sched-label">Pickup</span><span class="sched-val" id="sched-pickup"></span></div>
+      <div class="sched-row" id="row-delivery"><span class="sched-label">Delivery</span><span class="sched-val" id="sched-delivery"></span></div>
+    </div>
+    <div class="broker" id="broker"></div>
+    <div class="sub">Tap YES to send the booking email to the broker.</div>
+    <button class="btn btn-yes" onclick="book()">YES, BOOK IT</button>
+    <button class="btn btn-no" onclick="history.back()">NO, GO BACK</button>
+    <div class="msg" id="msg"></div>
+  </div>
+<script>
+  const API = "https://edgeai-gmail-webhook-417422203146.us-central1.run.app";
+  const token = new URLSearchParams(location.search).get("t");
+
+  (async function loadDetails(){
+    if(!token) return;
+    try{
+      const r = await fetch(API + "/load-info?t=" + encodeURIComponent(token));
+      if(r.ok) renderLoad(await r.json());
+    }catch(e){ /* leave placeholders; booking still works */ }
+  })();
+
+  function renderLoad(L){
+    document.getElementById("lane-from").textContent = [L.pickup_city, L.pickup_state].filter(Boolean).join(", ") || "—";
+    document.getElementById("lane-to").textContent   = [L.delivery_city, L.delivery_state].filter(Boolean).join(", ") || "—";
+    document.getElementById("miles").textContent     = L.miles ? L.miles + " mi" : "";
+    document.getElementById("stat-rate").textContent = L.rate_offered ? "$" + Number(L.rate_offered).toLocaleString() : "—";
+    const rpm = (L.rate_offered && L.miles) ? (L.rate_offered / L.miles) : null;
+    document.getElementById("stat-rpm").textContent  = rpm ? "$" + rpm.toFixed(2) : "—";
+    document.getElementById("stat-equip").textContent = L.vehicle_size || "Any";
+    document.getElementById("broker").innerHTML      = L.broker_company ? "via <b>" + L.broker_company + "</b>" : "";
+
+    // schedule rows — shown only when present (Phase 2 populates these)
+    let any = false;
+    if (L.pickup_datetime){ document.getElementById("sched-pickup").textContent = L.pickup_datetime; any = true; }
+    else document.getElementById("row-pickup").style.display = "none";
+    if (L.delivery_datetime){ document.getElementById("sched-delivery").textContent = L.delivery_datetime; any = true; }
+    else document.getElementById("row-delivery").style.display = "none";
+    if (any) document.getElementById("sched").style.display = "block";
+  }
+
+  async function book(){
+    const m = document.getElementById("msg");
+    m.textContent = "Sending...";
+    try{
+      const r = await fetch(API + "/book-confirm", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ token })
+      });
+      const d = await r.json();
+      if(r.ok) location.href = "/booked";
+      else m.textContent = d.error || "Error — try again";
+    }catch(e){ m.textContent = "Network error — try again"; }
+  }
+</script>
+</body>
+</html>

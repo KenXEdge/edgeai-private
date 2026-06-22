@@ -3509,6 +3509,27 @@ def book_confirm():
         return jsonify({"error": "internal error"}), 500
 
 
+@app.route("/load-info", methods=["GET"])
+def load_info():
+    token = (request.args.get("t") or "").strip()
+    if not token or len(token) > 16 or "/" in token or "." in token:
+        return jsonify({"error": "invalid token"}), 400
+    try:
+        res = supabase_service_client().table("edge_load_activity").select(
+            "pickup_city,pickup_state,delivery_city,delivery_state,"
+            "miles,rate_offered,vehicle_size,broker_company"
+        ).or_(
+            f"book_token.eq.{token},rebid_token.eq.{token},pass_token.eq.{token}"
+        ).limit(1).execute()
+        rows = res.data or []
+        if not rows:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(rows[0]), 200
+    except Exception as exc:
+        log.error('"load_info: lookup failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal"}), 500
+
+
 @app.route("/rebid-submit", methods=["POST"])
 def rebid_submit():
     """POST endpoint called by the Vercel rebid.html SEND COUNTER button.
