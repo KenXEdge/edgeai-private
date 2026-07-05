@@ -1,0 +1,29 @@
+#!/bin/sh
+# ontology/hooks/pre-commit
+# Runs the ontology drift validator on commit.
+# Wired via:  git config core.hooksPath ontology/hooks   (one time)
+#
+# Git runs hooks under sh even on Windows (Git Bash), so this shell script
+# works on the dev machine. It calls the Node validator (Python is not
+# installed). Only fires when the ontology yaml or schema snapshot is staged,
+# so unrelated commits are never slowed.
+
+# Only validate when ontology files are part of this commit.
+STAGED=$(git diff --cached --name-only)
+echo "$STAGED" | grep -Eq '^ontology/(xbase1_ontology\.yaml|schema\.json)$' || exit 0
+
+echo "pre-commit: validating ontology against schema.json ..."
+
+# REPORT mode initially (exit 0 on drift). Change to:
+#   node ontology/validate.mjs --enforce
+# once every `# CONFIRM` column in the yaml is resolved and you want drift to
+# actually block commits.
+node ontology/validate.mjs
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+  echo "pre-commit: ontology validation FAILED — commit blocked."
+  exit 1
+fi
+
+exit 0

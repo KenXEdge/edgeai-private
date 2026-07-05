@@ -1,0 +1,262 @@
+# =====================================================================
+# XBASE1 BUSINESS ONTOLOGY  —  v0.2  (mapped to live schema 2026-06-30)
+# =====================================================================
+# v0.2 corrects v0.1 guesses against the real Supabase schema
+# (project siafwhlzazefyoevslde, public, 29 tables). Every maps_from
+# below is a VERIFIED physical column. Validator passes in --enforce.
+#
+# Rules: entity = noun with a PK you query as a unit. Every attribute
+# names its real source via maps_from. Relationship real only if it has
+# a `via` edge. provenance: clean | platform_sourced. Extend additively;
+# never rename a canonical term in place (alias instead).
+# =====================================================================
+
+meta:
+  version: 0.2
+  status: mapped
+  system_of_record: supabase           # siafwhlzazefyoevslde
+  schema_snapshot: schema.json         # 2026-06-30
+  notes: >
+    Neo4j not required. Postgres serves current depth. Project a subgraph
+    out only if a deep-traversal query becomes a sold feature.
+
+# ---------------------------------------------------------------------
+# ENTITIES
+# ---------------------------------------------------------------------
+entities:
+
+  Carrier:
+    provenance: clean
+    canonical_id: carriers.id
+    attributes:
+      mc_number:          { maps_from: [carriers.mc_number] }
+      company_name:       { maps_from: [carriers.company_name] }
+      owner_name:         { maps_from: [carriers.owner_name] }
+      first_name:         { maps_from: [carriers.first_name] }
+      last_name:          { maps_from: [carriers.last_name] }
+      phone:              { maps_from: [carriers.phone] }
+      subscription_tier:
+        canonical_values: [base, one, plus]
+        maps_from: [carriers.subscription_tier]
+      subscription_status: { maps_from: [carriers.subscription_status] }
+      equipment_class:
+        # DRIFT: carrier equipment is fragmented across THREE columns.
+        canonical_values: [sprinter, cargo_van, box_truck, straight, reefer, flatbed]
+        maps_from:
+          - carriers.equipment_type      # designate canonical
+          - carriers.truck_type          # redundant — reconcile
+          - carriers.truck_types         # redundant — reconcile
+      rate_floor:         { maps_from: [carriers.rate_floor] }
+
+  Load:
+    # Load spans the full ACE lifecycle + EDGE sources. No single PK today.
+    canonical_id: load_uid               # SYNTHETIC — still unminted (open)
+    provenance_by_source:
+      ace_active_loads:      platform_sourced
+      ace_sylectus_activity: platform_sourced
+      ace_bid_loads:         platform_sourced
+      edge_load_activity:    clean
+      unknown_brokers_inbox: clean
+    sourced_from:
+      - ace_active_loads
+      - ace_sylectus_activity
+      - ace_bid_loads
+      - edge_load_activity
+      - unknown_brokers_inbox
+    attributes:
+      order_no:                          # ACE-side identity
+        maps_from:
+          - ace_active_loads.order_no
+          - ace_sylectus_activity.order_no
+          - ace_bid_loads.order_no
+      ref_no:                            # ACE-side only
+        maps_from:
+          - ace_active_loads.ref_no
+          - ace_sylectus_activity.ref_no
+      gmail_message_id:                  # EDGE-side identity (keys instead of ref_no)
+        maps_from:
+          - edge_load_activity.gmail_message_id
+          - unknown_brokers_inbox.gmail_message_id
+      pickup_city:
+        maps_from:
+          - ace_active_loads.pickup_city
+          - ace_sylectus_activity.pickup_city
+          - edge_load_activity.pickup_city
+      pickup_state:
+        maps_from:
+          - ace_active_loads.pickup_state
+          - ace_sylectus_activity.pickup_state
+          - edge_load_activity.pickup_state
+      delivery_city:
+        maps_from:
+          - ace_active_loads.delivery_city
+          - ace_sylectus_activity.delivery_city
+          - edge_load_activity.delivery_city
+      delivery_state:
+        maps_from:
+          - ace_active_loads.delivery_state
+          - ace_sylectus_activity.delivery_state
+          - edge_load_activity.delivery_state
+      equipment_class:
+        # Load side is CONSISTENT on vehicle_size (no vehicle_type anywhere).
+        # Real drift is Load.vehicle_size vs Carrier.equipment_type.
+        canonical_values: [sprinter, cargo_van, box_truck, straight, reefer, flatbed]
+        maps_from:
+          - ace_active_loads.vehicle_size
+          - ace_sylectus_activity.vehicle_size
+          - ace_bid_loads.vehicle_size
+          - edge_load_activity.vehicle_size
+      rate:
+        # DRIFT: ACE uses suggested_rate/posted_amount; EDGE uses rate_offered.
+        maps_from:
+          - ace_active_loads.suggested_rate
+          - ace_active_loads.posted_amount
+          - ace_sylectus_activity.suggested_rate
+          - edge_load_activity.rate_offered
+          - unknown_brokers_inbox.rate_offered
+      miles:
+        maps_from:
+          - ace_active_loads.miles
+          - ace_sylectus_activity.miles
+          - edge_load_activity.miles
+      pieces:                            # ACE-only
+        maps_from:
+          - ace_active_loads.pieces
+          - ace_sylectus_activity.pieces
+      weight:                            # ACE-only
+        maps_from:
+          - ace_active_loads.weight
+          - ace_sylectus_activity.weight
+      pickup_date:
+        maps_from:
+          - ace_active_loads.pickup_date
+          - ace_sylectus_activity.pickup_date
+      delivery_date:
+        maps_from:
+          - ace_active_loads.delivery_date
+          - ace_sylectus_activity.delivery_date
+
+  Broker:
+    provenance: clean
+    canonical_id: brokers.id
+    attributes:
+      name:               { maps_from: [brokers.name] }
+      first_name:         { maps_from: [brokers.first_name] }
+      last_name:          { maps_from: [brokers.last_name] }
+      company:            { maps_from: [brokers.company] }
+      email:              { maps_from: [brokers.email] }
+      mc_number:          { maps_from: [brokers.mc_number] }
+      phone:              { maps_from: [brokers.phone] }
+      # derived responsiveness metrics — computed, not stored
+      response_count:     { maps_from: [brokers.response_count] }
+      touch_count:        { maps_from: [brokers.touch_count] }
+      last_reply_at:      { maps_from: [brokers.last_reply_at] }
+      response_rate:      { derived: true, maps_from: [] }   # response_count / touch_count
+      avg_response_minutes: { derived: true, maps_from: [] }
+
+  Lane:
+    provenance: clean
+    canonical_id: lane_id                # derived: pickup region + delivery region
+    attributes:
+      origin_region:  { derived: true, maps_from: [] }
+      dest_region:    { derived: true, maps_from: [] }
+      equipment_class: { derived: true, maps_from: [] }
+
+  Equipment:
+    provenance: clean
+    canonical_id: equipment_class        # enum, carrier/truck-attached
+    attributes:
+      equipment_class:
+        canonical_values: [sprinter, cargo_van, box_truck, straight, reefer, flatbed]
+        maps_from:
+          - carriers.equipment_type
+          - trucks.equipment_type
+
+  Channel:
+    provenance: clean
+    canonical_id: channel                # enum
+    attributes:
+      channel:
+        canonical_values: [gmail, sylectus, sms]
+        maps_from: [outreach_log.channel]
+
+# ---------------------------------------------------------------------
+# RELATIONSHIPS  (real only if `via` points at a materialized edge)
+# ---------------------------------------------------------------------
+relationships:
+
+  - from: Carrier
+    verb: operates
+    to:   Equipment
+    via:  carriers.equipment_type
+
+  - from: Equipment
+    verb: matches
+    to:   Load
+    via:  computed                       # vehicle_size <-> equipment_type compatibility
+    notes: drives auto-book fit (PRD v4.5 Phase 2/3)
+
+  - from: Load
+    verb: on
+    to:   Lane
+    via:  derived                        # pickup/delivery city+state -> region pair
+
+  - from: Load
+    verb: posted_by
+    to:   Broker
+    via:  edge_load_activity.broker_id
+    notes: EDGE side has broker_id fk; ACE side joins on broker_email
+
+  - from: Carrier
+    verb: bid_on
+    to:   Load
+    via:  ace_bid_loads                  # CORRECTED: bid ledger, not ace_load_wins
+    edge_properties:
+      bid_amount:  ace_bid_loads.bid_amount
+      status:      ace_bid_loads.status
+      won_at:      ace_bid_loads.won_at
+      lost_at:     ace_bid_loads.lost_at
+      sent_at:     ace_bid_loads.sent_at
+    notes: >
+      ace_load_wins is the WIN subset (rate_confirmed), NOT the bid ledger.
+      ace_bid_loads carries the full bid lifecycle + outcome. This is the
+      clean/yours foundation for Lane Rate Intelligence.
+
+  - from: Broker
+    verb: reachable_via
+    to:   Channel
+    via:  enum
+
+# ---------------------------------------------------------------------
+# PROVENANCE POLICY
+# ---------------------------------------------------------------------
+provenance_policy:
+  clean: >
+    Yours/public — eligible for internal use AND monetized/graph products.
+    ace_bid_loads + ace_load_wins (XTX own outcomes), carriers, brokers,
+    edge_load_activity, unknown_brokers_inbox, prospects (FMCSA public).
+  platform_sourced: >
+    Sylectus-delivered content — INTERNAL / XTX-ONLY, never monetized or
+    graphed as a product: ace_active_loads, ace_sylectus_activity,
+    ace_bid_loads load-detection fields, and anything derived from them.
+    NOTE: ace_bid_loads is mixed — the BID/OUTCOME columns are your own
+    action data (clean); the load-detail columns are Sylectus-sourced.
+    Wall enforced at query/ETL layer.
+
+# ---------------------------------------------------------------------
+# OPEN ITEMS (was the # CONFIRM list — now resolved or promoted)
+# ---------------------------------------------------------------------
+# RESOLVED against live schema:
+#   - equipment drift is Load.vehicle_size vs Carrier.equipment_type
+#     (NOT vehicle_size vs vehicle_type — no vehicle_type column exists).
+#   - carriers has THREE overlapping equipment cols: equipment_type /
+#     truck_type / truck_types. Pick one canonical, deprecate two.
+#   - bid edge is ace_bid_loads, not ace_load_wins.
+#   - Load has NO origin/destination cols; uses pickup_/delivery_ city+state(+zip).
+#   - ref_no/order_no are ACE-only; EDGE loads key on gmail_message_id.
+#   - rate drift: suggested_rate/posted_amount (ACE) vs rate_offered (EDGE).
+# STILL OPEN:
+#   1. Mint Load.load_uid spanning all 5 source tables.
+#   2. Reconcile carriers equipment triple -> one canonical column.
+#   3. Backfill first_name/last_name on carriers/brokers from name (deferred).
+# =====================================================================

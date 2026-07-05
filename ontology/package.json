@@ -1,0 +1,14 @@
+{
+  "name": "xbase1-ontology",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "XBASE1 business ontology spec + drift validator",
+  "scripts": {
+    "validate": "node validate.mjs",
+    "validate:enforce": "node validate.mjs --enforce"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}
