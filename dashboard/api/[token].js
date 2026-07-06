@@ -1,8 +1,9 @@
-// Resolves 6-char opaque tokens (book/rebid/pass) to the correct page.
+// Resolves 6-char opaque tokens (EDGE book/rebid/pass + ACE send/draft/pass) to the correct page.
 // Triggered by vercel.json rewrite: /:token([A-Za-z0-9]{6}) -> /api/:token
 //
-// Mirrors the logic of Cloud Run /<token> handler in main.py line 3290.
-// Looks up the token in edge_load_activity, checks state, redirects.
+// EDGE tokens live in edge_load_activity; ACE (Sylectus loadboard) tokens live in
+// ace_sylectus_activity. On an EDGE miss, fall through to the ACE lookup.
+// APPLY TO CANONICAL: edgeai-private/dashboard/api/[token].js  (NOT the XBase1 fork)
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -14,12 +15,11 @@ const supabase = createClient(
 export default async function handler(req, res) {
   const { token } = req.query;
 
-  // Basic shape check
   if (!token || !/^[A-Za-z0-9]{6}$/.test(token)) {
     return res.redirect(302, '/expired.html');
   }
 
-  // Find the row that has this token in any of the three columns
+  // --- EDGE lookup ---
   const { data, error } = await supabase
     .from('edge_load_activity')
     .select('book_token, rebid_token, pass_token, consumed_at, expires_at, rate_offered')
@@ -28,20 +28,16 @@ export default async function handler(req, res) {
     .maybeSingle();
 
   if (error || !data) {
-    return res.redirect(302, '/expired.html');
+    // Not an EDGE token — try ACE (Sylectus loadboard)
+    return resolveAce(token, res);
   }
 
-  // Already-used (any action taken on this row already)
   if (data.consumed_at) {
     return res.redirect(302, '/already-used.html');
   }
-
-  // Time expiry
   if (data.expires_at && new Date(data.expires_at) < new Date()) {
     return res.redirect(302, '/expired.html');
   }
-
-  // Dispatch by which token matched
   if (token === data.book_token) {
     return res.redirect(302, `/book-confirm.html?t=${token}`);
   }
@@ -52,7 +48,35 @@ export default async function handler(req, res) {
   if (token === data.pass_token) {
     return res.redirect(302, `/passed.html?t=${token}`);
   }
+  return res.redirect(302, '/expired.html');
+}
 
-  // Shouldn't reach here given the OR query matched
+// --- ACE branch ---
+async function resolveAce(token, res) {
+  const { data, error } = await supabase
+    .from('ace_sylectus_activity')
+    .select('send_bid_token, draft_bid_token, pass_token, consumed_at, expires_at')
+    .or(`send_bid_token.eq.${token},draft_bid_token.eq.${token},pass_token.eq.${token}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return res.redirect(302, '/expired.html');
+  }
+  if (data.consumed_at) {
+    return res.redirect(302, '/already-used.html');
+  }
+  if (data.expires_at && new Date(data.expires_at) < new Date()) {
+    return res.redirect(302, '/expired.html');
+  }
+  if (token === data.send_bid_token) {
+    return res.redirect(302, `/ace-bid.html?t=${token}`);
+  }
+  if (token === data.draft_bid_token) {
+    return res.redirect(302, `/ace-draft.html?t=${token}`);
+  }
+  if (token === data.pass_token) {
+    return res.redirect(302, `/ace-pass.html?t=${token}`);
+  }
   return res.redirect(302, '/expired.html');
 }

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ACE+ · Send Bid</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0a0a;color:#f0f0f0;font-family:Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#111;border:1px solid #222;border-radius:12px;padding:36px 30px;max-width:420px;width:90%}
+  .kicker{font-size:11px;letter-spacing:2px;color:#c8f135;text-transform:uppercase;text-align:center;margin-bottom:22px;font-weight:700}
+  .lane{text-align:center}
+  .lane-city{font-size:24px;font-weight:800;color:#f0f0f0;line-height:1.2}
+  .lane-mid{display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0;color:#555}
+  .lane-mid .line{height:1px;width:40px;background:#2a2a2a}
+  .lane-mid .miles{font-size:12px;color:#888;white-space:nowrap}
+  .bidbox{background:#0e0e0e;border:1px solid #222;border-radius:10px;padding:20px;margin:26px 0 14px;text-align:center}
+  .bid-label{font-size:9px;letter-spacing:1.5px;color:#777;text-transform:uppercase;margin-bottom:10px}
+  .bid-input-wrap{display:flex;align-items:center;justify-content:center;gap:2px}
+  .bid-dollar{font-size:30px;font-weight:800;color:#c8f135}
+  .bid-input{background:transparent;border:none;border-bottom:2px solid #333;color:#c8f135;font-size:30px;font-weight:800;width:150px;text-align:center;font-family:Arial,sans-serif;outline:none}
+  .bid-input:focus{border-bottom-color:#c8f135}
+  .rpm{font-size:12px;color:#888;margin-top:10px}
+  .meta{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:#222;border:1px solid #222;border-radius:10px;overflow:hidden;margin-bottom:16px}
+  .m{background:#0e0e0e;padding:12px 8px;text-align:center}
+  .m-label{font-size:9px;letter-spacing:1.5px;color:#777;text-transform:uppercase;margin-bottom:5px}
+  .m-val{font-size:15px;font-weight:700;color:#e8e8e8}
+  .broker{text-align:center;font-size:13px;color:#777;margin-bottom:22px}
+  .broker b{color:#aaa;font-weight:600}
+  .btn{display:block;width:100%;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;border:none;margin-bottom:12px}
+  .btn-go{background:#c8f135;color:#0a0a0a}
+  .btn-back{background:#1a1a1a;color:#888;border:1px solid #333}
+  .msg{margin-top:6px;font-size:13px;color:#888;text-align:center;min-height:18px}
+  .sched{display:none;border:1px solid #222;border-radius:10px;margin:0 0 16px;overflow:hidden}
+  .sched-row{display:flex;justify-content:space-between;padding:11px 16px;font-size:13px}
+  .sched-row+.sched-row{border-top:1px solid #1c1c1c}
+  .sched-label{color:#777}
+  .sched-val{color:#e8e8e8;font-weight:600}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="kicker" id="kicker">ACE+ · Send Bid</div>
+    <div class="lane">
+      <div class="lane-city" id="lane-from">—</div>
+      <div class="lane-mid"><span class="line"></span><span class="miles" id="miles"></span><span class="line"></span></div>
+      <div class="lane-city" id="lane-to">—</div>
+    </div>
+    <div class="sched" id="sched">
+      <div class="sched-row" id="row-pickup"><span class="sched-label">Pickup</span><span class="sched-val" id="sched-pickup"></span></div>
+      <div class="sched-row" id="row-delivery"><span class="sched-label">Delivery</span><span class="sched-val" id="sched-delivery"></span></div>
+    </div>
+    <div class="bidbox">
+      <div class="bid-label">Your Bid</div>
+      <div class="bid-input-wrap"><span class="bid-dollar">$</span><input class="bid-input" id="bid" type="number" inputmode="numeric" oninput="calc()"></div>
+      <div class="rpm" id="rpm"></div>
+    </div>
+    <div class="meta">
+      <div class="m"><div class="m-label">Equipment</div><div class="m-val" id="equip">—</div></div>
+      <div class="m"><div class="m-label">Type</div><div class="m-val" id="ltype">—</div></div>
+    </div>
+    <div class="broker" id="broker"></div>
+    <button class="btn btn-go" id="go" onclick="submitBid()">SEND BID</button>
+    <button class="btn btn-back" onclick="history.back()">GO BACK</button>
+    <div class="msg" id="msg"></div>
+  </div>
+<script>
+  const API = "https://edgeai-gmail-webhook-417422203146.us-central1.run.app";
+  const ENDPOINT = "/ace-send-bid";          // ace-draft.html swaps this + labels
+  const token = new URLSearchParams(location.search).get("t");
+  let miles = null;
+
+  const SAMPLE = {pickup_city:"Humble",pickup_state:"TX",delivery_city:"Stillwater",delivery_state:"OK",
+                  miles:497,suggested_rate:2250,pickup_date:"07/07 08:00",delivery_date:"07/08 14:00",vehicle_size:"Sprinter",load_type:"Van",broker_name:"XTX Transport"};
+
+  (async function(){
+    let L = SAMPLE;                            // fallback so the page renders w/o a live token
+    if(token){ try{ const r=await fetch(API+"/ace-load-info?t="+encodeURIComponent(token)); if(r.ok) L=await r.json(); }catch(e){} }
+    render(L);
+  })();
+
+  function render(L){
+    document.getElementById("lane-from").textContent=[L.pickup_city,L.pickup_state].filter(Boolean).join(", ")||"—";
+    document.getElementById("lane-to").textContent=[L.delivery_city,L.delivery_state].filter(Boolean).join(", ")||"—";
+    miles=L.miles||null;
+    document.getElementById("miles").textContent=miles?miles+" mi":"";
+    document.getElementById("bid").value=L.suggested_rate?Math.round(L.suggested_rate):"";
+    document.getElementById("equip").textContent=L.vehicle_size||"Any";
+    document.getElementById("ltype").textContent=L.load_type||"—";
+    document.getElementById("broker").innerHTML=L.broker_name?"via <b>"+L.broker_name+"</b>":"";
+    let any=false;
+    if(L.pickup_date){document.getElementById("sched-pickup").textContent=L.pickup_date;any=true;}else document.getElementById("row-pickup").style.display="none";
+    if(L.delivery_date){document.getElementById("sched-delivery").textContent=L.delivery_date;any=true;}else document.getElementById("row-delivery").style.display="none";
+    if(any)document.getElementById("sched").style.display="block";
+
+    calc();
+  }
+  function calc(){
+    const amt=parseFloat(document.getElementById("bid").value);
+    document.getElementById("rpm").textContent=(amt&&miles)?("$"+(amt/miles).toFixed(2)+" / mi"):"";
+  }
+  const VERB="SEND BID";
+  const CONFIRM=true;
+  let armed=false, armTimer=null;
+  async function submitBid(){
+    const m=document.getElementById("msg"), go=document.getElementById("go");
+    const amt=parseFloat(document.getElementById("bid").value);
+    if(!amt||amt<=0){ m.textContent="Enter a bid amount"; return; }
+    if(CONFIRM && !armed){ armed=true; go.textContent="TAP AGAIN: $"+amt.toLocaleString(); go.style.background="#e8a020"; go.style.color="#0a0a0a"; m.textContent="Confirm amount, tap again to send"; armTimer=setTimeout(function(){armed=false;go.textContent=VERB;go.style.background="";m.textContent="";},2500); return; }
+    clearTimeout(armTimer); armed=false; go.style.background=""; go.textContent=VERB;
+    if(!token){ m.textContent="(preview — no live token)"; return; }
+    go.disabled=true; m.textContent="Sending...";
+    try{
+      const r=await fetch(API+ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({t:token,bid_amount:amt})});
+      const d=await r.json();
+      if(r.ok){ document.querySelector(".card").innerHTML='<div class="kicker">ACE+ · Bid Sent</div><div style="text-align:center;color:#c8f135;font-size:40px;margin:20px 0">✓</div><div style="text-align:center;color:#aaa">Bid of $'+amt.toLocaleString()+' sent to the broker.</div>'; }
+      else{ m.textContent=d.error||d.status||"Error — try again"; go.disabled=false; go.textContent=VERB; }
+    }catch(e){ m.textContent="Network error — try again"; go.disabled=false; go.textContent=VERB; }
+  }
+</script>
+</body>
+</html>
