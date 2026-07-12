@@ -963,6 +963,9 @@ def send_load_offer_sms(email_data: dict) -> None:
     if os.environ.get("SMS_ENABLED", "true") == "false":
         log.info('"SMS disabled — skipping load offer SMS"')
         return
+    if sms_kill_switch_active():
+        log.warning('"EDGE load_offer SMS suppressed -- platform kill switch active"')
+        return
     body = (
         f"LOAD OFFER from {email_data['from_email']}\n"
         f"Subject: {email_data['subject']}\n"
@@ -983,6 +986,9 @@ def send_load_offer_sms(email_data: dict) -> None:
 def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
     if os.environ.get("SMS_ENABLED", "true") == "false":
         log.info('"SMS disabled — skipping unknown broker SMS"')
+        return
+    if sms_kill_switch_active():
+        log.warning('"EDGE unknown_broker SMS suppressed -- platform kill switch active"')
         return
     origin = extracted.get("load_origin") or "Unknown"
     destination = extracted.get("load_destination") or "Unknown"
@@ -1021,6 +1027,48 @@ def send_unknown_broker_sms(email_data: dict, extracted: dict) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 EDGE_LOAD_OFFER_TTL_MINUTES = 60
+
+# PASS action is controlled at runtime via the database (no redeploy to change) —
+# two tiers resolved as an AND (global is the founder ceiling; carrier chooses within it):
+#   platform_config.pass_action_enabled  (admin dashboard global, all carriers)
+#   carriers.pass_action_enabled          (per-carrier choice, Carrier Settings)
+# PASS renders in the ACE alert SMS only when BOTH are true. All pass code, the
+# pass_token mint, and the /ace-pass endpoint remain intact regardless — only the
+# SMS-rendered PASS option is gated. Default false at both tiers.
+# Reads LIVE on every send (no cache) so an admin/carrier toggle takes effect on the
+# very next SMS, not after a delay.
+def pass_action_platform_enabled() -> bool:
+    """Global PASS flag from platform_config, read live per send. Fails CLOSED
+    (PASS off) on read error — safer to hide a retired action than surface it."""
+    try:
+        r = (supabase_service_client().table("platform_config")
+             .select("pass_action_enabled").eq("id", 1).limit(1).execute())
+        return bool(r.data[0].get("pass_action_enabled")) if r.data else False
+    except Exception as _e:
+        log.error('"pass_action_platform read failed (fail-closed): %s"', _e)
+        return False
+
+
+# Single-link ACE SMS. DB-controlled at runtime (no redeploy), same pattern as
+# pass_action_enabled. ACE-ONLY — EDGE keeps its 3-link BOOK/REBID/PASS body and
+# does not read this flag. Reads LIVE on every send (no cache).
+#   True  -> ACE alert carries ONE link (send_bid_token) to the combined
+#            SEND BID / DRAFT BID landing page (ace-load.html).
+#   False -> legacy 2-link body. DEFAULT.
+def ace_single_link_enabled() -> bool:
+    """Global single-link SMS flag from platform_config, read live per send.
+    Fails CLOSED (legacy 2-link) on read error — a DB blip falls back to the
+    known-good shipped behavior, never to an untested path."""
+    try:
+        r = (supabase_service_client().table("platform_config")
+             .select("ace_single_link_enabled").eq("id", 1).limit(1).execute())
+        return bool(r.data[0].get("ace_single_link_enabled")) if r.data else False
+    except Exception as _e:
+        log.error('"ace_single_link_enabled read failed (fail-closed): %s"', _e)
+        return False
+
+
+ACE_SMS_VOLLEY_CAP = 2   # max SMS per load id (source_ref_id) — loop/volley protection
 EDGE_SMS_BROKER_NAME_MAX = 20
 
 
@@ -1573,6 +1621,9 @@ def send_load_offer_sms_v2(
             log.info('"send_load_offer_sms_v2: SMS_ENABLED=false — would have sent to=%s body=%s"',
                      carrier_phone, sms_body)
             return True
+        if sms_kill_switch_active():
+            log.warning('"send_load_offer_sms_v2: PLATFORM SMS KILL SWITCH ACTIVE -- suppressed to=%s"', carrier_phone)
+            return True
 
         telnyx.api_key = os.environ.get("TELNYX_API_KEY", "")
         telnyx.Message.create(
@@ -1586,6 +1637,413 @@ def send_load_offer_sms_v2(
 
     except Exception as exc:
         log.error('"send_load_offer_sms_v2 failed: %s"', exc, exc_info=True)
+        return False
+
+
+# ── ACE SMS compaction helpers ────────────────────────────────────────────────
+# Legal suffixes / filler stripped from broker names before the 2-word cap. The
+# brand is the signal; "LLC"/"INC" is noise that eats GSM-7 characters.
+_BROKER_NOISE = {
+    "llc", "l.l.c.", "inc", "inc.", "incorporated", "corp", "corp.",
+    "corporation", "ltd", "ltd.", "limited", "lp", "llp", "co", "co.",
+    "company", "group", "&", "and", "the",
+}
+
+
+def _brand_word(w: str) -> str:
+    """Title-case a broker word, preserving all-caps tokens of <=3 chars as
+    acronyms: XPO, RP, CH, G&H survive; FLEX and ECHO get title-cased.
+    The <=3 bound was set against LIVE data — source names are inconsistently
+    cased ("FREIGHT FLEX" is shouting, not an acronym), and a <=4 bound produced
+    "Freight FLEX"."""
+    if "/" in w:
+        return w            # preserve placeholders verbatim, e.g. "n/a"
+    core = re.sub(r"[^A-Za-z0-9]", "", w)
+    if core.isupper() and len(core) <= 3:
+        return w.upper()
+    return w.capitalize()
+
+
+def _compact_broker(name: str, max_words: int = 2) -> str:
+    """Two-word broker brand. Word-capped, not char-capped — a char cap truncates
+    mid-word ("TOTAL QUALITY LOGISTI"); a word cap always ends on a real word.
+
+        "XPO LOGISTICS LLC"               -> "XPO Logistics"
+        "Freeway International Logistics" -> "Freeway International"
+        "Usko Logistics, Inc"             -> "Usko Logistics"
+        "RP EXPEDITING LLC"               -> "RP Expediting"
+        "FREIGHT FLEX"                    -> "Freight Flex"
+        "n/a"                             -> ""
+
+    SMS-RENDER ONLY. broker_name in the DB and in the bid email keep the FULL name.
+    """
+    if not name:
+        return ""
+    words = [w.strip(" ,.;:") for w in re.split(r"\s+", str(name).strip())]
+    words = [w for w in words if w]
+    kept = [w for w in words
+            if re.sub(r"[^A-Za-z0-9]", "", w).lower() not in _BROKER_NOISE]
+    if not kept:
+        kept = words
+    return " ".join(_brand_word(w) for w in kept[:max_words])
+
+
+# Non-date literals seen in LIVE ace_sylectus_activity data. These appear in BOTH
+# pickup_date AND delivery_date (order 6393 had "Deliver Direct" as its PICKUP).
+_DT_LITERAL = {
+    "asap": "ASAP",
+    "deliver direct": "Direct",
+    "direct": "Direct",
+    "call": "Call",
+    "tbd": "TBD",
+}
+
+_DT_MONDAY = re.compile(r"^\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?")
+_DT_TIME = re.compile(r"(\d{1,2}):?(\d{2})\s*([AaPp])?[Mm]?")
+
+
+def _compact_dt(v):
+    """Normalize a pickup/delivery stamp to compact 24h. TIME IS NEVER TRUNCATED —
+    hours and minutes always render in full, 4-digit padded military form.
+
+    LIVE FORMAT (verified against ace_sylectus_activity, 2026-07-12):
+        "07/11/2026 11:30" -> "7/11 1130"
+        "07/11/2026 16:00" -> "7/11 1600"
+        "07/13/2026 09:00" -> "7/13 0900"
+        "ASAP"             -> "ASAP"      (real value, not a date)
+        "Deliver Direct"   -> "Direct"    (real value, not a date)
+        None / empty       -> None        (line omitted; never renders junk)
+
+    Year is dropped from the date (7/10, not 07/10/2026) — a load alert is always
+    near-term and the year costs 5 chars per stamp. Tolerant: also accepts ISO,
+    M/D, and 12h am/pm. Unknown shapes pass through raw at 10 chars.
+    """
+    if not v:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+
+    lit = _DT_LITERAL.get(s.lower())
+    if lit:
+        return lit
+
+    iso = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})[T ]?(.*)$", s)
+    if iso:
+        mo, da, rest = int(iso.group(2)), int(iso.group(3)), iso.group(4)
+    else:
+        m = _DT_MONDAY.match(s)
+        if not m:
+            return s[:10] or None
+        mo, da, rest = int(m.group(1)), int(m.group(2)), s[m.end():]
+
+    date = f"{mo}/{da}"
+    t = _DT_TIME.search(rest or "")
+    if not t:
+        return date
+    hh, mm = int(t.group(1)), int(t.group(2))
+    ampm = (t.group(3) or "").lower()
+    if ampm == "p" and hh < 12:
+        hh += 12
+    if ampm == "a" and hh == 12:
+        hh = 0
+    if hh > 23 or mm > 59:
+        return date
+    return f"{date} {hh:02d}{mm:02d}"
+
+
+def _sched_line(pickup_date, delivery_date):
+    """'PU 7/10 1630 > DEL 7/13 0900'. Renders whichever side is present; returns
+    None if neither parses, so the SMS never carries an empty schedule row."""
+    a, b = _compact_dt(pickup_date), _compact_dt(delivery_date)
+    if not a and not b:
+        return None
+    if a and b:
+        return f"PU {a} > DEL {b}"
+    return f"PU {a}" if a else f"DEL {b}"
+
+
+def _format_ace_alert_sms(broker_display: str, pickup: str, delivery: str,
+                          miles, rate,
+                          send_bid_token: str, draft_bid_token: str,
+                          pass_token: str, show_pass: bool = False,
+                          single_link: bool = False,
+                          pickup_date=None, delivery_date=None) -> str:
+    """ACE ALERT SMS card. Pre-qualified Sylectus/VM load -> carrier phone.
+
+    GSM-7 ONLY. The previous body used emoji (U+2705 U+1F4DD U+274C) AND a middle
+    dot (U+00B7) AND a right arrow (U+2192). None are in the GSM-7 charset, so every
+    ACE SMS encoded as UCS-2 at 67 chars/segment instead of 153 — this, not link
+    count, was the cause of segment inflation (3 segments -> 1). Dropping only the
+    emoji would NOT have fixed it: the dot and arrow alone still force UCS-2.
+
+    Broker word-capped to 2 words, legal suffixes stripped. Schedule line lets the
+    carrier triage timing WITHOUT tapping through.
+
+    single_link: resolved platform_config.ace_single_link_enabled. True renders ONE
+    link (send_bid_token) to the combined SEND/DRAFT page. False renders the legacy
+    2-link body. Both bid tokens are minted upstream either way — nothing is lost.
+
+    show_pass: resolved (platform_config.pass_action_enabled AND
+    carriers.pass_action_enabled). PASS is NOT rendered in single-link mode — the
+    combined page owns the actions. Pass token still minted regardless.
+
+    HEADROOM (measured on real loads, 160-char GSM-7 single-segment ceiling):
+        1-link + schedule -> 120-140 chars, 1 segment ALWAYS
+        2-link + schedule -> 158 chars typical, but 169+ on a long broker
+                             ("Freeway International") and SPLITS to 2 segments.
+    The schedule line does not fit reliably in the 2-link body in ANY date format.
+    """
+    miles_part = f"{miles}mi - " if miles else ""
+    rate_part = f"Bid ${rate}" if rate else "Bid TBD"
+    broker = _compact_broker(broker_display)
+
+    lines = [f"ACE - {broker} - {pickup} > {delivery}"]
+
+    sched = _sched_line(pickup_date, delivery_date)
+    if sched:
+        lines.append(sched)
+
+    lines.append(f"{miles_part}{rate_part}")
+    lines.append("")
+
+    if single_link:
+        # ONE link -> combined SEND BID / DRAFT BID page. Uses send_bid_token;
+        # draft_bid_token still exists and still resolves to its own page.
+        # CTA "Bid>" NAMES THE DESTINATION. Urgency phrasing ("ACT NOW", "Click
+        # here") next to a URL is a primary A2P content-filter signature and would
+        # work against the deliverability this build exists to improve.
+        lines.append(f"Bid> xtxtec.com/{send_bid_token}")
+        return "\n".join(lines)
+
+    # ── Legacy 2-link body (default) ──
+    lines.append(f"SEND BID  xtxtec.com/{send_bid_token}")
+    lines.append(f"DRAFT BID xtxtec.com/{draft_bid_token}")
+    # PASS retired from the live SMS flow. Rendered only when BOTH the platform
+    # global (admin) and the per-carrier flags are on. All pass code, the token
+    # mint, and /ace-pass remain intact for product/development record.
+    if show_pass:
+        lines.append(f"PASS      xtxtec.com/{pass_token}")
+    return "\n".join(lines)
+
+
+# ── Platform-wide SMS kill switch (founder emergency brake) ────────────────────
+# DB-backed global flag in platform_config. Checked before every SMS send across
+# ALL carriers (ACE + EDGE). Survives deploys (it's data, not env), flippable from
+# anywhere that can write Supabase (admin button, SB dashboard, phone). Reads LIVE
+# on every send (no cache) so tripping it stops SMS on the very next send. Trip it:
+# update platform_config set sms_kill_switch=true where id=1;
+def sms_kill_switch_active() -> bool:
+    try:
+        r = (supabase_service_client().table("platform_config")
+             .select("sms_kill_switch").eq("id", 1).limit(1).execute())
+        return bool(r.data[0].get("sms_kill_switch")) if r.data else False
+    except Exception as _e:
+        # Fail OPEN (allow sends) on read error — a DB blip shouldn't halt the
+        # platform. The env SMS_ENABLED gate remains as the deploy-time backstop.
+        log.error('"sms_kill_switch read failed (fail-open): %s"', _e)
+        return False
+
+
+def send_ace_alert_sms(data: dict) -> bool:
+    """P2 - ACE ALERT SMS sender. Pre-qualified Sylectus/VM load -> carrier phone.
+
+    Mirrors send_load_offer_sms_v2 (token mint + Telnyx, SMS_ENABLED-gated) but
+    with no Haiku / source-resolution -- every ACE row is a pre-qualified SYL load.
+    Upserts the ace_sylectus_activity row (on carrier_id,order_no) with the three
+    action tokens + alert fields, formats the ACE ALERT card, sends via Telnyx.
+    Idempotent: skips if the load was already alerted (sms_alert_sent_at set).
+    Returns True on success.
+    """
+    try:
+        carrier_id = data.get("carrier_id")
+        order_no = data.get("order_no")
+        if not carrier_id or not order_no:
+            log.error('"send_ace_alert_sms: missing carrier_id/order_no -- aborting"')
+            return False
+
+        # Platform kill switch -- founder emergency brake, all carriers at once.
+        if sms_kill_switch_active():
+            log.warning('"send_ace_alert_sms: PLATFORM SMS KILL SWITCH ACTIVE -- order=%s suppressed"', order_no)
+            return True
+
+        sb = supabase_service_client()
+
+        # Fire-once guard -- skip if this load was already alerted
+        existing = (sb.table("ace_sylectus_activity")
+                    .select("id, sms_alert_sent_at, pass_count")
+                    .eq("carrier_id", carrier_id).eq("order_no", order_no)
+                    .limit(1).execute())
+
+        # Carrier settings -- read ONCE, unconditionally (must run on fresh
+        # detections too, not only when an activity row already exists).
+        _cs = (sb.table("carriers")
+               .select("phone, name, sms_alerts_enabled, pass_action_enabled")
+               .eq("id", carrier_id).limit(1).execute())
+        carrier = _cs.data[0] if _cs.data else None
+        if not carrier:
+            log.error('"send_ace_alert_sms: carrier %s not found -- aborting"', carrier_id)
+            return False
+
+        # Per-carrier master SMS kill -- applies to every send, fresh or re-detect.
+        if carrier.get("sms_alerts_enabled") is False:
+            log.info('"send_ace_alert_sms: order=%s carrier sms_alerts_enabled=false -- suppressing"', order_no)
+            return True
+
+        if existing.data and existing.data[0].get("sms_alert_sent_at"):
+            log.info('"send_ace_alert_sms: order=%s already alerted -- skipping"', order_no)
+            return True
+
+        # Resolve PASS visibility: platform global (admin) AND per-carrier choice.
+        show_pass = bool(pass_action_platform_enabled()) and bool(carrier.get("pass_action_enabled"))
+
+        # Resolve single-link SMS format (platform-global, live read, no cache).
+        single_link = ace_single_link_enabled()
+
+        # 1. Carrier already loaded above (phone for SMS).
+        if not carrier.get("phone"):
+            log.error('"send_ace_alert_sms: carrier %s has no phone -- aborting"', carrier_id)
+            return False
+
+        # 2. Mint tokens (reuse EDGE generator -- same 6-char alphabet)
+        send_bid_token, draft_bid_token, pass_token = _generate_load_offer_tokens()
+
+        # 3. Upsert ace_sylectus_activity row (detection-time: tokens + alert fields)
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(minutes=EDGE_LOAD_OFFER_TTL_MINUTES)
+        row = {
+            "carrier_id":      carrier_id,
+            "order_no":        order_no,
+            "broker_name":     data.get("broker_name"),
+            "broker_email":    data.get("broker_email"),
+            "pickup_city":     data.get("pickup_city"),
+            "pickup_state":    data.get("pickup_state"),
+            "delivery_city":   data.get("delivery_city"),
+            "delivery_state":  data.get("delivery_state"),
+            "miles":           data.get("miles"),
+            "load_type":       data.get("load_type"),
+            "suggested_rate":  data.get("suggested_rate"),
+            "pickup_zip":      data.get("pickup_zip"),
+            "delivery_zip":    data.get("delivery_zip"),
+            "ref_no":          data.get("ref_no"),
+            "pickup_date":     data.get("pickup_date"),
+            "delivery_date":   data.get("delivery_date"),
+            "post_date":       data.get("post_date"),
+            "expiry_date":     data.get("expiry_date"),
+            "vehicle_size":    data.get("vehicle_size"),
+            "pieces":          data.get("pieces"),
+            "weight":          data.get("weight"),
+            "send_bid_token":  send_bid_token,
+            "draft_bid_token": draft_bid_token,
+            "pass_token":      pass_token,
+            "stage":     "alerted",
+            "consumed":        False,
+            "expires_at":      expires.isoformat(),
+        }
+        row = {k: v for k, v in row.items() if v is not None}
+        _up = sb.table("ace_sylectus_activity").upsert(
+            row, on_conflict="carrier_id,order_no"
+        ).execute()
+        row_id = (_up.data[0].get("id") if _up.data else
+                  (existing.data[0].get("id") if existing.data else None))
+
+        # 4. Format the ACE ALERT card
+        broker_display = data.get("broker_name") or data.get("broker_email") or "Broker"
+        rate = _parse_rate_numeric(data.get("suggested_rate"))
+        rate_disp = (int(rate) if rate is not None and rate == int(rate) else rate) if rate else None
+        pickup_disp = (f"{data.get('pickup_city')}, {data.get('pickup_state')}"
+                       if data.get("pickup_city") and data.get("pickup_state")
+                       else (data.get("pickup_city") or "\u2014"))
+        delivery_disp = (f"{data.get('delivery_city')}, {data.get('delivery_state')}"
+                         if data.get("delivery_city") and data.get("delivery_state")
+                         else (data.get("delivery_city") or "\u2014"))
+        sms_body = _format_ace_alert_sms(
+            broker_display=broker_display,
+            pickup=pickup_disp,
+            delivery=delivery_disp,
+            miles=data.get("miles"),
+            rate=rate_disp,
+            send_bid_token=send_bid_token,
+            draft_bid_token=draft_bid_token,
+            pass_token=pass_token,
+            show_pass=show_pass,
+            single_link=single_link,
+            pickup_date=data.get("pickup_date"),
+            delivery_date=data.get("delivery_date"),
+        )
+
+        # 5. Send via Telnyx + sms_log ledger (volley cap + loop protection + audit)
+        carrier_phone = carrier.get("phone")
+        if not carrier_phone:
+            log.error('"send_ace_alert_sms: no phone on carrier %s -- SMS not sent"', carrier_id)
+            return False
+
+        def _stamp_sent():
+            sb.table("ace_sylectus_activity").update(
+                {"sms_alert_sent_at": now.isoformat()}
+            ).eq("carrier_id", carrier_id).eq("order_no", order_no).execute()
+
+        def _log_sms(status, telnyx_id=None, telnyx_err=None, suppress=None):
+            try:
+                sb.table("sms_log").insert({
+                    "carrier_id":        carrier_id,
+                    "to_phone":          carrier_phone,
+                    "kind":              "load_alert",
+                    "build":             "ACE",
+                    "source_ref_table":  "ace_sylectus_activity",
+                    "source_ref_id":     row_id,
+                    "payload_text":      sms_body,
+                    "status":            status,
+                    "suppress_reason":   suppress,
+                    "telnyx_message_id": telnyx_id,
+                    "telnyx_error":      telnyx_err,
+                    "sent_at":           now.isoformat() if status == "sent" else None,
+                }).execute()
+            except Exception as _e:
+                log.error('"send_ace_alert_sms: sms_log insert failed: %s"', _e)
+
+        # Volley cap -- count prior SENT rows for this load id (loop protection)
+        if row_id:
+            _cnt = (sb.table("sms_log").select("id", count="exact")
+                    .eq("source_ref_table", "ace_sylectus_activity")
+                    .eq("source_ref_id", row_id)
+                    .eq("status", "sent").execute())
+            if (_cnt.count or 0) >= ACE_SMS_VOLLEY_CAP:
+                log.info('"send_ace_alert_sms: order=%s volley cap %s hit -- suppressing"',
+                         order_no, ACE_SMS_VOLLEY_CAP)
+                _log_sms("suppressed", suppress="volley_cap")
+                _stamp_sent()
+                return True
+
+        if os.environ.get("SMS_ENABLED", "false").lower() != "true":
+            log.info('"send_ace_alert_sms: SMS_ENABLED=false -- would have sent to=%s body=%s"',
+                     carrier_phone, sms_body)
+            _log_sms("suppressed", suppress="sms_disabled")
+            _stamp_sent()
+            return True
+
+        try:
+            telnyx.api_key = os.environ.get("TELNYX_API_KEY", "")
+            _resp = telnyx.Message.create(
+                from_=os.environ["TELNYX_FROM"],
+                to=carrier_phone,
+                text=sms_body,
+            )
+            _tid = getattr(_resp, "id", None)
+            if _tid is None and isinstance(_resp, dict):
+                _tid = _resp.get("id")
+            _log_sms("sent", telnyx_id=_tid)
+        except Exception as _tex:
+            log.error('"send_ace_alert_sms: telnyx send failed: %s"', _tex, exc_info=True)
+            _log_sms("error", telnyx_err=str(_tex))
+            return False
+
+        _stamp_sent()
+        log.info('"send_ace_alert_sms: SMS sent to=%s order=%s"', carrier_phone, order_no)
+        return True
+
+    except Exception as exc:
+        log.error('"send_ace_alert_sms failed: %s"', exc, exc_info=True)
         return False
 
 
@@ -1790,6 +2248,9 @@ def load_board_matches_carrier(parsed: dict, carrier: dict) -> bool:
 
 
 def send_load_board_sms(email_data: dict, parsed: dict, board_name: str) -> None:
+    if sms_kill_switch_active():
+        log.warning('"send_load_board_sms: PLATFORM SMS KILL SWITCH ACTIVE -- suppressed"')
+        return
     origin = parsed.get("origin") or "?"
     destination = parsed.get("destination") or "?"
     mileage = parsed.get("mileage")
@@ -3101,7 +3562,6 @@ def oauth_gmail_callback():
 
     supabase_client().table("carriers").update({
         "gmail_token": refresh_token,
-        "ace_status":  "pending",
     }).eq("id", carrier_id).execute()
 
     log.info('"oauth_gmail_callback — connected carrier_id=%s"', carrier_id)
@@ -3207,6 +3667,23 @@ def stripe_webhook():
     return jsonify({"status": "ok"})
 
 
+# ACE decision taxonomy (founder spec):
+#   TOKEN ACTIONS — consume the 3-token surface for the load:
+#     pass  -> load passed (server increments pass_count)
+#     bid   -> bid email sent to broker
+#     draft -> bid staged in carrier Gmail; finished/sent from the mail app
+#              (outside this ecosystem). A draft IS a bid; nothing further valid.
+#   TRACKING ACTIONS — voluntary post-bid selections in the dashboard "Bid Sent"
+#   section, on a row that was ALREADY bid + consumed. Decision-only; they never
+#   touch the token surface or pass_count and ARE allowed on a consumed row:
+#     win     -> user marks the bid as won (ace_load_wins owned by dashboard)
+#     deleted -> bid was NOT won; removed from the Bid Sent section
+#   NON-ACTIONS:
+#     null  -> detection-time write, no decision yet; tokens stay live
+_ACE_TOKEN_ACTIONS = {'pass', 'bid', 'draft'}
+_ACE_TRACKING_ACTIONS = {'win', 'deleted'}
+
+
 @app.route('/log-sylectus-activity', methods=['POST'])
 def log_sylectus_activity():
     try:
@@ -3216,9 +3693,16 @@ def log_sylectus_activity():
         carrier_id = data.get('carrier_id')
         if not carrier_id:
             return jsonify({'error': 'Missing carrier_id'}), 400
+        order_no = data.get('order_no')
+        decision = data.get('decision')
+
+        # DETAIL / METRIC fields only. pass_count and the consume surface
+        # (consumed / consumed_at / consumed_token / stage) are SERVER-OWNED and
+        # are NEVER read from the client: the extension's local pass_count is
+        # stale and was overwriting SB (e.g. clobbering an SMS-set 1 back to 0).
         payload = {
             'carrier_id':           carrier_id,
-            'order_no':             data.get('order_no'),
+            'order_no':             order_no,
             'broker_name':          data.get('broker_name'),
             'broker_email':         data.get('broker_email'),
             'pickup_city':          data.get('pickup_city'),
@@ -3229,8 +3713,7 @@ def log_sylectus_activity():
             'load_type':            data.get('load_type'),
             'suggested_rate':       data.get('suggested_rate'),
             'bid_amount':           data.get('bid_amount'),
-            'decision':             data.get('decision'),
-            'pass_count':           data.get('pass_count', 0),
+            'decision':             decision,
             't1_posted_at':         data.get('t1_posted_at'),
             't2_detected_at':       data.get('t2_detected_at'),
             't3_alerted_at':        data.get('t3_alerted_at'),
@@ -3241,10 +3724,61 @@ def log_sylectus_activity():
             'alert_speed_sec':      data.get('alert_speed_sec'),
             'response_time_sec':    data.get('response_time_sec'),
             'bid_speed_sec':        data.get('bid_speed_sec'),
-            'performance_tier':     data.get('performance_tier')
+            'performance_tier':     data.get('performance_tier'),
+            'ref_no':               data.get('ref_no'),
+            'pickup_date':          data.get('pickup_date'),
+            'delivery_date':        data.get('delivery_date'),
+            'post_date':            data.get('post_date'),
+            'expiry_date':          data.get('expiry_date'),
+            'vehicle_size':         data.get('vehicle_size'),
+            'pieces':               data.get('pieces'),
+            'weight':               data.get('weight'),
+            'pickup_zip':           data.get('pickup_zip'),
+            'delivery_zip':         data.get('delivery_zip')
         }
         payload = {k: v for k, v in payload.items() if v is not None}
+
         sb = supabase_client()
+
+        # Read current server state for this load: consume guard + pass_count base.
+        existing = None
+        if order_no is not None:
+            _ex = (sb.table('ace_sylectus_activity')
+                   .select('id, consumed, consumed_at, pass_count, decision')
+                   .eq('carrier_id', carrier_id)
+                   .eq('order_no', order_no)
+                   .limit(1).execute().data or [])
+            existing = _ex[0] if _ex else None
+
+        already_consumed = bool(existing and existing.get('consumed_at'))
+
+        if decision in _ACE_TRACKING_ACTIONS:
+            # WIN / DELETE: post-bid dashboard disposition. The load was already
+            # bid + consumed; update the disposition for tracking ONLY. Never
+            # touch the token surface or pass_count, and ALLOW through even on a
+            # consumed row (bid -> win / bid -> deleted).
+            # ace_load_wins is NOT written here — dashboard owns it (UNVERIFIED).
+            payload['decision'] = decision
+        elif already_consumed:
+            # CLOBBER GUARD: a token action (pass/bid/draft) arriving on an
+            # already-consumed row = stale/duplicate (re-pass, re-bid). Freeze:
+            # no decision downgrade, no pass_count reset, no re-consume.
+            payload.pop('decision', None)
+        elif decision in _ACE_TOKEN_ACTIONS:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            payload['consumed'] = True
+            payload['consumed_at'] = now_iso
+            payload['consumed_token'] = 'DT'   # provenance: local desktop action
+            if decision == 'pass':
+                prev = (existing.get('pass_count') or 0) if existing else 0
+                payload['pass_count'] = prev + 1
+                payload['stage'] = 'passed'
+            elif decision == 'bid':
+                payload['stage'] = 'bid_sent'
+            elif decision == 'draft':
+                payload['stage'] = 'drafted'
+        # null: plain upsert (detection-time), tokens stay live, pass_count untouched
+
         result = sb.table('ace_sylectus_activity').upsert(
             payload,
             on_conflict='carrier_id,order_no'
@@ -3307,7 +3841,7 @@ def validate_carrier():
             return jsonify({'active': False, 'reason': 'missing_uuid'}), 400
 
         result = supabase_client().table('carriers') \
-            .select('id, status, subscription_status, tier, secondary_email, email, name, email_signature') \
+            .select('id, subscription_status, subscription_tier, secondary_email, email, name, email_signature') \
             .eq('id', uuid) \
             .execute()
 
@@ -3315,15 +3849,12 @@ def validate_carrier():
             return jsonify({'active': False, 'reason': 'not_found'}), 200
 
         carrier = result.data[0]
-        is_active = (
-            carrier.get('status') == 'active' and
-            carrier.get('subscription_status') == 'active'
-        )
+        is_active = (carrier.get('subscription_status') == 'active')
 
         return jsonify({
             'active':           is_active,
             'reason':           'active' if is_active else 'inactive',
-            'tier':             carrier.get('tier'),
+            'tier':             carrier.get('subscription_tier'),
             'secondary_email':  carrier.get('secondary_email'),
             'email':            carrier.get('email'),
             'carrier_name':     carrier.get('name'),
@@ -3530,6 +4061,289 @@ def load_info():
         return jsonify({"error": "internal"}), 500
 
 
+@app.route("/ace-alert", methods=["POST"])
+def ace_alert():
+    """P2 - ACE ALERT trigger. Feeder (DT extension / VM) POSTs a detection-time
+    pre-qualified Sylectus load; mint the 3 action tokens and fire the ACE ALERT SMS.
+    Body: carrier_id, order_no, broker_name, broker_email, pickup_city, pickup_state,
+    delivery_city, delivery_state, miles, load_type, suggested_rate.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data"}), 400
+        if not data.get("carrier_id") or not data.get("order_no"):
+            return jsonify({"error": "Missing carrier_id or order_no"}), 400
+        ok = send_ace_alert_sms(data)
+        return jsonify({"status": "ok" if ok else "error"}), (200 if ok else 500)
+    except Exception as e:
+        logging.error(f"[ace-alert] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/ace-load-info", methods=["GET"])
+def ace_load_info():
+    """P3 - read endpoint the ACE pages call to render the load card.
+    Resolves any of the 3 ACE tokens against ace_sylectus_activity. Does NOT
+    gate on expiry (mirrors /load-info); returns the action the token maps to.
+    """
+    token = (request.args.get("t") or "").strip()
+    if not token or len(token) > 16 or "/" in token or "." in token:
+        return jsonify({"error": "invalid token"}), 400
+    try:
+        res = supabase_service_client().table("ace_sylectus_activity").select(
+            "order_no,broker_name,broker_email,pickup_city,pickup_state,pickup_zip,"
+            "delivery_city,delivery_state,delivery_zip,miles,load_type,suggested_rate,"
+            "ref_no,pickup_date,delivery_date,post_date,expiry_date,vehicle_size,pieces,weight,"
+            "send_bid_token,draft_bid_token,pass_token,stage,consumed,consumed_at,expires_at"
+        ).or_(
+            f"send_bid_token.eq.{token},draft_bid_token.eq.{token},pass_token.eq.{token}"
+        ).limit(1).execute()
+        rows = res.data or []
+        if not rows:
+            return jsonify({"error": "not found"}), 404
+        row = rows[0]
+        if token == row.get("send_bid_token"):
+            row["action"] = "send_bid"
+        elif token == row.get("draft_bid_token"):
+            row["action"] = "draft_bid"
+        elif token == row.get("pass_token"):
+            row["action"] = "pass"
+        # do not expose sibling tokens to the page
+        for k in ("send_bid_token", "draft_bid_token", "pass_token"):
+            row.pop(k, None)
+        return jsonify(row), 200
+    except Exception as exc:
+        log.error('"ace_load_info: lookup failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal"}), 500
+
+
+@app.route("/ace-pass", methods=["POST"])
+def ace_pass():
+    """P3 - PASS action. Resolves pass_token, logs the pass (decision + pass_count),
+    consumes the token. No broker email (founder determination: PASS = no response).
+    """
+    try:
+        data = request.get_json() or {}
+        token = (data.get("t") or "").strip()
+        if not token or len(token) > 16:
+            return jsonify({"error": "invalid token"}), 400
+        sb = supabase_service_client()
+        res = sb.table("ace_sylectus_activity").select(
+            "id, pass_token, consumed_at, pass_count"
+        ).eq("pass_token", token).limit(1).execute()
+        rows = res.data or []
+        if not rows:
+            return jsonify({"error": "not found"}), 404
+        row = rows[0]
+        if row.get("consumed_at"):
+            return jsonify({"status": "already-actioned"}), 200
+        sb.table("ace_sylectus_activity").update({
+            "decision": "pass",
+            "pass_count": (row.get("pass_count") or 0) + 1,
+            "stage": "passed",
+            "consumed": True,
+            "consumed_token": token,
+            "consumed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", row["id"]).execute()
+        return jsonify({"status": "passed"}), 200
+    except Exception as exc:
+        log.error('"ace_pass failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal"}), 500
+
+
+@app.route("/ace-check-consumed", methods=["POST"])
+def ace_check_consumed():
+    """Pre-action guard for the extension (and future VM). The DT popup / VM
+    calls this BEFORE sending a bid, staging a draft, or passing locally, so it
+    gets the same instant "already actioned" answer an SMS tap gets from the
+    token endpoints — closing the SMS-first -> DT-second double-send window.
+
+    Body: {"carrier_id": <uuid>, "order_no": <text>}
+    Returns 200 with:
+      {"consumed": true,  "decision": <str|null>, "consumed_token": <str|null>,
+       "consumed_at": <iso|null>, "message": "Action already taken"}
+      {"consumed": false, "decision": <str|null>}   # clear to act
+    A missing row -> consumed=false (nothing actioned yet; safe to proceed).
+    """
+    try:
+        data = request.get_json() or {}
+        carrier_id = (data.get("carrier_id") or "").strip()
+        order_no = data.get("order_no")
+        if order_no is not None:
+            order_no = str(order_no).strip()
+        if not carrier_id or not order_no:
+            return jsonify({"error": "carrier_id and order_no required"}), 400
+        sb = supabase_service_client()
+        rows = (sb.table("ace_sylectus_activity")
+                .select("consumed, consumed_at, consumed_token, decision")
+                .eq("carrier_id", carrier_id)
+                .eq("order_no", order_no)
+                .limit(1).execute().data or [])
+        if not rows:
+            return jsonify({"consumed": False, "decision": None}), 200
+        row = rows[0]
+        is_consumed = bool(row.get("consumed_at"))
+        resp = {
+            "consumed": is_consumed,
+            "decision": row.get("decision"),
+        }
+        if is_consumed:
+            resp["consumed_token"] = row.get("consumed_token")
+            resp["consumed_at"] = row.get("consumed_at")
+            resp["message"] = "Action already taken"
+        return jsonify(resp), 200
+    except Exception as exc:
+        log.error('"ace_check_consumed failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal"}), 500
+
+
+def _build_ace_load_table(load: dict) -> str:
+    """Byte-for-byte port of DT extension _buildLoadTable (background.js)."""
+    post_parts = (load.get("post_date") or "").split(" ")
+    expiry_parts = (load.get("expiry_date") or "").split(" ")
+    post_str = f"{post_parts[0]}<br>{post_parts[1]}" if len(post_parts) > 1 else (load.get("post_date") or "")
+    expiry_str = f"{expiry_parts[0]}<br>{expiry_parts[1]}" if len(expiry_parts) > 1 else (load.get("expiry_date") or "")
+    g = lambda k: load.get(k) or ""
+    return (
+        "\n<table style=\"font-family:verdana,arial,sans-serif;font-size:13px;color:#000;border-collapse:collapse;background:transparent;display:inline-table;\">\n"
+        "  <tr>\n"
+        f"    <td style=\"padding:2px 4px;vertical-align:top;border:1px solid #d0d0d0;\"><br>{g('load_type')}<br>{g('ref_no')}</td>\n"
+        f"    <td style=\"padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;\"><br><span style=\"color:#cc0000;text-decoration:underline;\">{g('order_no')}</span></td>\n"
+        f"    <td style=\"padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;\">{g('pickup_city')},{g('pickup_state')}<br>{g('pickup_zip')}<br>{g('pickup_date')}</td>\n"
+        f"    <td style=\"padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;\">{g('delivery_city')},{g('delivery_state')}<br>{g('delivery_zip')}<br>{g('delivery_date')}</td>\n"
+        f"    <td style=\"padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;\">{post_str}<br>{expiry_str}</td>\n"
+        f"    <td style=\"padding:2px 4px;vertical-align:top;text-align:left;border:1px solid #d0d0d0;\"><br>{g('vehicle_size')}<br>{g('miles')}</td>\n"
+        f"    <td style=\"padding:2px 4px;vertical-align:top;text-align:right;border:1px solid #d0d0d0;\"><br>{g('pieces')}<br>{g('weight')}</td>\n"
+        "  </tr>\n"
+        "</table>"
+    )
+
+
+def _build_ace_bid_email(row: dict, carrier: dict, settings: dict, bid_amount):
+    """Byte-for-byte port of DT _sendBidEmail subject+body. Signature from
+    carriers.email_signature (canonical), NOT the stale Gmail sendAs path."""
+    pc, ps = row.get("pickup_city") or "", row.get("pickup_state") or ""
+    dc, ds = row.get("delivery_city") or "", row.get("delivery_state") or ""
+    subject = f"{pc},{ps} to {dc},{ds} - Bid ${bid_amount}"
+    mc_number = settings.get("mc_number") or ""
+    cname = carrier.get("name") or ""
+    first_name = settings.get("bid_contact_name") or (cname.split(" ")[0] if cname else "")
+    sig = (carrier.get("email_signature") or "").replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>")
+    load_table = _build_ace_load_table(row)
+    sig_html = f'<div style="margin-top:12px;">{sig}</div>' if sig else ""
+    body = (
+        '<div style="font-family:verdana,arial,sans-serif;font-size:13px;color:#000;">\n'
+        f'<p>Hey there, this is {first_name}..interested in this load. Thx!</p>\n'
+        f'<p><strong>QUOTE: ${bid_amount}</strong><br>MC {mc_number}</p>\n'
+        f'{load_table}\n'
+        f'{sig_html}\n'
+        '</div>'
+    )
+    return subject, body
+
+
+def _ace_execute_bid(token: str, token_col: str, bid_amount, mode: str):
+    """Resolve an ACE bid token on ace_sylectus_activity, build the bid email, and
+    either SEND it from the carrier's Gmail or stage a DRAFT. Consumes the token
+    (first-wins). mode: 'send' | 'draft'. Returns (dict, http_code).
+
+    Token lookup matches the BID FAMILY (send_bid_token OR draft_bid_token) rather
+    than a single column. Required by single-link SMS, where ONE token backs both
+    actions on the combined landing page: /ace-draft-bid previously matched only
+    draft_bid_token and would 404 on a send_bid_token. The ACTION is determined by
+    which endpoint was called (mode), NOT by which token was presented — the token
+    only ever identified the row.
+
+    pass_token is DELIBERATELY EXCLUDED from the OR: a pass token can never execute
+    a bid. No new capability — anyone holding a valid bid token for a row could
+    already trigger a bid on that row. Legacy 2-link taps are unaffected.
+
+    token_col is retained for signature back-compat and is now inert.
+    """
+    sb = supabase_service_client()
+    res = (sb.table("ace_sylectus_activity").select("*")
+           .or_(f"send_bid_token.eq.{token},draft_bid_token.eq.{token}")
+           .limit(1).execute())
+    rows = res.data or []
+    if not rows:
+        return {"error": "not found"}, 404
+    row = rows[0]
+    if row.get("consumed_at"):
+        return {"status": "already-actioned"}, 200
+    exp = row.get("expires_at")
+    if exp:
+        try:
+            if datetime.now(timezone.utc) > datetime.fromisoformat(exp.replace("Z", "+00:00")):
+                return {"status": "expired"}, 410
+        except Exception:
+            pass
+    if not row.get("broker_email"):
+        return {"error": "no broker_email on load"}, 422
+    carrier_id = row.get("carrier_id")
+    c_list = (sb.table("carriers").select("id, name, email_signature, gmail_token")
+              .eq("id", carrier_id).limit(1).execute().data or [])
+    carrier = c_list[0] if c_list else None
+    if not carrier or not carrier.get("gmail_token"):
+        return {"error": "carrier gmail not connected"}, 422
+    s_list = (sb.table("ace_syl_settings").select("bid_contact_name, mc_number")
+              .eq("carrier_id", carrier_id).limit(1).execute().data or [])
+    settings = s_list[0] if s_list else {}
+    amount = bid_amount if bid_amount not in (None, "") else row.get("suggested_rate")
+    amount = _parse_rate_numeric(amount)
+    if amount is not None and amount == int(amount):
+        amount = int(amount)
+    subject, body = _build_ace_bid_email(row, carrier, settings, amount)
+    mime = (f"To: {row['broker_email']}\r\nSubject: {subject}\r\n"
+            "MIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n" + body)
+    raw = base64.urlsafe_b64encode(mime.encode("utf-8")).decode().rstrip("=")
+    service = gmail_service(carrier["gmail_token"])
+    now = datetime.now(timezone.utc).isoformat()
+    if mode == "send":
+        service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        sb.table("ace_sylectus_activity").update({
+            "decision": "bid", "bid_amount": amount, "stage": "bid_sent",
+            "consumed": True, "consumed_token": token, "consumed_at": now,
+        }).eq("id", row["id"]).execute()
+        return {"status": "bid_sent", "amount": amount}, 200
+    service.users().drafts().create(userId="me", body={"message": {"raw": raw}}).execute()
+    sb.table("ace_sylectus_activity").update({
+        "decision": "draft", "bid_amount": amount, "stage": "drafted",
+        "consumed": True, "consumed_token": token, "consumed_at": now,
+    }).eq("id", row["id"]).execute()
+    return {"status": "drafted", "amount": amount}, 200
+
+
+@app.route("/ace-send-bid", methods=["POST"])
+def ace_send_bid():
+    """P3 - SEND BID. Sends the bid email from the carrier's Gmail to the broker."""
+    try:
+        data = request.get_json() or {}
+        token = (data.get("t") or "").strip()
+        if not token or len(token) > 16:
+            return jsonify({"error": "invalid token"}), 400
+        result, code = _ace_execute_bid(token, "send_bid_token", data.get("bid_amount"), "send")
+        return jsonify(result), code
+    except Exception as exc:
+        log.error('"ace_send_bid failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal"}), 500
+
+
+@app.route("/ace-draft-bid", methods=["POST"])
+def ace_draft_bid():
+    """P3 - DRAFT BID. Stages the same bid email as a Gmail draft (no send)."""
+    try:
+        data = request.get_json() or {}
+        token = (data.get("t") or "").strip()
+        if not token or len(token) > 16:
+            return jsonify({"error": "invalid token"}), 400
+        result, code = _ace_execute_bid(token, "draft_bid_token", data.get("bid_amount"), "draft")
+        return jsonify(result), code
+    except Exception as exc:
+        log.error('"ace_draft_bid failed: %s"', exc, exc_info=True)
+        return jsonify({"error": "internal"}), 500
+
+
 @app.route("/rebid-submit", methods=["POST"])
 def rebid_submit():
     """POST endpoint called by the Vercel rebid.html SEND COUNTER button.
@@ -3655,18 +4469,87 @@ def expiry_sweep():
 
 @app.route("/telnyx-webhook", methods=["POST"])
 def telnyx_webhook():
-    """Placeholder for Telnyx delivery receipts and inbound SMS callbacks.
-    Telnyx Console is configured to POST here. We log the payload type and
-    return 200 to stop the retry storm. Full handling (delivery state to
-    edge_load_activity, inbound SMS reply parsing) is future scope.
+    """Single Telnyx webhook for the shared 10DLC messaging profile (EDGE + ACE).
+    Branches on event_type:
+      message.finalized  -> delivery receipt (DLR) -> update sms_log delivery state
+      message.received   -> inbound SMS -> EDGE reply handling (future; logged + 200)
+      other/unknown      -> logged + 200
+    Idempotent and always 200 (Telnyx retries non-2xx; multiple status events per
+    message are expected). Ed25519 signature verified when TELNYX_PUBLIC_KEY is set.
     """
+    raw = request.get_data()  # exact bytes for signature verification
+
+    # --- Ed25519 signature verification (reject spoofed/unsigned) ---
+    pub_key = os.environ.get("TELNYX_PUBLIC_KEY", "")
+    if pub_key:
+        sig = request.headers.get("telnyx-signature-ed25519", "")
+        ts = request.headers.get("telnyx-timestamp", "")
+        if not sig or not ts:
+            return jsonify({"error": "missing signature headers"}), 403
+        try:
+            from nacl.signing import VerifyKey
+            from nacl.encoding import Base64Encoder
+            signed = ts.encode("utf-8") + b"|" + raw
+            VerifyKey(pub_key.encode("utf-8"), encoder=Base64Encoder).verify(
+                signed, base64.b64decode(sig)
+            )
+        except Exception as exc:
+            log.warning('"telnyx_webhook: signature verify failed: %s"', exc)
+            return jsonify({"error": "bad signature"}), 403
+
     try:
-        payload = request.get_json(force=True, silent=True) or {}
-        event_type = payload.get("data", {}).get("event_type", "unknown")
-        log.info('"telnyx_webhook: received event_type=%s"', event_type)
+        body = request.get_json(force=True, silent=True) or {}
+        data = body.get("data") or {}
+        event_type = data.get("event_type", "unknown")
+        payload = data.get("payload") or {}
+
+        # ---- DLR: delivery receipt ----
+        if event_type in ("message.finalized", "message.sent", "message.failed"):
+            msg_id = payload.get("id")
+            if not msg_id:
+                return jsonify({"status": "ignored", "reason": "no message id"}), 200
+            to_list = payload.get("to") or []
+            dlr_status = (to_list[0].get("status") if to_list else None) or payload.get("status")
+            terminal = {
+                "delivered": "delivered",
+                "delivery_failed": "failed",
+                "failed": "failed",
+                "sending_failed": "failed",
+                "expired": "failed",
+            }
+            mapped = terminal.get((dlr_status or "").lower())
+            if not mapped:
+                # non-terminal (queued/sending/sent) — don't downgrade an existing row
+                return jsonify({"status": "ignored", "reason": f"non-terminal:{dlr_status}"}), 200
+            errs = payload.get("errors") or []
+            err_txt = None
+            if errs:
+                e0 = errs[0]
+                err_txt = f"{e0.get('code','')}:{e0.get('title','') or e0.get('detail','')}".strip(":")
+            completed = payload.get("completed_at") or payload.get("received_at")
+            upd = {"status": mapped, "telnyx_error": err_txt}
+            if mapped == "delivered":
+                upd["delivered_at"] = completed
+            sb = supabase_service_client()
+            res = (sb.table("sms_log").update(upd)
+                   .eq("telnyx_message_id", msg_id).execute())
+            log.info('"telnyx_webhook DLR: msg=%s -> %s (matched %s)"',
+                     msg_id, mapped, len(res.data or []))
+            return jsonify({"status": "ok", "matched": len(res.data or [])}), 200
+
+        # ---- Inbound SMS: EDGE reply flow (future scope) ----
+        if event_type == "message.received":
+            frm = payload.get("from", {}).get("phone_number") if isinstance(payload.get("from"), dict) else payload.get("from")
+            text = payload.get("text", "")
+            log.info('"telnyx_webhook INBOUND: from=%s text=%s (no handler yet)"',
+                     frm, (text or "")[:40])
+            # TODO: route to EDGE inbound reply handling when built
+            return jsonify({"status": "received", "handled": False}), 200
+
+        log.info('"telnyx_webhook: unhandled event_type=%s"', event_type)
         return jsonify({"status": "received"}), 200
     except Exception as exc:
-        log.error('"telnyx_webhook handler failed: %s"', exc)
+        log.error('"telnyx_webhook handler failed: %s"', exc, exc_info=True)
         return jsonify({"status": "received"}), 200  # always 200 to stop retries
 
 
